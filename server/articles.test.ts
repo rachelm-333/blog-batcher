@@ -180,11 +180,29 @@ describe("16-point Authority Standard in generation prompt", () => {
 
   it("Prompt includes primary keyword density rule (point 1)", () => {
     expect(prompt).toContain("PRIMARY KEYWORD DENSITY");
-    expect(prompt).toContain("Minimum 4 mentions");
+    // Updated: minimum 5 mentions, density 0.5%–2.5%
+    expect(prompt).toContain("MINIMUM of 5 times");
+    expect(prompt).toContain("0.5%–2.5%");
+  });
+
+  it("Prompt instructs to count keyword appearances and enforce density before finalising", () => {
+    expect(prompt).toContain("count keyword appearances");
+    expect(prompt).toContain("density is below 0.5%");
   });
 
   it("Prompt includes keyword in H1 rule (point 2)", () => {
     expect(prompt).toContain("KEYWORD IN H1");
+  });
+
+  it("Prompt requires keyword in H2 (not just H3) — point 3 is mandatory", () => {
+    expect(prompt).toContain("KEYWORD IN H2");
+    expect(prompt).toContain("AT LEAST ONE <h2> heading");
+    expect(prompt).toContain("mandatory");
+  });
+
+  it("Prompt instructs keyword in opening sentence / first 50 words — point 5", () => {
+    expect(prompt).toContain("OPENING SENTENCE");
+    expect(prompt).toContain("first 50 words");
   });
 
   it("Prompt includes meta title rule with 60 char limit (point 7)", () => {
@@ -200,10 +218,16 @@ describe("16-point Authority Standard in generation prompt", () => {
   it("Prompt includes opening answer block / Featured Snippet rule (point 9)", () => {
     expect(prompt).toContain("OPENING ANSWER BLOCK");
     expect(prompt).toContain("Featured Snippet");
+    // Updated: must instruct bold question format
+    expect(prompt).toContain("<strong>");
   });
 
-  it("Prompt includes external authority link rule (point 10)", () => {
+  it("Prompt includes external authority link rule (point 10) with real-source requirement", () => {
     expect(prompt).toContain("EXTERNAL AUTHORITY LINK");
+    // Updated: must specify real sources (.gov.au, industry body, etc.)
+    expect(prompt).toContain(".gov.au");
+    expect(prompt).toContain("industry body");
+    expect(prompt).toContain("genuine");
   });
 
   it("Prompt includes internal CTA link rule (point 11)", () => {
@@ -458,6 +482,95 @@ describe("Pass 1 scorer — rules-based", () => {
   it("p10_external_link passes when externalLinkPresent is true", () => {
     const result = runPass1Scorer(makePass1Params({ externalLinkPresent: true }));
     expect(result.points.p10_external_link).toBe(true);
+  });
+
+  it("p10_external_link passes when bodyHtml contains a real external href (even if flag is false)", () => {
+    const result = runPass1Scorer(makePass1Params({
+      externalLinkPresent: false,
+      bodyHtml: `<p>emergency plumber sydney is available 24/7. emergency plumber sydney team. emergency plumber sydney experts. emergency plumber sydney pros. emergency plumber sydney now.</p><h2>Emergency Plumber Sydney Services</h2><a href="https://plumbingaustralia.com.au">Plumbing Industry Authority</a><a href="https://acmeplumbing.com.au/book">Book a Plumber</a>`,
+    }));
+    expect(result.points.p10_external_link).toBe(true);
+  });
+
+  it("p10_external_link fails when no external href is present and flag is false", () => {
+    const result = runPass1Scorer(makePass1Params({
+      externalLinkPresent: false,
+      bodyHtml: `<p>emergency plumber sydney is available 24/7. emergency plumber sydney team. emergency plumber sydney experts. emergency plumber sydney pros. emergency plumber sydney now.</p><h2>Emergency Plumber Sydney Services</h2><a href="/book">Book a Plumber</a>`,
+    }));
+    expect(result.points.p10_external_link).toBe(false);
+  });
+
+  it("p1_keyword_density passes with 5+ mentions and 0.5%–2.5% density", () => {
+    // 5 mentions in ~200 words = 2.5% density
+    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney Services</h2><p>Our emergency plumber sydney team arrives fast. Call emergency plumber sydney now. Best emergency plumber sydney.</p>`;
+    const result = runPass1Scorer(makePass1Params({
+      bodyHtml: body,
+      wordCount: 200,
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    expect(result.points.p1_keyword_density).toBe(true);
+  });
+
+  it("p1_keyword_density fails with fewer than 5 mentions", () => {
+    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Our Services</h2><p>We help you fast.</p>`;
+    const result = runPass1Scorer(makePass1Params({
+      bodyHtml: body,
+      wordCount: 200,
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    expect(result.points.p1_keyword_density).toBe(false);
+  });
+
+  it("p6_keyword_in_slug passes when keyword words appear in order in slug (non-adjacent)", () => {
+    // "pool installation cost sydney" words all appear in order in "pool-installation-cost-myths-sydney"
+    const result = runPass1Scorer(makePass1Params({
+      urlSlug: "pool-installation-cost-myths-sydney",
+      primaryKeyword: "pool installation cost sydney",
+    }));
+    expect(result.points.p6_keyword_in_slug).toBe(true);
+  });
+
+  it("p6_keyword_in_slug passes with exact adjacent match", () => {
+    const result = runPass1Scorer(makePass1Params({
+      urlSlug: "emergency-plumber-sydney",
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    expect(result.points.p6_keyword_in_slug).toBe(true);
+  });
+
+  it("p6_keyword_in_slug fails when a keyword word is missing from slug", () => {
+    const result = runPass1Scorer(makePass1Params({
+      urlSlug: "plumber-guide-sydney",
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    expect(result.points.p6_keyword_in_slug).toBe(false);
+  });
+
+  it("p9_opening_answer passes when bodyHtml has a bold question in first 600 chars", () => {
+    const body = `<p><strong>How much does pool installation cost in Sydney?</strong> Installing a pool in Sydney typically costs between $45,000 and $100,000 depending on size and materials.</p><h2>Pool Installation Cost Sydney Myths</h2><p>More content here.</p>`;
+    const result = runPass1Scorer(makePass1Params({
+      bodyHtml: body,
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    expect(result.points.p9_opening_answer).toBe(true);
+  });
+
+  it("p9_opening_answer passes when bodyHtml starts with a question paragraph", () => {
+    const body = `<p>How quickly can an emergency plumber sydney arrive?</p><p>Our team arrives within 30 minutes.</p><h2>Emergency Plumber Sydney Services</h2>`;
+    const result = runPass1Scorer(makePass1Params({
+      bodyHtml: body,
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    expect(result.points.p9_opening_answer).toBe(true);
+  });
+
+  it("p5_keyword_first_100 passes when keyword appears within first 50 words", () => {
+    const body = `<p>emergency plumber sydney is available 24 hours a day. When you need fast help, our team is ready.</p><h2>Services</h2><p>More content.</p>`;
+    const result = runPass1Scorer(makePass1Params({
+      bodyHtml: body,
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    expect(result.points.p5_keyword_first_100).toBe(true);
   });
 
   it("p11_internal_cta passes when internalCtaLinkPresent is true", () => {

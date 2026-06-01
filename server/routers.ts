@@ -5,6 +5,7 @@ import { authRouter } from "./routers/auth";
 import { businessRouter } from "./routers/business";
 import { keywordsRouter } from "./routers/keywords";
 import { articlesRouter } from "./routers/articles";
+import { scheduleRouter } from "./routers/schedule";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -33,6 +34,11 @@ export const appRouter = router({
   // Batch generation, progress polling, single article view, regenerate.
   // All procedures live in server/routers/articles.ts
   articles: articlesRouter,
+
+  // ─── Layer 7: Stage 5 — Review, Approve, Publish & Schedule ─────────────
+  // Publishing schedule management: save cadence, get dates, confirm.
+  // All procedures live in server/routers/schedule.ts
+  schedule: scheduleRouter,
 
   // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
   // Layer 3 (Stripe) will be wired here once Auth is fully verified.

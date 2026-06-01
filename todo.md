@@ -201,24 +201,47 @@
 ### Tests
 - [x] Vitest: articleEngine slug generation, generation order, word count enforcement, Pass 1 scorer (all 16 rules), status badge thresholds, scrub pass (banned phrase removal) — 65/65 pass
 
-## Layer 7: Stage 5 — Review
-- [ ] Article review UI (left panel: article body, right panel: SEO fields)
-- [ ] Inline editing of article body
-- [ ] Technical SEO fields (slug, meta title, meta description, schema, FAQ)
-- [ ] Image section (URL or upload)
-- [ ] Approval flow
+## Layer 7: Stage 5 — Review, Edit, Approve, Publish & Schedule
 
-## Layer 8: Stage 5 — Publish
-- [ ] WordPress CMS connection (REST API + Application Password)
-- [ ] Wix, Shopify, Webflow, Squarespace, Ghost connections
-- [ ] Zapier webhook integration
-- [ ] Export ZIP package
-- [ ] Publish failure handling and notifications
+### Backend Procedures (articles router extensions)
+- [x] articles.updateSeoFields — save edits to urlSlug, metaTitle, metaDescription, focusKeyword, schemaMarkup, faqItems
+- [x] articles.approve — advance status to approved, set approvedAt
+- [x] articles.approveAll — approve all generated articles for a business in one call
+- [x] articles.saveImage — save image URL or upload to S3, store in article_images, auto-generate alt text
+- [x] articles.exportZip — generate ZIP with HTML, Markdown, meta .txt, schema JSON-LD, schedule CSV
+- [x] schedule.save — save publishing cadence + startDate for a business
+- [x] schedule.get — return current schedule with calculated publish dates per article
+- [x] schedule.confirm — lock schedule, set scheduledPublishAt on each article, advance business to stage 5
 
-## Layer 9: Stage 5 — Schedule
-- [ ] Publishing calendar UI
-- [ ] Cadence selector (daily, every 2/3 days, weekly, twice weekly)
-- [ ] Send articles to CMS as drafts with scheduled publish dates
+### Frontend Pages
+- [x] /review route — Stage 5 Review & Publish page (auth-guarded, redirects to /generate if stage < 5)
+- [x] Left panel: article list sidebar (Cornerstone/Pillar/Cluster labels, status badges matching mockup)
+- [x] Right panel: article body (rendered HTML, Position Zero Answer Block highlighted, inline edit)
+- [x] SEO panel: URL Slug, Meta Title (char counter), Meta Description (char counter), Focus Keyword, Image upload/URL, Schema (advanced)
+- [x] Score badge: Authority Ready / Strong / Needs Review with correct colours
+- [x] Warning box: "Over-editing keyword placement can reduce your ranking potential. We recommend publishing as-is."
+- [x] Save Draft button and Approve & Publish → button
+- [x] Regenerate button (only before approval)
+- [x] Publish & Schedule screen: Publishing Method cards (Wix, WordPress, Zapier, Export ZIP)
+- [x] Publish As: Scheduled / Drafts toggle
+- [x] Publishing Cadence selector (Daily / 2 days / 3 days / 1/week / 2/week)
+- [x] Publishing Calendar Preview (month view with article titles on publish dates)
+- [x] Send All to CMS & Schedule → button
+- [x] Export ZIP download (HTML + Markdown + meta .txt + schema JSON-LD + schedule CSV)
+- [x] Dashboard Stage 5 'Continue' button links to /review
+
+### Verification
+- [x] All articles must be approved before publish options unlock
+- [x] Regenerate locked after approval
+- [x] Export ZIP contains all required files
+- [x] Schedule cadence correctly distributes articles across dates
+- [x] Status badges display correctly in article list
+- [x] Vitest: SEO field validation, schedule date calculation, ZIP contents, approval gate — 37/37 pass
+- [ ] Integration test: articles.saveImage persists to article_images with alt text
+- [ ] Integration test: real ZIP produced by exportZip endpoint verified for all required files
+- [ ] Route-level test: /review auth guard and stage<5 redirect verified
+- [ ] Real UI gate test: publish options locked until all approved (currently unit-tested only)
+- [ ] Real UI gate test: regenerate blocked after approval (currently unit-tested only)
 
 ## Layer 10: Dashboard
 - [ ] Status badges per article

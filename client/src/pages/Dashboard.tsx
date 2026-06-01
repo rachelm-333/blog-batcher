@@ -139,6 +139,7 @@ export default function Dashboard() {
                         else if (stage.id === 2) navigate("/architecture");
                         else if (stage.id === 3) navigate("/keywords");
                         else if (stage.id === 4) navigate("/generate");
+                        else if (stage.id === 5) navigate("/review");
                         else toast.info("Coming soon", { description: `Stage ${stage.id}: ${stage.label} is not yet available.` });
                       }}
                       className="shrink-0"

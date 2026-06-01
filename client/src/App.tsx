@@ -8,6 +8,8 @@ import Architecture from "./pages/Architecture";
 import Dashboard from "./pages/Dashboard";
 import Keywords from "./pages/Keywords";
 import ArticleGeneration from "./pages/ArticleGeneration";
+import ArticleReview from "./pages/ArticleReview";
+import PublishSchedule from "./pages/PublishSchedule";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -35,6 +37,8 @@ function Router() {
       <Route path="/architecture" component={Architecture} />
       <Route path="/keywords" component={Keywords} />
       <Route path="/generate" component={ArticleGeneration} />
+      <Route path="/review" component={ArticleReview} />
+      <Route path="/publish" component={PublishSchedule} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

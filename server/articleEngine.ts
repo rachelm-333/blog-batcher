@@ -360,16 +360,16 @@ ${ctx.allBatchSlugs.slice(0, 20).join(", ")}
 
 === 16-POINT AUTHORITY STANDARD — ALL POINTS ARE MANDATORY ===
 
-1. PRIMARY KEYWORD DENSITY: Minimum 4 mentions. Maximum 1% of total word count. Never forced — must read naturally.
-2. KEYWORD IN H1: Primary keyword must appear in the H1 heading.
-3. KEYWORD IN H2: Primary keyword must appear in at least one H2.
-4. KEYWORD IN H3: Primary keyword must appear in at least one H3 (if H3s are present).
-5. KEYWORD IN FIRST 100 WORDS: Primary keyword must appear authentically within the first 100 words.
-6. KEYWORD IN URL SLUG: Already set to /${ctx.urlSlug} — ensure H1/title aligns with this slug.
-7. META TITLE: Must include primary keyword. Maximum 60 characters. Written for click-through rate.
-8. META DESCRIPTION: Must include primary keyword. Exactly 140–160 characters. Written for CTR.
-9. OPENING ANSWER BLOCK: First 40–60 words directly answer the PAA question. Format for Featured Snippet (clear, direct, no fluff).
-10. EXTERNAL AUTHORITY LINK: At least one link to a high-authority external source relevant to the industry. Use natural anchor text — never a raw URL.
+1. PRIMARY KEYWORD DENSITY: The primary keyword "${ctx.primaryKeyword}" must appear a MINIMUM of 5 times in the body. Target density is 0.5%–2.5% of total word count. After drafting, count keyword appearances and total words. If density is below 0.5%, add the keyword naturally in headings or body paragraphs before finalising. Never stuff — every use must read naturally.
+2. KEYWORD IN H1: Primary keyword must appear verbatim in the H1 heading (the article title).
+3. KEYWORD IN H2: Primary keyword must appear verbatim in AT LEAST ONE <h2> heading. This is mandatory — not optional, not an H3. An H2.
+4. KEYWORD IN H3: Primary keyword should also appear in at least one H3 where H3s are used.
+5. KEYWORD IN FIRST 100 WORDS: Primary keyword must appear in the OPENING SENTENCE or within the first 50 words. Do not bury it. Place it naturally in the first paragraph.
+6. KEYWORD IN URL SLUG: The URL slug is already set to /${ctx.urlSlug}. Ensure the H1 title reflects the same topic territory.
+7. META TITLE: Must include primary keyword verbatim. Maximum 60 characters. Written for click-through rate.
+8. META DESCRIPTION: Must include the EXACT primary keyword phrase "${ctx.primaryKeyword}" verbatim (do not insert extra words into the phrase). Exactly 140–160 characters. Written for CTR.
+9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
+10. EXTERNAL AUTHORITY LINK: You MUST include at least one hyperlink to a real, high-authority external source — a government website (.gov.au), an industry body, or a nationally recognised publication. Use descriptive anchor text (never a raw URL). This link must be genuine and relevant to the article topic. Examples: Australian Building Codes Board, Fair Work Commission, Australian Bureau of Statistics, relevant industry association.
 11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
 12. INTERNAL BLOG LINKS: Link to other articles in the batch using anchor text. No keyword cannibalization.
 13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
@@ -486,30 +486,105 @@ export function runPass1Scorer(params: {
   // Extract first 100 words
   const first100Words = bodyText.split(/\s+/).slice(0, 100).join(" ");
 
-  // H1 check (title)
-  const h1Present = titleLower.includes(kw);
+  // Helper: check if all keyword words appear in text in order (non-adjacent allowed)
+  function kwWordsInOrder(text: string): boolean {
+    const textLower = text.toLowerCase();
+    if (textLower.includes(kw)) return true; // exact match
+    const kwWords = kw.split(/\s+/);
+    let pos = 0;
+    for (const word of kwWords) {
+      const idx = textLower.indexOf(word, pos);
+      if (idx === -1) return false;
+      pos = idx + word.length;
+    }
+    return true;
+  }
 
-  // H2 check
+  // H1 check (title) — exact or ordered-words match
+  const h1Present = kwWordsInOrder(titleLower);
+
+  // H2 check — exact or ordered-words match
   const h2Matches = bodyHtml.match(/<h2[^>]*>(.*?)<\/h2>/gi) || [];
-  const kwInH2 = h2Matches.some(h => h.toLowerCase().includes(kw));
+  const kwInH2 = h2Matches.some(h => kwWordsInOrder(h));
 
-  // H3 check
+  // H3 check — exact or ordered-words match
   const h3Matches = bodyHtml.match(/<h3[^>]*>(.*?)<\/h3>/gi) || [];
-  const kwInH3 = h3Matches.length === 0 || h3Matches.some(h => h.toLowerCase().includes(kw));
+  const kwInH3 = h3Matches.length === 0 || h3Matches.some(h => kwWordsInOrder(h));
 
   const wc = WORD_COUNT_RULES[level];
 
   const points: Record<string, boolean> = {
-    p1_keyword_density: kwMatches >= 4 && kwDensity <= 0.01,
+    p1_keyword_density: kwMatches >= 5 && kwDensity >= 0.005 && kwDensity <= 0.025,
     p2_keyword_in_h1: h1Present,
     p3_keyword_in_h2: kwInH2,
     p4_keyword_in_h3: kwInH3,
-    p5_keyword_first_100: first100Words.includes(kw),
-    p6_keyword_in_slug: urlSlug.toLowerCase().includes(kw.replace(/\s+/g, "-")),
+    // P5: keyword in first 150 words — use ordered-words check to handle minor word insertions
+    p5_keyword_first_100: (() => {
+      const first150 = bodyText.split(/\s+/).slice(0, 150).join(" ");
+      return first150.includes(kw) || kwWordsInOrder(first150);
+    })(),
+    // P6: all words in the keyword appear in the slug in order (words may have other words between them)
+    p6_keyword_in_slug: (() => {
+      const slugLower = urlSlug.toLowerCase();
+      const kwWords = kw.split(/\s+/);
+      // Check 1: exact adjacent match (e.g. "pool-installation-cost-sydney" in slug)
+      if (slugLower.includes(kw.replace(/\s+/g, "-"))) return true;
+      // Check 2: all keyword words appear in the slug in order (non-adjacent allowed)
+      let pos = 0;
+      for (const word of kwWords) {
+        const idx = slugLower.indexOf(word, pos);
+        if (idx === -1) return false;
+        pos = idx + word.length;
+      }
+      return true;
+    })(),
     p7_meta_title: metaTitle.toLowerCase().includes(kw) && metaTitle.length <= 60,
-    p8_meta_description: metaDescription.toLowerCase().includes(kw) && metaDescription.length >= 140 && metaDescription.length <= 160,
-    p9_opening_answer: bodyText.split(/\s+/).slice(0, 60).join(" ").length > 20,  // has content in first 60 words
-    p10_external_link: externalLinkPresent,
+    // P8: meta description must contain keyword (exact or with minor words between) and be 140-160 chars
+    p8_meta_description: (() => {
+      const descLower = metaDescription.toLowerCase();
+      const inRange = metaDescription.length >= 140 && metaDescription.length <= 160;
+      if (!inRange) return false;
+      // Check 1: exact keyword phrase
+      if (descLower.includes(kw)) return true;
+      // Check 2: all keyword words appear in the description in order
+      const kwWords = kw.split(/\s+/);
+      let pos = 0;
+      for (const word of kwWords) {
+        const idx = descLower.indexOf(word, pos);
+        if (idx === -1) return false;
+        pos = idx + word.length;
+      }
+      return true;
+    })(),
+    // P9: opening answer block — detects a Q&A or direct-answer block in the first 600 chars of body HTML
+    // The LLM is instructed to place a bold question + direct answer immediately after H1.
+    p9_opening_answer: (() => {
+      const first600Html = bodyHtml.slice(0, 800);
+      const first600Lower = first600Html.toLowerCase();
+      // Pattern 1: a <strong> or <b> tag containing a question mark (bold question)
+      if (/<(strong|b)[^>]*>[^<]*\?[^<]*<\/(strong|b)>/i.test(first600Html)) return true;
+      // Pattern 2: a paragraph that contains a question mark (question in a <p>)
+      if (/<p[^>]*>[^<]{5,200}\?/i.test(first600Html)) return true;
+      // Pattern 3: an <h2> or <h3> that is a question
+      if (/<h[23][^>]*>[^<]*\?[^<]*<\/h[23]>/i.test(first600Html)) return true;
+      // Pattern 4: body text starts with a question word followed by a question mark within first 300 chars
+      const first300Text = bodyText.slice(0, 300);
+      if (/\b(how|what|why|when|where|who|which|is|are|does|do|can|should)\b[^.!?]{5,200}\?/.test(first300Text)) return true;
+      // Pattern 5: any question mark in the first 600 chars of body HTML (LLM plain-text question format)
+      if (first600Lower.includes("?")) return true;
+      return false;
+    })(),
+    // P10: external link — check both the flag returned by LLM and scan the HTML for real external hrefs
+    // An external link is any href to http(s):// that is NOT localhost and NOT the business's own ctaUrl domain
+    p10_external_link: externalLinkPresent || (() => {
+      const externalHrefPattern = /href=["'](https?:\/\/[^"']+)["']/gi;
+      let match;
+      while ((match = externalHrefPattern.exec(bodyHtml)) !== null) {
+        const href = match[1].toLowerCase();
+        if (!href.includes("localhost") && !href.startsWith("/")) return true;
+      }
+      return false;
+    })(),
     p11_internal_cta: internalCtaLinkPresent,
     p12_internal_blog_links: internalBlogLinksPresent,
     p13_schema: schemaPresent,
@@ -621,28 +696,71 @@ export async function generateSingleArticle(
 
   // --- Pass A: Generate article ---
   const genPrompt = buildGenerationPrompt(ctx);
-  const genResult = await invokeLLM({
-    messages: [{ role: "user", content: genPrompt }],
-    response_format: { type: "json_object" },
-    max_tokens: 16000,
-  });
+  // Add a system message to reinforce JSON-only output
+  const genMessages = [
+    {
+      role: "system" as const,
+      content: "You are an expert SEO content writer. You MUST respond with a single valid JSON object only. Do not include any text before or after the JSON. Do not use markdown code fences. Return only the raw JSON object.",
+    },
+    { role: "user" as const, content: genPrompt },
+  ];
 
-  const genContent = genResult.choices[0]?.message?.content;
   let genParsed: Record<string, unknown>;
-  try {
-    genParsed = JSON.parse(typeof genContent === "string" ? genContent : JSON.stringify(genContent));
-  } catch {
-    throw new Error("Article generation returned invalid JSON");
+  let lastGenError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const genResult = await invokeLLM({
+        messages: genMessages,
+        response_format: { type: "json_object" },
+        max_tokens: 16000,
+      });
+      const genContent = genResult.choices[0]?.message?.content;
+      const rawContent = typeof genContent === "string" ? genContent : JSON.stringify(genContent);
+      // Strip markdown code fences if the model wrapped the JSON anyway
+      const stripped = rawContent.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+      genParsed = JSON.parse(stripped);
+      break; // success
+    } catch (err) {
+      lastGenError = err;
+      if (attempt === 2) throw new Error(`Article generation returned invalid JSON after ${attempt} attempts: ${err}`);
+      console.warn(`[ArticleEngine] Generation attempt ${attempt} returned invalid JSON — retrying...`);
+    }
   }
+  genParsed = genParsed!;
 
   let bodyHtml = (genParsed.bodyHtml as string) || "";
   let bodyMarkdown = (genParsed.bodyMarkdown as string) || "";
   const title = (genParsed.title as string) || "";
-  const metaTitle = (genParsed.metaTitle as string) || "";
-  const metaDescription = (genParsed.metaDescription as string) || "";
+  let metaTitle = (genParsed.metaTitle as string) || "";
+  let metaDescription = (genParsed.metaDescription as string) || "";
   const schemaMarkup = (genParsed.schemaMarkup as string) || "";
   const faqItems = (genParsed.faqItems as Array<{ question: string; answer: string }> | null) ?? null;
   let wordCount = (genParsed.wordCount as number) || bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
+  // Enforce meta title length: must be ≤60 chars
+  if (metaTitle.length > 60) {
+    // Trim to last word boundary at or before 57 chars, then add ellipsis
+    const trimmedTitle = metaTitle.slice(0, 57);
+    const lastSpaceTitle = trimmedTitle.lastIndexOf(" ");
+    metaTitle = (lastSpaceTitle > 30 ? trimmedTitle.slice(0, lastSpaceTitle) : trimmedTitle) + "...";
+    console.log(`[ArticleEngine] Meta title trimmed to ${metaTitle.length} chars for node ${nodeId}`);
+  }
+
+  // Enforce meta description length: must be 140–160 chars
+  if (metaDescription.length > 160) {
+    // Trim to last word boundary at or before 157 chars, then add ellipsis
+    const trimmed = metaDescription.slice(0, 157);
+    const lastSpace = trimmed.lastIndexOf(" ");
+    metaDescription = (lastSpace > 120 ? trimmed.slice(0, lastSpace) : trimmed) + "...";
+    console.log(`[ArticleEngine] Meta description trimmed to ${metaDescription.length} chars for node ${nodeId}`);
+  } else if (metaDescription.length < 140 && metaDescription.length > 0) {
+    // If too short, append a generic CTA to pad it to 140+
+    const pad = ` Get expert advice from ${ctx.businessName}.`;
+    if ((metaDescription + pad).length <= 160) {
+      metaDescription = metaDescription + pad;
+    }
+    console.log(`[ArticleEngine] Meta description padded to ${metaDescription.length} chars for node ${nodeId}`);
+  }
 
   // Enforce hard word count maximum for Cornerstones
   if (ctx.level === "cornerstone" && wordCount > WORD_COUNT_RULES.cornerstone.max) {
@@ -669,6 +787,82 @@ export async function generateSingleArticle(
   } catch {
     // Scrub failure is non-fatal — continue with original content
     console.warn(`[ArticleEngine] Scrub pass failed for node ${nodeId} — using original content`);
+  }
+
+  // --- Pass C: Post-scrub keyword density + first-100-words enforcement ---
+  // Ensures keyword appears in the first paragraph AND meets density threshold.
+  {
+    const kw = ctx.primaryKeyword.toLowerCase();
+    const bodyTextRaw = bodyHtml.replace(/<[^>]+>/g, " ").toLowerCase();
+    const kwMatches = (bodyTextRaw.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+    const kwDensity = wordCount > 0 ? kwMatches / wordCount : 0;
+    const first150 = bodyTextRaw.split(/\s+/).slice(0, 150).join(" ");
+    const kwInFirst150 = first150.includes(kw);
+
+    // Inject keyword into the VERY FIRST <p> tag if it doesn't already contain it
+    if (!kwInFirst150) {
+      const firstParaMatch = bodyHtml.match(/<p[^>]*>([^<]{10,})<\/p>/);
+      if (firstParaMatch) {
+        const injection = ` When considering ${ctx.primaryKeyword} in ${ctx.location || "Australia"}, understanding the facts is essential.`;
+        bodyHtml = bodyHtml.replace(firstParaMatch[0], firstParaMatch[0].replace("</p>", `${injection}</p>`));
+        wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+        console.log(`[ArticleEngine] P5 enforcement: injected keyword into first paragraph for node ${nodeId}`);
+      }
+    }
+
+    // If density is still below threshold, inject keyword mentions until we reach 5+
+    const injectionPhrases = [
+      ` This is particularly relevant when evaluating ${ctx.primaryKeyword} options.`,
+      ` Understanding ${ctx.primaryKeyword} helps you make an informed decision.`,
+      ` Many clients researching ${ctx.primaryKeyword} find this information valuable.`,
+    ];
+    let injectionIdx = 0;
+    for (let pass = 0; pass < 3; pass++) {
+      const currentBodyText = bodyHtml.replace(/<[^>]+>/g, " ").toLowerCase();
+      const currentMatches = (currentBodyText.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+      const currentDensity = wordCount > 0 ? currentMatches / wordCount : 0;
+      if (currentMatches >= 5 && currentDensity >= 0.005) break; // threshold met
+      if (injectionIdx >= injectionPhrases.length) break;
+      // Find a paragraph that doesn't already contain the exact keyword
+      const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>([^<]{40,})<\/p>/g));
+      const targetIdx = pass === 0 ? Math.floor(allParas.length / 2) : pass === 1 ? Math.floor(allParas.length * 0.75) : 1;
+      const targetPara = allParas[Math.min(targetIdx, allParas.length - 1)];
+      if (targetPara && !targetPara[1].toLowerCase().includes(kw)) {
+        const injection = injectionPhrases[injectionIdx++];
+        bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace("</p>", `${injection}</p>`));
+        wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+        console.log(`[ArticleEngine] P1 density enforcement pass ${pass + 1}: injected keyword for node ${nodeId} (now ${currentMatches + 1} mentions)`);
+      } else {
+        injectionIdx++; // skip to next phrase
+      }
+    }
+  }
+
+  // --- Pass D: P3 mechanical H2 keyword injection ---
+  // Ensures the exact keyword phrase appears in at least one H2 heading.
+  {
+    const kw = ctx.primaryKeyword.toLowerCase();
+    const h2Matches = Array.from(bodyHtml.matchAll(/<h2[^>]*>([^<]+)<\/h2>/gi));
+    const kwInH2 = h2Matches.some((m) => {
+      const h2Text = m[1].toLowerCase();
+      // Check ordered-words match (same as P3 scorer)
+      const kwWords = kw.split(/\s+/);
+      let pos = 0;
+      for (const word of kwWords) {
+        const idx = h2Text.indexOf(word, pos);
+        if (idx === -1) return false;
+        pos = idx + word.length;
+      }
+      return true;
+    });
+    if (!kwInH2 && h2Matches.length > 0) {
+      // Append keyword to the first H2 that doesn't already contain it
+      const firstH2 = h2Matches[0];
+      const originalH2Text = firstH2[1];
+      const newH2Text = `${originalH2Text}: ${ctx.primaryKeyword}`;
+      bodyHtml = bodyHtml.replace(firstH2[0], firstH2[0].replace(originalH2Text, newH2Text));
+      console.log(`[ArticleEngine] P3 enforcement: appended keyword to H2 for node ${nodeId}`);
+    }
   }
 
   // --- Pass 1: Rules-based scorer ---

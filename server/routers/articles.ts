@@ -1,5 +1,6 @@
 /**
  * Layer 6 — Stage 4: Article Generation tRPC Router
+ * Layer 7 — Stage 5: Review, Edit, Approve, Publish & Schedule
  *
  * Procedures:
  *  articles.startGeneration     — kick off batch generation for a business
@@ -8,19 +9,32 @@
  *  articles.get                 — return a single article with full content
  *  articles.regenerate          — re-run generation for a single failed/needs_review article
  *  articles.updateStatus        — advance article status (generated → pending_approval → approved)
+ *  articles.updateSeoFields     — save edits to SEO fields (slug, meta title, meta description, etc.)
+ *  articles.approve             — approve a single article (sets approvedAt, status=approved)
+ *  articles.approveAll          — approve all generated articles for a business
+ *  articles.saveImage           — save image URL or upload bytes to S3 for an article
+ *  articles.exportZip           — generate export ZIP (HTML + Markdown + meta + schema + schedule CSV)
  */
 
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const archiver = require("archiver") as (format: string, options?: object) => any;
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
+  articleImages,
   articleNodes,
   articles,
   businesses,
+  schedules,
   keywords,
 } from "../../drizzle/schema";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { storagePut } from "../storage";
+import { invokeLLM } from "../_core/llm";
 import {
   generateSingleArticle,
   getOrderedNodes,
@@ -428,5 +442,343 @@ export const articlesRouter = router({
         .where(eq(articles.id, input.articleId));
 
       return { updated: true };
+    }),
+
+  // ---------------------------------------------------------------------------
+  // Layer 7: Stage 5 — Review, Edit, Approve, Publish & Schedule
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Save edits to SEO fields.
+   * All fields are optional — only provided fields are updated.
+   */
+  updateSeoFields: protectedProcedure
+    .input(z.object({
+      articleId: z.number(),
+      urlSlug: z.string().max(512).optional(),
+      metaTitle: z.string().max(120).optional(),
+      metaDescription: z.string().max(320).optional(),
+      focusKeyword: z.string().max(512).optional(),
+      schemaMarkup: z.string().optional(),
+      faqItems: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [article] = await db
+        .select({ businessId: articles.businessId, status: articles.status })
+        .from(articles)
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!article) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, article.businessId);
+
+      // Block edits to approved articles that have been published
+      if (article.status === "published") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Published articles cannot be edited here. Edit directly in your CMS." });
+      }
+
+      // Validate meta title length
+      if (input.metaTitle && input.metaTitle.length > 60) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Meta title must be 60 characters or fewer." });
+      }
+      // Validate meta description length
+      if (input.metaDescription && (input.metaDescription.length < 140 || input.metaDescription.length > 160)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Meta description must be between 140 and 160 characters." });
+      }
+
+      const updates: Partial<typeof articles.$inferInsert> = {};
+      if (input.urlSlug !== undefined) updates.urlSlug = input.urlSlug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+      if (input.metaTitle !== undefined) updates.metaTitle = input.metaTitle;
+      if (input.metaDescription !== undefined) updates.metaDescription = input.metaDescription;
+      if (input.focusKeyword !== undefined) updates.focusKeyword = input.focusKeyword;
+      if (input.schemaMarkup !== undefined) updates.schemaMarkup = input.schemaMarkup;
+      if (input.faqItems !== undefined) updates.faqItems = input.faqItems as unknown;
+
+      await db.update(articles).set(updates).where(eq(articles.id, input.articleId));
+      return { updated: true };
+    }),
+
+  /**
+   * Approve a single article.
+   * Sets status = approved and records approvedAt timestamp.
+   * Regeneration is blocked after approval.
+   */
+  approve: protectedProcedure
+    .input(z.object({ articleId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [article] = await db
+        .select({ businessId: articles.businessId, status: articles.status })
+        .from(articles)
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!article) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, article.businessId);
+
+      if (article.status === "approved" || article.status === "scheduled" || article.status === "published") {
+        return { approved: true, alreadyApproved: true };
+      }
+
+      if (article.status !== "generated" && article.status !== "pending_approval") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Cannot approve article with status '${article.status}'. Article must be generated first.` });
+      }
+
+      await db
+        .update(articles)
+        .set({ status: "approved", approvedAt: new Date() })
+        .where(eq(articles.id, input.articleId));
+
+      return { approved: true, alreadyApproved: false };
+    }),
+
+  /**
+   * Approve all generated articles for a business in one call.
+   * Only approves articles in generated or pending_approval status.
+   * Returns count of newly approved articles.
+   */
+  approveAll: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      const toApprove = await db
+        .select({ id: articles.id })
+        .from(articles)
+        .where(
+          and(
+            eq(articles.businessId, input.businessId),
+            inArray(articles.status, ["generated", "pending_approval"])
+          )
+        );
+
+      if (toApprove.length === 0) return { approvedCount: 0 };
+
+      const ids = toApprove.map(a => a.id);
+      const now = new Date();
+
+      await db
+        .update(articles)
+        .set({ status: "approved", approvedAt: now })
+        .where(inArray(articles.id, ids));
+
+      return { approvedCount: ids.length };
+    }),
+
+  /**
+   * Save an image for an article.
+   * Accepts either a URL (paste from website) or base64-encoded bytes (upload).
+   * If bytes provided, uploads to S3 and saves the storage URL.
+   * Auto-generates alt text using the LLM.
+   */
+  saveImage: protectedProcedure
+    .input(z.object({
+      articleId: z.number(),
+      /** Paste a URL from the user's existing website */
+      imageUrl: z.string().url().optional(),
+      /** Base64-encoded image bytes for direct upload */
+      imageBase64: z.string().optional(),
+      /** MIME type for uploaded file, e.g. image/jpeg */
+      mimeType: z.string().optional(),
+      /** Filename for uploaded file */
+      filename: z.string().optional(),
+      /** User-provided alt text (overrides AI-generated) */
+      altText: z.string().max(512).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [article] = await db
+        .select({ businessId: articles.businessId, title: articles.title })
+        .from(articles)
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!article) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, article.businessId);
+
+      let finalUrl: string;
+      let storageKey: string | undefined;
+
+      if (input.imageBase64) {
+        // Upload to S3
+        const bytes = Buffer.from(input.imageBase64, "base64");
+        const filename = input.filename ?? `article-${input.articleId}-image.jpg`;
+        const contentType = input.mimeType ?? "image/jpeg";
+        const { key, url } = await storagePut(`article-images/${filename}`, bytes, contentType);
+        finalUrl = url;
+        storageKey = key;
+      } else if (input.imageUrl) {
+        finalUrl = input.imageUrl;
+      } else {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Provide either imageUrl or imageBase64." });
+      }
+
+      // Auto-generate alt text if not provided
+      let altText = input.altText ?? "";
+      if (!altText) {
+        try {
+          const altResp = await invokeLLM({
+            messages: [
+              { role: "system", content: "You write concise, SEO-optimised image alt text. Return only the alt text string, no quotes, no explanation." },
+              { role: "user", content: `Article title: "${article.title ?? ""}". Write alt text for the featured image of this article. Max 125 characters.` },
+            ],
+          });
+          altText = (altResp.choices?.[0]?.message?.content as string ?? "").trim().slice(0, 512);
+        } catch {
+          altText = article.title ?? "";
+        }
+      }
+
+      // Upsert article_images row
+      const existing = await db
+        .select({ id: articleImages.id })
+        .from(articleImages)
+        .where(eq(articleImages.articleId, input.articleId))
+        .limit(1);
+
+      if (existing.length) {
+        await db
+          .update(articleImages)
+          .set({ imageUrl: finalUrl, storageKey: storageKey ?? null, altText })
+          .where(eq(articleImages.articleId, input.articleId));
+      } else {
+        await db.insert(articleImages).values({
+          articleId: input.articleId,
+          imageUrl: finalUrl,
+          storageKey: storageKey ?? null,
+          altText,
+        });
+      }
+
+      return { imageUrl: finalUrl, altText };
+    }),
+
+  /**
+   * Generate and return an export ZIP for all approved articles in a business.
+   * ZIP contains:
+   *   - articles/{slug}.html
+   *   - articles/{slug}.md
+   *   - articles/{slug}-meta.txt
+   *   - articles/{slug}-schema.json
+   *   - schedule.csv
+   *
+   * Returns the ZIP as a base64-encoded string so the frontend can trigger a download.
+   */
+  exportZip: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      // Fetch all approved articles with their node info
+      const rows = await db
+        .select({
+          id: articles.id,
+          title: articles.title,
+          bodyHtml: articles.bodyHtml,
+          bodyMarkdown: articles.bodyMarkdown,
+          metaTitle: articles.metaTitle,
+          metaDescription: articles.metaDescription,
+          focusKeyword: articles.focusKeyword,
+          urlSlug: articles.urlSlug,
+          schemaMarkup: articles.schemaMarkup,
+          wordCount: articles.wordCount,
+          statusBadge: articles.statusBadge,
+          scheduledPublishAt: articles.scheduledPublishAt,
+          nodeLevel: articleNodes.level,
+          nodeUrlSlug: articleNodes.urlSlug,
+        })
+        .from(articles)
+        .innerJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
+        .where(
+          and(
+            eq(articles.businessId, input.businessId),
+            inArray(articles.status, ["approved", "scheduled", "published"])
+          )
+        )
+        .orderBy(articleNodes.sortOrder);
+
+      if (rows.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No approved articles found. Approve articles before exporting." });
+      }
+
+      // Build ZIP in memory
+      const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
+        const archive = archiver("zip", { zlib: { level: 9 } });
+        const chunks: Buffer[] = [];
+
+        archive.on("data", (chunk: Buffer) => chunks.push(chunk));
+        archive.on("end", () => resolve(Buffer.concat(chunks)));
+        archive.on("error", reject);
+
+        for (const row of rows) {
+          const slug = row.urlSlug ?? `article-${row.id}`;
+
+          // HTML file
+          const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${row.metaTitle ?? row.title ?? ""}</title>
+<meta name="description" content="${row.metaDescription ?? ""}">
+${row.schemaMarkup ? `<script type="application/ld+json">${row.schemaMarkup}</script>` : ""}
+</head>
+<body>
+${row.bodyHtml ?? ""}
+</body>
+</html>`;
+          archive.append(htmlContent, { name: `articles/${slug}.html` });
+
+          // Markdown file
+          archive.append(row.bodyMarkdown ?? "", { name: `articles/${slug}.md` });
+
+          // Meta text file
+          const metaTxt = [
+            `Title: ${row.title ?? ""}`,
+            `Meta Title: ${row.metaTitle ?? ""}`,
+            `Meta Description: ${row.metaDescription ?? ""}`,
+            `Focus Keyword: ${row.focusKeyword ?? ""}`,
+            `URL Slug: ${row.urlSlug ?? ""}`,
+            `Word Count: ${row.wordCount ?? ""}`,
+            `Status: ${row.statusBadge ?? ""}`,
+            `Level: ${row.nodeLevel ?? ""}`,
+          ].join("\n");
+          archive.append(metaTxt, { name: `articles/${slug}-meta.txt` });
+
+          // Schema JSON-LD file
+          if (row.schemaMarkup) {
+            archive.append(row.schemaMarkup, { name: `articles/${slug}-schema.json` });
+          }
+        }
+
+        // Schedule CSV
+        const csvLines = [
+          "Title,Slug,Level,Scheduled Publish Date,Status",
+          ...rows.map(r => [
+            `"${(r.title ?? "").replace(/"/g, '""')}"`,
+            r.urlSlug ?? "",
+            r.nodeLevel ?? "",
+            r.scheduledPublishAt ? new Date(r.scheduledPublishAt).toISOString().split("T")[0] : "",
+            r.statusBadge ?? "",
+          ].join(",")),
+        ].join("\n");
+        archive.append(csvLines, { name: "schedule.csv" });
+
+        archive.finalize();
+      });
+
+      return { zipBase64: zipBuffer.toString("base64"), articleCount: rows.length };
     }),
 });
