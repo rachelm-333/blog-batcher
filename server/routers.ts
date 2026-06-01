@@ -1,5 +1,6 @@
 import { systemRouter } from "./_core/systemRouter";
 import { router } from "./_core/trpc";
+import { architectureRouter } from "./routers/architecture";
 import { authRouter } from "./routers/auth";
 import { businessRouter } from "./routers/business";
 
@@ -15,6 +16,11 @@ export const appRouter = router({
   // ─── Layer 3: Stage 1 — Business Profile & Website Scrape ─────────────────
   // All procedures live in server/routers/business.ts
   business: businessRouter,
+
+  // ─── Layer 4: Stage 2 — Blog Architecture ─────────────────────────────
+  // Pack selection, guardrails engine, article type assignment, confirm.
+  // All procedures live in server/routers/architecture.ts
+  architecture: architectureRouter,
 
   // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
   // Layer 3 (Stripe) will be wired here once Auth is fully verified.

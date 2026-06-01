@@ -83,12 +83,37 @@
 - [x] Vitest: business.create, business.get, business.update, business.scrape (mocked Claude), business.saveBrandVoice (24/24 pass)
 
 ## Layer 4: Stage 2 — Blog Architecture
-- [ ] Pack selection UI (20 or 50 articles)
-- [ ] Architecture rules engine (Cornerstone → Pillar → Cluster)
-- [ ] Visual architecture map (tree diagram)
-- [ ] Slider-based adjustments with real-time guardrails
-- [ ] Article type selection per pillar
-- [ ] Save architecture to DB
+
+### Architecture rules (from scope)
+- Rules: clusters-per-pillar = always 3; min ratio 1:1:3; max per cornerstone 1:4:12
+- 20-pack default: 2 cornerstones × 2 pillars × 3 clusters = 18 + 2 extra clusters
+- 50-pack default: 4 cornerstones × 3 pillars × 3 clusters = 52 → adjusted to 50
+- Pack is locked once selected (tied to Stripe purchase — placeholder for now)
+- Article types: Cornerstone Guide, Top 10 List, How-To, The Why, Comparison, Myth-Busting, Case Study
+
+### Backend (server/routers/architecture.ts)
+- [x] architecture.getOrCreate — get existing architecture or create default for the business
+- [x] architecture.update — update cornerstones/pillars counts, validate guardrails server-side
+- [x] architecture.setArticleType — set article type for a specific article_node
+- [x] architecture.confirm — lock the architecture, advance stage to 3
+- [x] Guardrails engine (shared/architectureRules.ts): validate any config, return corrected values + explanation message
+- [x] Auto-generate article_nodes rows when architecture is created/updated
+
+### Frontend (client/src/pages/Architecture.tsx)
+- [x] Pack selection card (20 or 50 articles) — locked after selection
+- [x] Cornerstone slider (1–4) with live guardrail feedback
+- [x] Pillars-per-cornerstone slider (1–4) with live guardrail feedback
+- [x] Real-time article count display (cornerstones + pillars + clusters = total)
+- [x] Visual tree map: cornerstones → pillars → clusters (collapsible)
+- [x] Article type selector dropdown on each Pillar node
+- [x] Cluster type shown as auto-assigned (read-only)
+- [x] Guardrail warning banner when config is auto-corrected
+- [x] 'Confirm Architecture & Continue' button (disabled until valid)
+- [x] /architecture route, auth-guarded, redirects to /onboarding if no business
+- [x] Dashboard Stage 2 'Continue' button links to /architecture
+
+### Tests
+- [x] Vitest: guardrails engine (20 tests), architecture procedures — 47/47 total tests pass
 
 ## Layer 5: Stage 3 — SEO Keyword Research
 - [ ] DataForSEO API integration

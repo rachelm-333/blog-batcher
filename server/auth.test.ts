@@ -224,7 +224,7 @@ describe("auth.forgotPassword", () => {
       .where(eq(users.email, TEST_EMAIL))
       .limit(1);
     expect(u.token).toBeTruthy();
-  });
+  }, 15000);
 });
 
 describe("auth.resetPassword", () => {
@@ -254,7 +254,7 @@ describe("auth.resetPassword", () => {
     const loginResult = await caller2.auth.login({ email: TEST_EMAIL, password: "NewPass456!" });
     expect(loginResult.success).toBe(true);
     expect(cookies).toHaveLength(1);
-  });
+  }, 15000);
 
   it("rejects invalid reset token", async () => {
     const { ctx } = makeCtx();

@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import Architecture from "./pages/Architecture";
 import Dashboard from "./pages/Dashboard";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
@@ -29,6 +30,7 @@ function Router() {
       {/* Authenticated app */}
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/architecture" component={Architecture} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

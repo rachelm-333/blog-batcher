@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { Loader2, ArrowRight, CheckCircle2, Circle } from "lucide-react";
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 
 const STAGES = [
@@ -135,6 +136,8 @@ export default function Dashboard() {
                       size="sm"
                       onClick={() => {
                         if (stage.id === 1) navigate("/onboarding");
+                        else if (stage.id === 2) navigate("/architecture");
+                        else toast.info("Coming soon", { description: `Stage ${stage.id}: ${stage.label} is not yet available.` });
                       }}
                       className="shrink-0"
                     >

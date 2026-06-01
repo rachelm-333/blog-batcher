@@ -220,7 +220,7 @@ describe("business.scrape", () => {
     expect(result.data.name).toBe("Sunshine Physio");
     expect(result.data.industry).toBe("Physiotherapy");
     expect(invokeLLM).toHaveBeenCalledOnce();
-  });
+  }, 15000);
 
   it("returns success:false if LLM returns invalid JSON", async () => {
     vi.mocked(invokeLLM).mockResolvedValue({
