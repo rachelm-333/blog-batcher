@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1780298264175,
+      "tag": "0000_shocking_deadpool",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1780298463243,
+      "tag": "0001_lucky_sharon_carter",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1780298842545,
+      "tag": "0002_tan_snowbird",
+      "breakpoints": true
+    }
+  ]
 }
