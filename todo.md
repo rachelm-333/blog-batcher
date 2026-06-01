@@ -21,15 +21,28 @@
 - [x] stripe_payments table (Stripe payment records)
 - [x] Run Drizzle migration and apply to DB (migration 0001 applied, 18 tables verified)
 
-## Layer 2: Auth + Stripe
-- [ ] User registration and login (email + password)
-- [ ] Email verification flow
-- [ ] Password reset via email
-- [ ] JWT session management (30-day refresh)
-- [ ] Stripe Checkout for 20-article and 50-article packs
-- [ ] Stripe webhook handlers (payment succeeded, failed, refund)
-- [ ] Credits allocated on successful purchase
-- [ ] Free trial flow (1 article, no credit card)
+## Layer 2: Auth (no Stripe yet)
+- [x] Resend email helper (server/email.ts) — verification + reset emails
+- [x] bcrypt password hashing utility
+- [x] auth.register procedure (email+password, creates user + credits row, sends verification email)
+- [x] auth.verifyEmail procedure (token validation, marks emailVerified=true)
+- [x] auth.login procedure (email+password, JWT cookie, 30-day refresh)
+- [x] auth.logout procedure (clears JWT cookie)
+- [x] auth.forgotPassword procedure (sends reset email with token)
+- [x] auth.resetPassword procedure (validates token, updates passwordHash)
+- [x] auth.me procedure (returns current user from JWT)
+- [x] Role system: role=admin|user + tier=standard|multi_business|agency (in schema)
+- [x] Rachel Mackay pre-seeded as admin (rachel.m@noize.com.au) with unlimited credits
+- [x] All users get full access after email verification — no purchase gate
+- [x] Stripe placeholder comment block in routers.ts
+- [x] Register page UI (/register)
+- [x] Login page UI (/login)
+- [x] Verify email page UI (/verify-email?token=...)
+- [x] Forgot password page UI (/forgot-password)
+- [x] Reset password page UI (/reset-password?token=...)
+- [x] Post-login redirect to onboarding or dashboard
+- [x] Auth guard: redirect unauthenticated users to /login
+- [x] Vitest: register, login, logout, verifyEmail, forgotPassword, resetPassword (16/16 pass)
 
 ## Layer 3: Stage 1 — Business Profile & Website Scrape
 - [ ] Business profile UI (all fields from Section 3.2)
