@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Onboarding from "./pages/Onboarding";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
 
       {/* Authenticated app */}
+      <Route path="/onboarding" component={Onboarding} />
       <Route path="/dashboard" component={Dashboard} />
 
       {/* Fallback */}

@@ -1,6 +1,7 @@
 import { systemRouter } from "./_core/systemRouter";
 import { router } from "./_core/trpc";
 import { authRouter } from "./routers/auth";
+import { businessRouter } from "./routers/business";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -10,6 +11,10 @@ export const appRouter = router({
   // Email+password registration, verification, login, logout, password reset.
   // All procedures live in server/routers/auth.ts
   auth: authRouter,
+
+  // ─── Layer 3: Stage 1 — Business Profile & Website Scrape ─────────────────
+  // All procedures live in server/routers/business.ts
+  business: businessRouter,
 
   // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
   // Layer 3 (Stripe) will be wired here once Auth is fully verified.

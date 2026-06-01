@@ -45,13 +45,42 @@
 - [x] Vitest: register, login, logout, verifyEmail, forgotPassword, resetPassword (16/16 pass)
 
 ## Layer 3: Stage 1 — Business Profile & Website Scrape
-- [ ] Business profile UI (all fields from Section 3.2)
-- [ ] AI-powered website scrape via Claude
-- [ ] Brand voice builder (archetypes, persona, extracted voice, final brief)
-- [ ] Social proof / E-E-A-T fields
-- [ ] Competitor research section
-- [ ] Publishing platform selector (CMS + SEO plugin)
-- [ ] Save profile to DB, re-scan button
+
+### Backend procedures (server/routers/business.ts)
+- [x] business.create — create a new business for the logged-in user
+- [x] business.get — get the user's current business (or null)
+- [x] business.update — update all business detail fields
+- [x] business.scrape — AI scrape via Claude: returns prefilled fields for all sections
+- [x] business.saveAudiences — upsert audience groups
+- [x] business.saveServices — upsert services/products
+- [x] business.saveCtaLinks — CTA links saved via business.update
+- [x] business.saveCompetitors — upsert competitors (max 3)
+- [x] business.saveBrandVoice — upsert brand_voice row
+- [x] business.saveExistingContent — store scraped blog posts
+- [x] business.markStageComplete — advance stage tracker
+
+### Frontend — Stage 1 multi-step wizard (client/src/pages/onboarding/)
+- [x] Step 0: Scrape input (business name + URL, trigger scrape, loading state)
+- [x] Step 1: Business Details (name, industry, location, service area, address, ABN, UVP, keyword exclusions, target audiences)
+- [x] Step 2: Services & Products (list with name + URL, add/remove rows)
+- [x] Step 3: Internal CTA Links (contact, bookings, testimonials, shop, primary CTA text + URL)
+- [x] Step 4: Brand Voice (archetype selector primary+secondary, persona name, formality, key phrases, phrases to avoid, style notes, final voice brief editable textarea)
+- [x] Step 5: Competitor Research (up to 3 competitors, AI-suggested, accept/edit/remove)
+- [x] Step 6: Publishing Platform (CMS selector + WordPress SEO plugin sub-selector)
+- [x] Step 7: Social Proof / E-E-A-T (years in business, clients served, awards/certs)
+- [x] Step 8: Review & Save (summary of all fields, Save Profile & Continue button)
+- [x] Re-scan button on Step 0 to re-crawl and regenerate all fields
+- [x] Progress stepper component showing current step
+- [x] All fields pre-filled from scrape result, fully editable
+- [x] Persist draft to DB on each step save (not just at the end)
+
+### Routing & auth
+- [x] /onboarding route — redirects to /dashboard if profile already complete
+- [x] /dashboard redirects to /onboarding if no business profile exists
+- [x] Auth guard on both /onboarding and /dashboard
+
+### Tests
+- [x] Vitest: business.create, business.get, business.update, business.scrape (mocked Claude), business.saveBrandVoice (24/24 pass)
 
 ## Layer 4: Stage 2 — Blog Architecture
 - [ ] Pack selection UI (20 or 50 articles)

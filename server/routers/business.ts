@@ -1,0 +1,582 @@
+/**
+ * Layer 3 — Stage 1: Business Profile & Website Scrape
+ *
+ * Procedures:
+ *  business.get          — get the user's current business (or null)
+ *  business.create       — create a new business for the logged-in user
+ *  business.update       — update all business detail fields
+ *  business.scrape       — AI scrape via Claude: returns prefilled fields
+ *  business.saveAudiences    — upsert audience groups
+ *  business.saveServices     — upsert services/products
+ *  business.saveCompetitors  — upsert competitors (max 3)
+ *  business.saveBrandVoice   — upsert brand_voice row
+ *  business.saveExistingContent — store scraped blog posts
+ *  business.markStageComplete — advance stage tracker
+ */
+
+import { TRPCError } from "@trpc/server";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+import {
+  brandVoice,
+  businessAudiences,
+  businessCompetitors,
+  businessExistingContent,
+  businessServices,
+  businesses,
+} from "../../drizzle/schema";
+import { invokeLLM } from "../_core/llm";
+import { protectedProcedure, router } from "../_core/trpc";
+import { getDb } from "../db";
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/** Ensure the user owns the given business. Throws FORBIDDEN if not. */
+async function assertOwnership(userId: number, businessId: number) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+  const rows = await db
+    .select({ id: businesses.id })
+    .from(businesses)
+    .where(and(eq(businesses.id, businessId), eq(businesses.userId, userId)))
+    .limit(1);
+  if (!rows.length) throw new TRPCError({ code: "FORBIDDEN", message: "Business not found" });
+}
+
+// ---------------------------------------------------------------------------
+// Input schemas
+// ---------------------------------------------------------------------------
+
+const audienceSchema = z.object({
+  id: z.number().optional(),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  sortOrder: z.number().default(0),
+});
+
+const serviceSchema = z.object({
+  id: z.number().optional(),
+  name: z.string().min(1),
+  pageUrl: z.string().optional(),
+  sortOrder: z.number().default(0),
+});
+
+const competitorSchema = z.object({
+  id: z.number().optional(),
+  name: z.string().min(1),
+  websiteUrl: z.string().optional(),
+  description: z.string().optional(),
+  sortOrder: z.number().default(0),
+});
+
+const brandVoiceSchema = z.object({
+  primaryArchetype: z
+    .enum(["professional_authority", "friendly_neighbour", "bold_direct", "inspiring_thought_leader"])
+    .optional(),
+  secondaryArchetype: z
+    .enum(["professional_authority", "friendly_neighbour", "bold_direct", "inspiring_thought_leader"])
+    .optional(),
+  namedPersona: z.string().optional(),
+  formalityLevel: z
+    .enum(["very_formal", "formal", "semi_formal", "conversational", "casual"])
+    .optional(),
+  keyPhrases: z.array(z.string()).optional(),
+  phrasesToAvoid: z.array(z.string()).optional(),
+  styleNotes: z.string().optional(),
+  finalVoiceBrief: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
+
+export const businessRouter = router({
+  // -------------------------------------------------------------------------
+  // GET — returns the first business for this user (or null)
+  // -------------------------------------------------------------------------
+  get: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+    const rows = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.userId, ctx.user.id))
+      .limit(1);
+
+    if (!rows.length) return null;
+    const biz = rows[0];
+
+    // Fetch related rows
+    const [audiences, services, competitors, existingContent, brandVoiceRows] = await Promise.all([
+      db.select().from(businessAudiences).where(eq(businessAudiences.businessId, biz.id)),
+      db.select().from(businessServices).where(eq(businessServices.businessId, biz.id)),
+      db.select().from(businessCompetitors).where(eq(businessCompetitors.businessId, biz.id)),
+      db.select().from(businessExistingContent).where(eq(businessExistingContent.businessId, biz.id)),
+      db.select().from(brandVoice).where(eq(brandVoice.businessId, biz.id)).limit(1),
+    ]);
+
+    return {
+      ...biz,
+      audiences,
+      services,
+      competitors,
+      existingContent,
+      brandVoice: brandVoiceRows[0] ?? null,
+    };
+  }),
+
+  // -------------------------------------------------------------------------
+  // CREATE — create a new business for the logged-in user
+  // -------------------------------------------------------------------------
+  create: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        websiteUrl: z.string().url().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const result = await db.insert(businesses).values({
+        userId: ctx.user.id,
+        name: input.name,
+        websiteUrl: input.websiteUrl,
+        scrapeStatus: "pending",
+        currentStage: 1,
+      });
+
+      const insertId = (result as unknown as { insertId: number }).insertId;
+      return { id: insertId };
+    }),
+
+  // -------------------------------------------------------------------------
+  // UPDATE — update all business detail fields
+  // -------------------------------------------------------------------------
+  update: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        name: z.string().min(1).optional(),
+        websiteUrl: z.string().optional(),
+        industry: z.string().optional(),
+        location: z.string().optional(),
+        serviceArea: z.string().optional(),
+        physicalAddress: z.string().optional(),
+        isPhysicalLocation: z.boolean().optional(),
+        abnBusinessRegistration: z.string().optional(),
+        uniqueValueProposition: z.string().optional(),
+        keywordExclusions: z.string().optional(),
+        yearsInBusiness: z.number().optional(),
+        clientsServed: z.number().optional(),
+        awardsAccreditations: z.string().optional(),
+        primaryCtaText: z.string().optional(),
+        primaryCtaUrl: z.string().optional(),
+        contactPageUrl: z.string().optional(),
+        bookingsPageUrl: z.string().optional(),
+        testimonialsPageUrl: z.string().optional(),
+        shopUrl: z.string().optional(),
+        otherInternalLinks: z.array(z.object({ label: z.string(), url: z.string() })).optional(),
+        cmsPlatform: z
+          .enum(["wordpress", "wix", "shopify", "webflow", "squarespace", "ghost"])
+          .optional(),
+        wordpressSeoPlugin: z.enum(["yoast", "rankmath", "aioseo", "none"]).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const { businessId, ...fields } = input;
+      await assertOwnership(ctx.user.id, businessId);
+
+      await db.update(businesses).set(fields).where(eq(businesses.id, businessId));
+      return { success: true };
+    }),
+
+  // -------------------------------------------------------------------------
+  // SCRAPE — AI-powered website scrape using Claude
+  // Returns a prefilled object for all Stage 1 sections.
+  // -------------------------------------------------------------------------
+  scrape: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        businessName: z.string(),
+        websiteUrl: z.string().url(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertOwnership(ctx.user.id, input.businessId);
+
+      // Mark scrape as running
+      await db
+        .update(businesses)
+        .set({ scrapeStatus: "running" })
+        .where(eq(businesses.id, input.businessId));
+
+      // ── Fetch website content ────────────────────────────────────────────────
+      let websiteContent = "";
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const fetchRes = await fetch(input.websiteUrl, {
+          signal: controller.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; BlogBatcher/1.0)" },
+        });
+        clearTimeout(timeoutId);
+        const html = await fetchRes.text();
+        // Strip HTML tags and collapse whitespace for a clean text payload
+        websiteContent = html
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 12000); // cap at ~12k chars to stay within token budget
+      } catch (fetchErr) {
+        // Fetch failed (timeout, DNS error, etc.) — proceed with URL only
+        console.warn("[Scrape] Website fetch failed, proceeding with URL only:", fetchErr);
+        websiteContent = "(Website content could not be fetched — use the URL and business name to infer details.)";
+      }
+
+      const prompt = `You are an expert business analyst and SEO strategist. Analyse the following website content for the business "${input.businessName}" (${input.websiteUrl}) and extract the information below. Return ONLY valid JSON matching the schema — no markdown, no explanation.
+
+WEBSITE CONTENT:
+${websiteContent}
+
+---
+
+Extract:
+
+{
+  "industry": "string — industry or category (e.g. 'Physiotherapy', 'E-commerce', 'Legal Services')",
+  "location": "string — city/state, 'Nationwide', or 'Online Only'",
+  "serviceArea": "string — where they ship/service",
+  "uniqueValueProposition": "string — what makes this business different in 1–2 sentences",
+  "audiences": [
+    { "label": "string — short audience label", "description": "string — what they search for and why" }
+  ],
+  "services": [
+    { "name": "string — service or product name", "pageUrl": "string or null — URL to that page if found" }
+  ],
+  "contactPageUrl": "string or null",
+  "bookingsPageUrl": "string or null",
+  "testimonialsPageUrl": "string or null",
+  "shopUrl": "string or null",
+  "primaryCtaText": "string — e.g. 'Book a free consultation'",
+  "primaryCtaUrl": "string or null",
+  "competitors": [
+    { "name": "string", "websiteUrl": "string or null", "description": "string or null" }
+  ],
+  "brandVoice": {
+    "formalityLevel": "very_formal | formal | semi_formal | conversational | casual",
+    "keyPhrases": ["string"],
+    "phrasesToAvoid": ["string"],
+    "styleNotes": "string — e.g. 'Uses short sentences. Avoids jargon.'",
+    "primaryArchetype": "professional_authority | friendly_neighbour | bold_direct | inspiring_thought_leader",
+    "finalVoiceBrief": "string — 2–4 sentence voice brief compiled from all sources above"
+  },
+  "existingBlogPosts": [
+    { "title": "string or null", "url": "string", "detectedKeyword": "string or null" }
+  ],
+  "yearsInBusiness": "number or null",
+  "clientsServed": "number or null",
+  "awardsAccreditations": "string or null"
+}
+
+Rules:
+- Return only data you can confidently infer from the website. Use null for unknowns.
+- Audiences: 2–5 groups maximum.
+- Services: list all distinct services/products found, up to 10.
+- Competitors: suggest 2–3 based on industry and location. These are suggestions — the user will confirm.
+- Existing blog posts: list up to 10 blog posts found on the site.
+- finalVoiceBrief must be a complete, usable brief that could be sent directly to an AI writing assistant.`;
+
+      try {
+        const response = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a business analyst. Return only valid JSON. No markdown fences, no explanation.",
+            },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" } as any,
+        });
+
+        const raw = (response?.choices?.[0]?.message?.content as string) ?? "{}";
+        let parsed: any = {};
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          parsed = {};
+        }
+
+        // Cache the scrape result and mark complete
+        await db
+          .update(businesses)
+          .set({
+            scrapeStatus: "complete",
+            lastScrapedAt: new Date(),
+            scrapeCache: parsed,
+            // Pre-fill top-level fields from scrape
+            industry: parsed.industry ?? undefined,
+            location: parsed.location ?? undefined,
+            serviceArea: parsed.serviceArea ?? undefined,
+            uniqueValueProposition: parsed.uniqueValueProposition ?? undefined,
+            primaryCtaText: parsed.primaryCtaText ?? undefined,
+            primaryCtaUrl: parsed.primaryCtaUrl ?? undefined,
+            contactPageUrl: parsed.contactPageUrl ?? undefined,
+            bookingsPageUrl: parsed.bookingsPageUrl ?? undefined,
+            testimonialsPageUrl: parsed.testimonialsPageUrl ?? undefined,
+            shopUrl: parsed.shopUrl ?? undefined,
+            yearsInBusiness: parsed.yearsInBusiness ?? undefined,
+            clientsServed: parsed.clientsServed ?? undefined,
+            awardsAccreditations: parsed.awardsAccreditations ?? undefined,
+          })
+          .where(eq(businesses.id, input.businessId));
+
+        return { success: true, data: parsed };
+      } catch (err) {
+        await db
+          .update(businesses)
+          .set({ scrapeStatus: "failed" })
+          .where(eq(businesses.id, input.businessId));
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Scrape failed. Please try again.",
+        });
+      }
+    }),
+
+  // -------------------------------------------------------------------------
+  // SAVE AUDIENCES — replace all audience rows for this business
+  // -------------------------------------------------------------------------
+  saveAudiences: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        audiences: z.array(audienceSchema),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertOwnership(ctx.user.id, input.businessId);
+
+      // Delete existing and re-insert (simple replace strategy)
+      await db
+        .delete(businessAudiences)
+        .where(eq(businessAudiences.businessId, input.businessId));
+
+      if (input.audiences.length > 0) {
+        await db.insert(businessAudiences).values(
+          input.audiences.map((a, i) => ({
+            businessId: input.businessId,
+            label: a.label,
+            description: a.description ?? null,
+            sortOrder: a.sortOrder ?? i,
+          }))
+        );
+      }
+
+      return { success: true };
+    }),
+
+  // -------------------------------------------------------------------------
+  // SAVE SERVICES — replace all service rows for this business
+  // -------------------------------------------------------------------------
+  saveServices: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        services: z.array(serviceSchema),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertOwnership(ctx.user.id, input.businessId);
+
+      await db
+        .delete(businessServices)
+        .where(eq(businessServices.businessId, input.businessId));
+
+      if (input.services.length > 0) {
+        await db.insert(businessServices).values(
+          input.services.map((s, i) => ({
+            businessId: input.businessId,
+            name: s.name,
+            pageUrl: s.pageUrl ?? null,
+            sortOrder: s.sortOrder ?? i,
+          }))
+        );
+      }
+
+      return { success: true };
+    }),
+
+  // -------------------------------------------------------------------------
+  // SAVE COMPETITORS — replace all competitor rows (max 3)
+  // -------------------------------------------------------------------------
+  saveCompetitors: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        competitors: z.array(competitorSchema).max(3),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertOwnership(ctx.user.id, input.businessId);
+
+      await db
+        .delete(businessCompetitors)
+        .where(eq(businessCompetitors.businessId, input.businessId));
+
+      if (input.competitors.length > 0) {
+        await db.insert(businessCompetitors).values(
+          input.competitors.map((c, i) => ({
+            businessId: input.businessId,
+            name: c.name,
+            websiteUrl: c.websiteUrl ?? null,
+            description: c.description ?? null,
+            sortOrder: c.sortOrder ?? i,
+          }))
+        );
+      }
+
+      return { success: true };
+    }),
+
+  // -------------------------------------------------------------------------
+  // SAVE BRAND VOICE — upsert the brand_voice row for this business
+  // -------------------------------------------------------------------------
+  saveBrandVoice: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        voice: brandVoiceSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertOwnership(ctx.user.id, input.businessId);
+
+      const existing = await db
+        .select({ id: brandVoice.id })
+        .from(brandVoice)
+        .where(eq(brandVoice.businessId, input.businessId))
+        .limit(1);
+
+      const values = {
+        businessId: input.businessId,
+        primaryArchetype: input.voice.primaryArchetype ?? null,
+        secondaryArchetype: input.voice.secondaryArchetype ?? null,
+        namedPersona: input.voice.namedPersona ?? null,
+        formalityLevel: input.voice.formalityLevel ?? null,
+        keyPhrases: input.voice.keyPhrases ?? null,
+        phrasesToAvoid: input.voice.phrasesToAvoid ?? null,
+        styleNotes: input.voice.styleNotes ?? null,
+        finalVoiceBrief: input.voice.finalVoiceBrief ?? null,
+      };
+
+      if (existing.length > 0) {
+        await db.update(brandVoice).set(values).where(eq(brandVoice.businessId, input.businessId));
+      } else {
+        await db.insert(brandVoice).values(values);
+      }
+
+      return { success: true };
+    }),
+
+  // -------------------------------------------------------------------------
+  // SAVE EXISTING CONTENT — store scraped blog posts (replaces all)
+  // -------------------------------------------------------------------------
+  saveExistingContent: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        posts: z.array(
+          z.object({
+            title: z.string().optional(),
+            url: z.string(),
+            detectedKeyword: z.string().optional(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertOwnership(ctx.user.id, input.businessId);
+
+      await db
+        .delete(businessExistingContent)
+        .where(eq(businessExistingContent.businessId, input.businessId));
+
+      if (input.posts.length > 0) {
+        await db.insert(businessExistingContent).values(
+          input.posts.map((p) => ({
+            businessId: input.businessId,
+            title: p.title ?? null,
+            url: p.url,
+            detectedKeyword: p.detectedKeyword ?? null,
+          }))
+        );
+      }
+
+      return { success: true };
+    }),
+
+  // -------------------------------------------------------------------------
+  // MARK STAGE COMPLETE — advance the stage tracker
+  // -------------------------------------------------------------------------
+  markStageComplete: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        completedStage: z.number().min(1).max(5),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertOwnership(ctx.user.id, input.businessId);
+
+      const nextStage = input.completedStage + 1;
+      await db
+        .update(businesses)
+        .set({ currentStage: nextStage })
+        .where(
+          and(
+            eq(businesses.id, input.businessId),
+            // Only advance if still on the expected stage
+            eq(businesses.currentStage, input.completedStage)
+          )
+        );
+
+      return { success: true, nextStage };
+    }),
+});
