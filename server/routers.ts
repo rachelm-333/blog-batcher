@@ -3,6 +3,7 @@ import { router } from "./_core/trpc";
 import { architectureRouter } from "./routers/architecture";
 import { authRouter } from "./routers/auth";
 import { businessRouter } from "./routers/business";
+import { keywordsRouter } from "./routers/keywords";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -21,6 +22,11 @@ export const appRouter = router({
   // Pack selection, guardrails engine, article type assignment, confirm.
   // All procedures live in server/routers/architecture.ts
   architecture: architectureRouter,
+
+  // ─── Layer 5: Stage 3 — SEO Keyword Research ──────────────────────────
+  // DataForSEO integration, keyword assignment, PAA, cannibalization check.
+  // All procedures live in server/routers/keywords.ts
+  keywords: keywordsRouter,
 
   // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
   // Layer 3 (Stripe) will be wired here once Auth is fully verified.

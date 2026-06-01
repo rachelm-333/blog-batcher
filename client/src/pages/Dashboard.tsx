@@ -137,6 +137,7 @@ export default function Dashboard() {
                       onClick={() => {
                         if (stage.id === 1) navigate("/onboarding");
                         else if (stage.id === 2) navigate("/architecture");
+                        else if (stage.id === 3) navigate("/keywords");
                         else toast.info("Coming soon", { description: `Stage ${stage.id}: ${stage.label} is not yet available.` });
                       }}
                       className="shrink-0"

@@ -116,12 +116,39 @@
 - [x] Vitest: guardrails engine (20 tests), architecture procedures — 47/47 total tests pass
 
 ## Layer 5: Stage 3 — SEO Keyword Research
-- [ ] DataForSEO API integration
-- [ ] Keyword assignment per article slot
-- [ ] Cannibalization check
-- [ ] People Also Ask (PAA) research
-- [ ] Keyword review and approval UI
-- [ ] PAA approval UI
+
+### DataForSEO integration (server/dataforseo.ts)
+- [x] DataForSEO API helper: keyword data (MSV, competition, CPC) via Keywords Data API
+- [x] DataForSEO PAA helper: People Also Ask questions via SERP API
+- [x] Fallback: if DataForSEO key not set, use Claude to suggest keywords (graceful degradation)
+
+### Backend (server/routers/keywords.ts)
+- [x] keywords.assignAll — auto-assign one primary keyword to every article_node (DataForSEO + Claude fallback)
+- [x] keywords.getAll — return all keywords for a business with node info
+- [x] keywords.getSuggestions — return DataForSEO alternatives for a given keyword
+- [x] keywords.swap — replace a keyword with a DataForSEO alternative or manual entry
+- [x] keywords.approveOne — approve a single keyword row
+- [x] keywords.approveAll — mark all keywords as approved, block if cannibalization found
+- [x] keywords.fetchPAA — fetch PAA questions for all approved keywords
+- [x] keywords.approvePAA — approve PAA question for a node, advance stage to 4 when all approved
+- [x] Cannibalization engine (shared/cannibalizationCheck.ts): exact duplicate + semantic overlap detection
+
+### Frontend (client/src/pages/Keywords.tsx)
+- [x] Stage progress bar showing: Assign → Keyword Review → PAA Review → Approved
+- [x] Keyword review table: one row per article node (type, node label, keyword, MSV, competition, status)
+- [x] Swap button per row: opens modal with DataForSEO alternatives + manual entry
+- [x] Approve button per row (individual approval)
+- [x] 'Approve All' button — blocked if any cannibalization warnings exist
+- [x] Cannibalization warning banner listing conflicting keyword pairs
+- [x] Duplicate keyword warning (exact match)
+- [x] Progress gate: 'Proceed to PAA Review' shown only when all keywords approved
+- [x] PAA review step: select dropdown per article from PAA questions list
+- [x] Progress gate: 'Proceed to Article Generation' shown only when all PAA approved
+- [x] /keywords route, auth-guarded, redirects to /architecture if stage < 3
+- [x] Dashboard Stage 3 'Continue' button links to /keywords
+
+### Tests
+- [x] Vitest: cannibalization engine (8 tests), keywords.getAll, keywords.approveOne, keywords.approveAll (blocks on cannibalization), keywords.approvePAA (stageAdvanced flag) — 70/70 total pass
 
 ## Layer 6: Stage 4 — Article Generation
 - [ ] Article generation queue (one at a time per user)

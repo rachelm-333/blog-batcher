@@ -9,4 +9,6 @@ export const ENV = {
   emailFromAddress: process.env.EMAIL_FROM_ADDRESS ?? "onboarding@resend.dev",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  dataForSeoLogin: process.env.DATAFORSEO_LOGIN ?? "",
+  dataForSeoPassword: process.env.DATAFORSEO_PASSWORD ?? "",
 };
