@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Architecture from "./pages/Architecture";
 import Dashboard from "./pages/Dashboard";
 import Keywords from "./pages/Keywords";
+import ArticleGeneration from "./pages/ArticleGeneration";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/architecture" component={Architecture} />
       <Route path="/keywords" component={Keywords} />
+      <Route path="/generate" component={ArticleGeneration} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

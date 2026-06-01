@@ -138,6 +138,7 @@ export default function Dashboard() {
                         if (stage.id === 1) navigate("/onboarding");
                         else if (stage.id === 2) navigate("/architecture");
                         else if (stage.id === 3) navigate("/keywords");
+                        else if (stage.id === 4) navigate("/generate");
                         else toast.info("Coming soon", { description: `Stage ${stage.id}: ${stage.label} is not yet available.` });
                       }}
                       className="shrink-0"

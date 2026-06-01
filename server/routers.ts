@@ -4,6 +4,7 @@ import { architectureRouter } from "./routers/architecture";
 import { authRouter } from "./routers/auth";
 import { businessRouter } from "./routers/business";
 import { keywordsRouter } from "./routers/keywords";
+import { articlesRouter } from "./routers/articles";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -27,6 +28,11 @@ export const appRouter = router({
   // DataForSEO integration, keyword assignment, PAA, cannibalization check.
   // All procedures live in server/routers/keywords.ts
   keywords: keywordsRouter,
+
+  // ─── Layer 6: Stage 4 — Article Generation ──────────────────────────────
+  // Batch generation, progress polling, single article view, regenerate.
+  // All procedures live in server/routers/articles.ts
+  articles: articlesRouter,
 
   // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
   // Layer 3 (Stripe) will be wired here once Auth is fully verified.

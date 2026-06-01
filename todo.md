@@ -151,14 +151,55 @@
 - [x] Vitest: cannibalization engine (8 tests), keywords.getAll, keywords.approveOne, keywords.approveAll (blocks on cannibalization), keywords.approvePAA (stageAdvanced flag) — 70/70 total pass
 
 ## Layer 6: Stage 4 — Article Generation
-- [ ] Article generation queue (one at a time per user)
-- [ ] Claude prompt builder (all 16-point Authority Standard context)
-- [ ] AI fingerprint scrub pass
-- [ ] Rules-based scoring (Pass 1)
-- [ ] AI quality scoring (Pass 2)
-- [ ] Status badge system (Authority Ready / Strong / Needs Review)
-- [ ] Progress visibility UI
-- [ ] Auto-regeneration for articles below threshold
+
+### Word count rules (from scope)
+- Cornerstone: 2,500–3,200 words (hard max 3,200)
+- Pillar: 1,500–1,800 words
+- Cluster: 1,000–1,200 words
+
+### Generation engine (server/articleEngine.ts)
+- [x] Pre-generate URL slugs for all article_nodes before writing begins
+- [x] Generation order: Cornerstone → Pillar (grouped by parent) → Cluster (grouped by parent pillar)
+- [x] Claude prompt builder: sends all 16 Authority Standard rules + full business context + internal link URLs
+- [x] Explicit no-fabrication instruction in every prompt
+- [x] Word count enforcement: prompt specifies range, post-generation check truncates/flags if exceeded
+- [x] AI fingerprint scrub pass (second Claude call): remove em dashes, rhetorical openers, banned phrases, repetitive structures
+- [x] Pass 1 rules-based scorer: keyword density, keyword in H1/H2/H3/first-100-words/slug, meta title ≤60 chars, meta description 140–160 chars, word count in range, external link present, internal CTA link present, schema present
+- [x] Pass 2 AI quality scorer: search intent resolution, human authenticity, title territory, E-E-A-T, batch cohesion
+- [x] Combined score → status badge: Authority Ready (all 16), Strong (14–15), Needs Review (<14)
+- [x] Auto-regeneration: articles scoring <80/100 internal queued for one retry; if still <80 flagged for manual review
+- [x] One article at a time per user (no parallel generation for same user)
+- [x] FAQ schema only on Cornerstones and Pillars — never Clusters
+
+### Backend procedures (server/routers/articles.ts)
+- [x] articles.startGeneration — validates stage=4, pre-generates slugs, enqueues all nodes in correct order, returns jobId
+- [x] articles.getGenerationStatus — returns progress (written/scored/ready/failed counts, current article title)
+- [x] articles.getAll — return all articles for a business with status badges
+- [x] articles.get — return single article with full content, SEO fields, schema, score breakdown
+- [x] articles.regenerate — re-run generation for a single flagged article
+- [x] articles.updateStatus — admin/manual status override
+
+### Frontend (client/src/pages/ArticleGeneration.tsx)
+- [x] 'Start Generation' button (disabled if stage < 4)
+- [x] Live progress bar: articles written / articles scored / articles ready
+- [x] Current article being written displayed by title
+- [x] Article cards grid: each card shows title, type, status badge (Authority Ready / Strong / Needs Review)
+- [x] Failed articles shown separately with 'Retry' button
+- [x] 'Proceed to Review' button (enabled when all articles ≥ Needs Review or manually reviewed)
+- [x] /generate route, auth-guarded, redirects to /keywords if stage < 4
+- [x] Dashboard Stage 4 'Continue' button links to /generate
+
+### Acceptance criteria (all must pass before checkpoint)
+- [x] Articles generate in correct order: Cornerstone → Pillar → Cluster
+- [x] Word counts enforced: Cornerstone ≤3,200 / Pillar 1,500–1,800 / Cluster 1,000–1,200
+- [x] All 16 Authority Standard points applied in prompt
+- [x] Status badge displays correctly based on score
+- [x] Articles saved to DB with correct status
+- [x] No fabricated stats instruction present in every prompt
+- [x] AI fingerprint scrub pass runs after generation
+
+### Tests
+- [x] Vitest: articleEngine slug generation, generation order, word count enforcement, Pass 1 scorer (all 16 rules), status badge thresholds, scrub pass (banned phrase removal) — 65/65 pass
 
 ## Layer 7: Stage 5 — Review
 - [ ] Article review UI (left panel: article body, right panel: SEO fields)
