@@ -271,3 +271,93 @@
 ## Layer 14: Multi-Business
 - [ ] Business selector dropdown in top nav
 - [ ] Isolated workspaces per business
+
+## Layer 8: Publishing & CMS Delivery
+
+### CMS Publisher Service (server/cmsPublisher.ts)
+- [ ] WordPress publisher: POST to /wp-json/wp/v2/posts with title, content, slug, status, date
+- [ ] WordPress SEO meta: Yoast (_yoast_wpseo_title, _yoast_wpseo_metadesc, _yoast_wpseo_focuskw), RankMath (rank_math_title, rank_math_description, rank_math_focus_keyword), AIOSEO (_aioseo_title, _aioseo_description, _aioseo_keywords), None (standard post meta)
+- [ ] WordPress schema: inject JSON-LD as custom field _blog_batcher_schema
+- [ ] WordPress image: upload featured image via /wp-json/wp/v2/media if imageUrl provided
+- [ ] Wix publisher: POST to Wix Blog API v3 (create draft, set SEO fields, publish)
+- [ ] Zapier publisher: POST article payload JSON to user-supplied webhookUrl
+- [ ] Publish failure: catch all errors, return structured { success, cmsPostId, cmsPostUrl, error } result
+- [ ] Connection test: testConnection(integration) — lightweight HEAD/GET to verify credentials before publish
+
+### Backend Procedures
+- [ ] integrations.save — upsert CMS credentials (encrypted) for a business+platform
+- [ ] integrations.get — return all integrations for a business (credentials redacted)
+- [ ] integrations.testConnection — test live connection to CMS, update status + lastTestedAt
+- [ ] integrations.delete — remove an integration
+- [ ] articles.publish — publish one article to connected CMS, update status/cmsPostId/cmsPostUrl/publishedAt or set failed+errorMessage
+- [ ] articles.publishAll — publish all approved articles for a business (respects scheduledPublishAt)
+- [ ] articles.retryPublish — retry a single failed article publish
+- [ ] Publish failure notification: call notifyOwner + send email to user on publish failure
+- [ ] ZIP export integration test: verify real archive from /api/articles/export-zip contains all 5 file types
+
+### Frontend Pages
+- [ ] /integrations route — CMS Integrations settings page (auth-guarded)
+- [ ] WordPress connection form: Site URL, Username, Application Password, SEO Plugin selector (Yoast/RankMath/AIOSEO/None), Test Connection button
+- [ ] Wix connection form: API Key, Site ID, Test Connection button
+- [ ] Zapier connection form: Webhook URL, Test Connection button
+- [ ] Shopify/Webflow/Squarespace/Ghost: Coming Soon cards (greyed out)
+- [ ] Connection status badge per integration (Connected / Not Connected / Failed)
+- [ ] Test Connection result shown inline (success message or error detail)
+- [ ] PublishSchedule page: wire Send All to CMS button to articles.publishAll
+- [ ] PublishSchedule page: show publish progress (X of Y articles published)
+- [ ] ArticleReview sidebar: show publish status badge (Scheduled / Published / Failed) per article
+- [ ] ArticleReview sidebar: show CMS post URL as clickable link when published
+- [ ] Failed publish error detail shown in ArticleReview sidebar with Retry button
+- [ ] Dashboard: link to /integrations from navigation sidebar
+- [ ] Integrations link in DashboardLayout sidebar nav
+
+### Verification
+- [ ] WordPress publish end-to-end: article appears in WP with correct SEO fields
+- [ ] ZIP download: open real archive, assert HTML + Markdown + meta.txt + schema.json + schedule.csv present
+- [ ] Deliberate publish failure: error notification appears in dashboard
+- [ ] Publish status updates correctly in article sidebar
+- [ ] Vitest: cmsPublisher (all 4 WP plugin modes, Zapier payload, failure handling, connection test)
+
+## Layer 8: Publishing & CMS Delivery
+
+### Backend
+- [x] server/cmsPublisher.ts — WordPress REST API (Yoast/RankMath/AIOSEO/None), Wix Content API, Zapier webhook
+- [x] integrations router — save/test/get CMS credentials (platform, siteUrl, username, password, webhookUrl, seoPlugin)
+- [x] articles.publish — publish single article to configured CMS, update status/cmsPostId/cmsPostUrl/publishedAt/errorMessage
+- [x] articles.retryPublish — clear error and re-attempt publish for failed articles
+- [x] articles.publishAll — publish all approved articles for a business
+- [x] Failed publish handling — error stored on article, notifyOwner called with specific error message
+- [x] Publish status tracking — articles.status enum includes scheduled/published/failed
+
+### Frontend
+- [x] /integrations route — Integrations settings page (WordPress, Wix, Zapier connection forms with Test Connection)
+- [x] WordPress form: Site URL, Username, Application Password, SEO Plugin selector (Yoast/RankMath/AIOSEO/None)
+- [x] Wix form: Site ID, API Key
+- [x] Zapier form: Webhook URL
+- [x] Test Connection button — validates credentials against live CMS endpoint
+- [x] Coming Soon cards: Shopify, Webflow, Squarespace, Ghost
+- [x] PublishSchedule.tsx — Send All to CMS button uses real articles.publishAll mutation
+- [x] ArticleReview.tsx — publish status badges in sidebar (published/scheduled/failed)
+- [x] ArticleReview.tsx — Retry Publish button for failed articles
+- [x] ArticleReview.tsx — CMS post URL link for published articles
+- [x] ArticleReview.tsx — publish error message displayed in SEO panel
+
+### Tests (34/34 pass)
+- [x] WordPress payload: all 4 SEO plugin modes (Yoast, RankMath, AIOSEO, None)
+- [x] Wix payload: title, slug, richContent, seoData
+- [x] Zapier payload: all required fields
+- [x] Export ZIP: real archive with all 5 file types verified (adm-zip)
+- [x] Failed publish: 401 error stored, status set to 'failed', publishedAt null
+- [x] Successful publish: status set to 'published', cmsPostId/cmsPostUrl stored, publishedAt set
+
+### Verification (48/48 pass)
+- [x] V1: WordPress payload — all 4 SEO plugin modes correct
+- [x] V2: Wix payload — title, slug, seoData, richContent correct
+- [x] V3: Zapier payload — all 11 fields correct
+- [x] V4: Export ZIP — real 1085-byte archive, all 5 files present and correct
+- [x] V5: Deliberate publish failure — 401 received, error stored, status=failed
+- [x] V6: Publish status badge update — published/failed badges correct
+
+### Honest Gap
+- [ ] Real WordPress site publish test — requires a live WordPress URL + application password from user
+  (mocked HTTP server used instead: verifies exact request structure, auth header, payload, and error handling)

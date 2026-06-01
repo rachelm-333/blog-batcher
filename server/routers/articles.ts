@@ -41,6 +41,15 @@ import {
   preGenerateSlugs,
   MIN_DELIVERY_SCORE,
 } from "../articleEngine";
+import {
+  publishToWordPress,
+  publishToWix,
+  publishToZapier,
+  decryptCredentials,
+  type ArticlePayload,
+} from "../cmsPublisher";
+import { integrations } from "../../drizzle/schema";
+import { notifyOwner } from "../_core/notification";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -780,5 +789,330 @@ ${row.bodyHtml ?? ""}
       });
 
       return { zipBase64: zipBuffer.toString("base64"), articleCount: rows.length };
+    }),
+
+  // ─── Layer 8: CMS Publish ─────────────────────────────────────────────────────
+
+  /**
+   * Publish a single article to the connected CMS.
+   * Updates article status to published/failed and records cmsPostId/cmsPostUrl.
+   */
+  publish: protectedProcedure
+    .input(
+      z.object({
+        articleId: z.number(),
+        platform: z.enum(["wordpress", "wix", "zapier"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      // Load article with node info
+      const [row] = await db
+        .select({
+          id: articles.id,
+          businessId: articles.businessId,
+          title: articles.title,
+          bodyHtml: articles.bodyHtml,
+          metaTitle: articles.metaTitle,
+          metaDescription: articles.metaDescription,
+          focusKeyword: articles.focusKeyword,
+          urlSlug: articles.urlSlug,
+          schemaMarkup: articles.schemaMarkup,
+          scheduledPublishAt: articles.scheduledPublishAt,
+          status: articles.status,
+          level: articleNodes.level,
+          imageUrl: articleImages.imageUrl,
+          altText: articleImages.altText,
+        })
+        .from(articles)
+        .leftJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
+        .leftJoin(articleImages, eq(articleImages.articleId, articles.id))
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, row.businessId);
+
+      if (row.status !== "approved" && row.status !== "scheduled" && row.status !== "failed") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Article must be approved before publishing",
+        });
+      }
+
+      // Load integration credentials
+      const [integration] = await db
+        .select({ credentialsEncrypted: integrations.credentialsEncrypted })
+        .from(integrations)
+        .where(
+          and(
+            eq(integrations.businessId, row.businessId),
+            eq(integrations.platform, input.platform)
+          )
+        )
+        .limit(1);
+
+      if (!integration?.credentialsEncrypted) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `No ${input.platform} credentials found. Connect your CMS in Integrations first.`,
+        });
+      }
+
+      const creds = decryptCredentials(integration.credentialsEncrypted);
+      if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt CMS credentials" });
+
+      const payload: ArticlePayload = {
+        title: row.title ?? "",
+        bodyHtml: row.bodyHtml ?? "",
+        metaTitle: row.metaTitle ?? row.title ?? "",
+        metaDescription: row.metaDescription ?? "",
+        focusKeyword: row.focusKeyword ?? "",
+        urlSlug: row.urlSlug ?? "",
+        schemaMarkup: row.schemaMarkup ?? null,
+        imageUrl: row.imageUrl ?? null,
+        imageAltText: row.altText ?? null,
+        scheduledPublishAt: row.scheduledPublishAt ?? null,
+        level: row.level ?? "cluster",
+      };
+
+      let result;
+      if (input.platform === "wordpress") {
+        result = await publishToWordPress(
+          {
+            siteUrl: creds.siteUrl ?? "",
+            username: creds.username ?? "",
+            applicationPassword: creds.applicationPassword ?? "",
+            seoPlugin: (creds.seoPlugin as "yoast" | "rankmath" | "aioseo" | "none") ?? "none",
+          },
+          payload
+        );
+      } else if (input.platform === "wix") {
+        result = await publishToWix(
+          { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "" },
+          payload
+        );
+      } else {
+        result = await publishToZapier(
+          { webhookUrl: creds.webhookUrl ?? "" },
+          payload
+        );
+      }
+
+      if (result.success) {
+        const isScheduled = row.scheduledPublishAt && row.scheduledPublishAt > new Date();
+        await db
+          .update(articles)
+          .set({
+            status: isScheduled ? "scheduled" : "published",
+            publishedAt: isScheduled ? null : new Date(),
+            cmsPostId: result.cmsPostId ?? null,
+            cmsPostUrl: result.cmsPostUrl ?? null,
+            errorMessage: null,
+          })
+          .where(eq(articles.id, input.articleId));
+      } else {
+        await db
+          .update(articles)
+          .set({
+            status: "failed",
+            errorMessage: result.error ?? "Publish failed",
+          })
+          .where(eq(articles.id, input.articleId));
+
+        // Notify owner of publish failure
+        await notifyOwner({
+          title: `Publish failed: ${row.title ?? "Article"}`,
+          content: `Article "${row.title ?? "Article"}" failed to publish to ${input.platform}.\nError: ${result.error ?? "Unknown error"}\nBusiness ID: ${row.businessId}`,
+        });
+      }
+
+      return { success: result.success, error: result.error, cmsPostUrl: result.cmsPostUrl };
+    }),
+
+  /**
+   * Publish all approved articles for a business to the connected CMS.
+   * Processes articles one at a time in generation order.
+   */
+  publishAll: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        platform: z.enum(["wordpress", "wix", "zapier"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      // Load integration credentials
+      const [integration] = await db
+        .select({ credentialsEncrypted: integrations.credentialsEncrypted })
+        .from(integrations)
+        .where(
+          and(
+            eq(integrations.businessId, input.businessId),
+            eq(integrations.platform, input.platform)
+          )
+        )
+        .limit(1);
+
+      if (!integration?.credentialsEncrypted) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `No ${input.platform} credentials found. Connect your CMS in Integrations first.`,
+        });
+      }
+
+      const creds = decryptCredentials(integration.credentialsEncrypted);
+      if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt CMS credentials" });
+
+      // Load all approved articles in generation order
+      const rows = await db
+        .select({
+          id: articles.id,
+          title: articles.title,
+          bodyHtml: articles.bodyHtml,
+          metaTitle: articles.metaTitle,
+          metaDescription: articles.metaDescription,
+          focusKeyword: articles.focusKeyword,
+          urlSlug: articles.urlSlug,
+          schemaMarkup: articles.schemaMarkup,
+          scheduledPublishAt: articles.scheduledPublishAt,
+          level: articleNodes.level,
+          imageUrl: articleImages.imageUrl,
+          altText: articleImages.altText,
+        })
+        .from(articles)
+        .leftJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
+        .leftJoin(articleImages, eq(articleImages.articleId, articles.id))
+        .where(
+          and(
+            eq(articles.businessId, input.businessId),
+            inArray(articles.status, ["approved", "scheduled"])
+          )
+        )
+        .orderBy(articleNodes.sortOrder);
+
+      if (rows.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No approved articles to publish" });
+      }
+
+      let published = 0;
+      let failed = 0;
+      const failures: { title: string; error: string }[] = [];
+
+      for (const row of rows) {
+        const payload: ArticlePayload = {
+          title: row.title ?? "",
+          bodyHtml: row.bodyHtml ?? "",
+          metaTitle: row.metaTitle ?? row.title ?? "",
+          metaDescription: row.metaDescription ?? "",
+          focusKeyword: row.focusKeyword ?? "",
+          urlSlug: row.urlSlug ?? "",
+          schemaMarkup: row.schemaMarkup ?? null,
+          imageUrl: row.imageUrl ?? null,
+          imageAltText: row.altText ?? null,
+          scheduledPublishAt: row.scheduledPublishAt ?? null,
+          level: row.level ?? "cluster",
+        };
+
+        let result;
+        if (input.platform === "wordpress") {
+          result = await publishToWordPress(
+            {
+              siteUrl: creds.siteUrl ?? "",
+              username: creds.username ?? "",
+              applicationPassword: creds.applicationPassword ?? "",
+              seoPlugin: (creds.seoPlugin as "yoast" | "rankmath" | "aioseo" | "none") ?? "none",
+            },
+            payload
+          );
+        } else if (input.platform === "wix") {
+          result = await publishToWix(
+            { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "" },
+            payload
+          );
+        } else {
+          result = await publishToZapier(
+            { webhookUrl: creds.webhookUrl ?? "" },
+            payload
+          );
+        }
+
+        if (result.success) {
+          const isScheduled = row.scheduledPublishAt && row.scheduledPublishAt > new Date();
+          await db
+            .update(articles)
+            .set({
+              status: isScheduled ? "scheduled" : "published",
+              publishedAt: isScheduled ? null : new Date(),
+              cmsPostId: result.cmsPostId ?? null,
+              cmsPostUrl: result.cmsPostUrl ?? null,
+              errorMessage: null,
+            })
+            .where(eq(articles.id, row.id));
+          published++;
+        } else {
+          await db
+            .update(articles)
+            .set({
+              status: "failed",
+              errorMessage: result.error ?? "Publish failed",
+            })
+            .where(eq(articles.id, row.id));
+          failed++;
+          failures.push({ title: row.title ?? "Article", error: result.error ?? "Unknown error" });
+        }
+      }
+
+      // Notify owner if any failures
+      if (failures.length > 0) {
+        await notifyOwner({
+          title: `Publish batch completed with ${failures.length} failure(s)`,
+          content: `Published ${published}/${rows.length} articles to ${input.platform}.\n\nFailed:\n${failures.map(f => `\u2022 ${f.title}: ${f.error}`).join("\n")}`,
+        });
+      }
+
+      return { total: rows.length, published, failed, failures };
+    }),
+
+  /**
+   * Retry publishing a single failed article.
+   * Resets status to approved so publish can be called again.
+   */
+  retryPublish: protectedProcedure
+    .input(
+      z.object({
+        articleId: z.number(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [row] = await db
+        .select({ id: articles.id, status: articles.status, businessId: articles.businessId })
+        .from(articles)
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, row.businessId);
+
+      if (row.status !== "failed") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Only failed articles can be retried" });
+      }
+
+      // Reset to approved so the publish mutation can be called again
+      await db
+        .update(articles)
+        .set({ status: "approved", errorMessage: null })
+        .where(eq(articles.id, input.articleId));
+
+      return { readyToPublish: true };
     }),
 });

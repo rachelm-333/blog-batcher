@@ -62,21 +62,18 @@ const PUBLISH_METHODS: {
     label: "Wix",
     description: "Publish directly to your Wix site via API",
     icon: <span className="text-2xl font-black text-blue-600">W</span>,
-    comingSoon: true,
   },
   {
     id: "wordpress",
     label: "WordPress",
     description: "REST API + Application Password",
     icon: <span className="text-2xl font-black text-blue-800">WP</span>,
-    comingSoon: true,
   },
   {
     id: "zapier",
     label: "Zapier",
     description: "Send to any platform via Zapier webhook",
     icon: <Zap className="h-6 w-6 text-orange-500" />,
-    comingSoon: true,
   },
   {
     id: "export_zip",
@@ -182,6 +179,18 @@ export default function PublishSchedule() {
     onError: (err) => toast.error(err.message),
   });
 
+  const publishAll = trpc.articles.publishAll.useMutation({
+    onSuccess: (data) => {
+      if (data.failed > 0) {
+        toast.error(`Published ${data.published}/${data.total} articles. ${data.failed} failed — check the Review screen for details.`);
+      } else {
+        toast.success(`All ${data.published} articles published successfully!`);
+      }
+      refetchSchedule();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   // Derived state
   const articleList = articlesData ?? [];
   const approvedCount = articleList.filter(
@@ -243,12 +252,28 @@ export default function PublishSchedule() {
   function handleSendToCMS() {
     if (!business?.id) return;
     if (selectedMethod === "export_zip") {
-      // Trigger ZIP download
       window.open(`/api/articles/export-zip?businessId=${business.id}`, "_blank");
       return;
     }
-    // For CMS methods (coming soon), confirm the schedule
-    confirmSchedule.mutate({ businessId: business.id });
+    // Save schedule, confirm it (sets scheduledPublishAt on articles), then publish all
+    saveSchedule.mutate(
+      { businessId: business.id, cadence, startDate },
+      {
+        onSuccess: () => {
+          confirmSchedule.mutate(
+            { businessId: business.id! },
+            {
+              onSuccess: () => {
+                publishAll.mutate({
+                  businessId: business.id!,
+                  platform: selectedMethod as "wordpress" | "wix" | "zapier",
+                });
+              },
+            }
+          );
+        },
+      }
+    );
   }
 
   const monthDays = getMonthDays(calendarMonth.year, calendarMonth.month);
@@ -525,11 +550,11 @@ export default function PublishSchedule() {
           </div>
           <Button
             size="lg"
-            disabled={!allApproved || confirmSchedule.isPending}
+            disabled={!allApproved || confirmSchedule.isPending || publishAll.isPending || saveSchedule.isPending}
             onClick={handleSendToCMS}
             className="min-w-[220px]"
           >
-            {confirmSchedule.isPending ? (
+            {(confirmSchedule.isPending || publishAll.isPending || saveSchedule.isPending) ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : selectedMethod === "export_zip" ? (
               <Download className="h-4 w-4 mr-2" />

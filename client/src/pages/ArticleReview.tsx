@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  ExternalLink,
   FileText,
   ImageIcon,
   Loader2,
@@ -36,6 +37,7 @@ import {
   Star,
   Trophy,
   Upload,
+  XCircle,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -87,7 +89,30 @@ function StatusBadgeChip({
   badge: StatusBadge;
   status: ArticleStatus;
 }) {
-  if (status === "approved" || status === "scheduled" || status === "published") {
+  if (status === "published") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+        <CheckCircle2 className="h-3 w-3" />
+        Published
+      </span>
+    );
+  }
+  if (status === "scheduled") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+        ⏰ Scheduled
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+        <XCircle className="h-3 w-3" />
+        Publish Failed
+      </span>
+    );
+  }
+  if (status === "approved") {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
         <CheckCircle2 className="h-3 w-3" />
@@ -345,8 +370,21 @@ export default function ArticleReview() {
   const isApproved =
     selectedItem?.status === "approved" ||
     selectedItem?.status === "scheduled" ||
-    selectedItem?.status === "published";
-  const canRegenerate = !!selectedItem?.id && !isApproved;
+    selectedItem?.status === "published" ||
+    selectedItem?.status === "failed";
+  const canRegenerate = !!selectedItem?.id &&
+    selectedItem?.status !== "approved" &&
+    selectedItem?.status !== "scheduled" &&
+    selectedItem?.status !== "published";
+
+  const retryPublish = trpc.articles.retryPublish.useMutation({
+    onSuccess: () => {
+      toast.success("Publish retry started.");
+      refetchArticles();
+      refetchFull();
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   function handleSaveDraft() {
     if (!selectedItem?.id) return;
@@ -694,6 +732,50 @@ export default function ArticleReview() {
                     )}
                     Approve &amp; Publish →
                   </Button>
+                </div>
+              ) : selectedItem.status === "failed" ? (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                    <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="font-semibold">Publish failed</div>
+                      {selectedItem.errorMessage && (
+                        <div className="mt-1 text-red-600">{selectedItem.errorMessage}</div>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-xs border-red-200 text-red-700 hover:bg-red-50"
+                    onClick={() => selectedItem.id && retryPublish.mutate({ articleId: selectedItem.id })}
+                    disabled={retryPublish.isPending}
+                  >
+                    {retryPublish.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    Retry Publish
+                  </Button>
+                </div>
+              ) : selectedItem.status === "published" ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Article published successfully.
+                  </div>
+                  {(fullArticle as any)?.cmsPostUrl && (
+                    <a
+                      href={(fullArticle as any).cmsPostUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-primary underline"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      View on CMS
+                    </a>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700">

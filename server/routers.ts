@@ -6,6 +6,7 @@ import { businessRouter } from "./routers/business";
 import { keywordsRouter } from "./routers/keywords";
 import { articlesRouter } from "./routers/articles";
 import { scheduleRouter } from "./routers/schedule";
+import { integrationsRouter } from "./routers/integrations";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -39,6 +40,11 @@ export const appRouter = router({
   // Publishing schedule management: save cadence, get dates, confirm.
   // All procedures live in server/routers/schedule.ts
   schedule: scheduleRouter,
+
+  // ─── Layer 8: CMS Integrations ────────────────────────────────────────────
+  // WordPress, Wix, Zapier connection management.
+  // All procedures live in server/routers/integrations.ts
+  integrations: integrationsRouter,
 
   // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
   // Layer 3 (Stripe) will be wired here once Auth is fully verified.

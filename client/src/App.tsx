@@ -10,6 +10,7 @@ import Keywords from "./pages/Keywords";
 import ArticleGeneration from "./pages/ArticleGeneration";
 import ArticleReview from "./pages/ArticleReview";
 import PublishSchedule from "./pages/PublishSchedule";
+import Integrations from "./pages/Integrations";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/generate" component={ArticleGeneration} />
       <Route path="/review" component={ArticleReview} />
       <Route path="/publish" component={PublishSchedule} />
+      <Route path="/integrations" component={Integrations} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />
