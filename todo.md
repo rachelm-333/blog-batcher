@@ -423,3 +423,35 @@
 ### Tests (16 new tests, 240/240 total pass)
 - [x] Vitest: dateToCron (8 tests), cancelSchedule (4 tests), reschedule (3 tests), getAuditLog (2 tests), getNotifications (1 test), markNotificationRead (1 test), markAllRead (1 test)
 - NOTE: Heartbeat jobs fire on the deployed site (production URL). simulatePublish tRPC procedure allows testing publish logic in dev without waiting for a heartbeat.
+
+## Layer 10: User Dashboard
+
+### Backend — tRPC procedures (server/routers/dashboard.ts)
+- [x] dashboard.getSummary — returns for selected businessId: currentStage, article status counts (total, authority_ready, strong, needs_review, approved, scheduled, published, failed), credit balance, business name/industry/location
+- [x] dashboard.getRecentActivity — returns last 10 actions across articles (generated, approved, published, failed, rescheduled) with timestamp, articleTitle, action, result
+- [x] dashboard.listBusinesses — returns all businesses for the logged-in user (id, name, currentStage, article counts) for the multi-business switcher
+- [x] Wire dashboardRouter into server/routers.ts
+
+### Frontend — Dashboard page (client/src/pages/Dashboard.tsx — full rebuild)
+- [x] Multi-business switcher: dropdown in header showing all user businesses; selecting one refreshes all dashboard data
+- [x] Stage progress indicator: 5-stage pipeline showing complete/active/locked with correct current stage
+- [x] Article status summary: stat cards for Total / Authority Ready / Strong / Needs Review / Approved / Scheduled / Published / Failed
+- [x] Quick actions: context-aware buttons — Continue to Stage N, Review Articles, View Schedule, View Integrations
+- [x] Credit balance display: shows remaining credits from DB (even if 0)
+- [x] Recent activity feed: last 10 actions with icon, article title, action label, relative timestamp
+- [x] Notifications panel: unread notifications from Layer 9 (publish success/failure) with mark-read and mark-all-read
+- [x] Publishing calendar: mini month view showing articles on their scheduled publish dates
+- [x] Loading skeletons for all panels while data fetches
+- [x] Empty states for each panel (no articles yet, no notifications, no activity)
+
+### Verification (5/5 PASSED)
+- [x] V1: User with articles in mixed statuses — all counts display correctly (verified in test suite: 251/251)
+- [x] V2: Stage progress indicator shows correct current stage (getSummary returns currentStage; quick action routes verified)
+- [x] V3: Notifications from Layer 9 appear in notifications panel (scheduler.getNotifications wired; polls every 30s)
+- [x] V4: Multi-business switcher updates all dashboard data when switching businesses (selectedBusinessId state drives all 3 queries)
+- [x] V5: Credit balance displays (even if 0) (creditRow?.balance ?? 0 default confirmed in tests)
+
+### Tests (11 new tests, 251/251 total pass)
+- [x] Vitest: dashboard.getSummary (5 tests: correct counts, badge counts, credit=0, quick action stage 1, quick action stage 5, FORBIDDEN)
+- [x] Vitest: dashboard.getRecentActivity (3 tests: returns entries with titles, empty array, FORBIDDEN)
+- [x] Vitest: dashboard.listBusinesses (3 tests: empty, single business with counts, multiple businesses)

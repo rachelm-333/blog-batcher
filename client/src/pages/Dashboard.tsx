@@ -1,188 +1,718 @@
-import { Button } from "@/components/ui/button";
-import { trpc } from "@/lib/trpc";
-import { Loader2, ArrowRight, CheckCircle2, Circle } from "lucide-react";
-import { useEffect } from "react";
-import { toast } from "sonner";
-import { useLocation } from "wouter";
+/**
+ * Layer 10 — User Dashboard
+ *
+ * The main screen a returning user sees after login.
+ * Panels:
+ *  - Multi-business switcher (header dropdown)
+ *  - Stage progress indicator (5-stage pipeline)
+ *  - Article status summary (stat cards)
+ *  - Quick actions (context-aware CTA buttons)
+ *  - Credit balance
+ *  - Recent activity feed (last 10 automated actions)
+ *  - Notifications panel (unread publish events)
+ *  - Publishing calendar (mini month view)
+ */
 
+import { useState, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import DashboardLayout from "@/components/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  CheckCircle2,
+  Circle,
+  ArrowRight,
+  ChevronDown,
+  Building2,
+  CreditCard,
+  Activity,
+  Bell,
+  CalendarDays,
+  FileText,
+  Zap,
+  AlertTriangle,
+  RefreshCw,
+  XCircle,
+  Clock,
+  CheckCheck,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 const STAGES = [
-  { id: 1, label: "Business Profile", description: "Website scan, brand voice, services" },
-  { id: 2, label: "Blog Architecture", description: "Pack size, content hierarchy" },
-  { id: 3, label: "Keyword Research", description: "Primary keywords, PAA questions" },
-  { id: 4, label: "Article Generation", description: "AI-written, SEO-optimised articles" },
-  { id: 5, label: "Review & Publish", description: "Edit, approve, schedule, export" },
+  { id: 1, label: "Business Profile", description: "Website scan, brand voice, services", path: "/onboarding" },
+  { id: 2, label: "Blog Architecture", description: "Pack size, content hierarchy", path: "/architecture" },
+  { id: 3, label: "Keyword Research", description: "Primary keywords, PAA questions", path: "/keywords" },
+  { id: 4, label: "Article Generation", description: "AI-written, SEO-optimised articles", path: "/generate" },
+  { id: 5, label: "Review & Publish", description: "Edit, approve, schedule, export", path: "/review" },
 ];
 
+const ACTION_LABELS: Record<string, string> = {
+  scheduled_publish_attempted: "Publish attempted",
+  scheduled_publish_succeeded: "Published successfully",
+  scheduled_publish_failed: "Publish failed",
+  retry_attempted: "Retry attempted",
+  retry_succeeded: "Retry succeeded",
+  retry_failed: "Retry failed",
+  schedule_cancelled: "Schedule cancelled",
+  schedule_rescheduled: "Rescheduled",
+};
+
+const ACTION_ICONS: Record<string, React.ElementType> = {
+  scheduled_publish_attempted: Clock,
+  scheduled_publish_succeeded: CheckCircle2,
+  scheduled_publish_failed: AlertTriangle,
+  retry_attempted: RefreshCw,
+  retry_succeeded: CheckCircle2,
+  retry_failed: XCircle,
+  schedule_cancelled: XCircle,
+  schedule_rescheduled: RotateCcw,
+};
+
+const ACTION_COLORS: Record<string, string> = {
+  scheduled_publish_attempted: "text-blue-500",
+  scheduled_publish_succeeded: "text-emerald-500",
+  scheduled_publish_failed: "text-amber-500",
+  retry_attempted: "text-blue-400",
+  retry_succeeded: "text-emerald-500",
+  retry_failed: "text-red-500",
+  schedule_cancelled: "text-slate-400",
+  schedule_rescheduled: "text-violet-500",
+};
+
+const NOTIF_ICONS: Record<string, React.ElementType> = {
+  publish_success: CheckCircle2,
+  publish_failed: AlertTriangle,
+  retry_failed: XCircle,
+  schedule_cancelled: XCircle,
+  schedule_rescheduled: RotateCcw,
+};
+
+const NOTIF_COLORS: Record<string, string> = {
+  publish_success: "text-emerald-500",
+  publish_failed: "text-amber-500",
+  retry_failed: "text-red-500",
+  schedule_cancelled: "text-slate-400",
+  schedule_rescheduled: "text-violet-500",
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function relativeTime(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function getMonthDays(year: number, month: number) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return { firstDay, daysInMonth };
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function StatCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-1 shadow-sm">
+      <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</span>
+      <span className={`text-2xl font-bold ${accent ?? "text-slate-900"}`}>{value}</span>
+    </div>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-2 shadow-sm">
+      <Skeleton className="h-3 w-20" />
+      <Skeleton className="h-8 w-12" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mini Publishing Calendar
+// ---------------------------------------------------------------------------
+function MiniCalendar({ scheduledDates }: { scheduledDates: Date[] }) {
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+
+  const { firstDay, daysInMonth } = useMemo(
+    () => getMonthDays(viewYear, viewMonth),
+    [viewYear, viewMonth]
+  );
+
+  const scheduledSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const d of scheduledDates) {
+      if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
+        s.add(d.getDate().toString());
+      }
+    }
+    return s;
+  }, [scheduledDates, viewYear, viewMonth]);
+
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-AU", {
+    month: "long",
+    year: "numeric",
+  });
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  }
+
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  return (
+    <div className="select-none">
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={prevMonth} className="p-1 rounded hover:bg-slate-100 transition-colors">
+          <ChevronLeft className="h-4 w-4 text-slate-500" />
+        </button>
+        <span className="text-sm font-semibold text-slate-700">{monthLabel}</span>
+        <button onClick={nextMonth} className="p-1 rounded hover:bg-slate-100 transition-colors">
+          <ChevronRight className="h-4 w-4 text-slate-500" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 text-center">
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
+          <div key={d} className="text-[10px] font-semibold text-slate-400 py-1">{d}</div>
+        ))}
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e-${i}`} />;
+          const isToday =
+            day === today.getDate() &&
+            viewMonth === today.getMonth() &&
+            viewYear === today.getFullYear();
+          const hasArticle = scheduledSet.has(day.toString());
+          return (
+            <div
+              key={day}
+              className={`text-xs py-1 rounded-md font-medium transition-colors
+                ${isToday ? "bg-blue-600 text-white" : ""}
+                ${hasArticle && !isToday ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300" : ""}
+                ${!isToday && !hasArticle ? "text-slate-600 hover:bg-slate-100" : ""}
+              `}
+            >
+              {day}
+            </div>
+          );
+        })}
+      </div>
+      {scheduledSet.size > 0 && (
+        <p className="text-xs text-slate-400 mt-2 text-center">
+          {scheduledSet.size} article{scheduledSet.size !== 1 ? "s" : ""} scheduled this month
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loading skeleton
+// ---------------------------------------------------------------------------
+function DashboardSkeleton() {
+  return (
+    <div className="max-w-7xl mx-auto space-y-6 animate-pulse">
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-10 w-52" />
+        <Skeleton className="h-10 w-36" />
+      </div>
+      <Skeleton className="h-36 w-full rounded-xl" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+      </div>
+      <div className="flex gap-3">
+        <Skeleton className="h-9 w-44 rounded-lg" />
+        <Skeleton className="h-9 w-36 rounded-lg" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Dashboard Page
+// ---------------------------------------------------------------------------
 export default function Dashboard() {
   const [, navigate] = useLocation();
+  const { user, loading: authLoading } = useAuth();
   const utils = trpc.useUtils();
 
-  const { data: user, isLoading: userLoading } = trpc.auth.me.useQuery();
-  const { data: business, isLoading: bizLoading } = trpc.business.get.useQuery(undefined, {
-    enabled: !!user,
-  });
+  const [selectedBusinessId, setSelectedBusinessId] = useState<number | null>(null);
 
-  const logout = trpc.auth.logout.useMutation({
-    onSuccess: async () => {
-      await utils.auth.me.invalidate();
-      navigate("/login");
-    },
-  });
+  const { data: businesses, isLoading: bizListLoading } = trpc.dashboard.listBusinesses.useQuery(
+    undefined,
+    { enabled: !!user }
+  );
 
-  // Auth guard
   useEffect(() => {
-    if (!userLoading && !user) {
-      navigate("/login");
+    if (businesses && businesses.length > 0 && !selectedBusinessId) {
+      setSelectedBusinessId(businesses[0]!.id);
     }
-  }, [user, userLoading, navigate]);
+  }, [businesses, selectedBusinessId]);
 
-  // If no business profile yet, redirect to onboarding
+  const { data: summary, isLoading: summaryLoading } = trpc.dashboard.getSummary.useQuery(
+    { businessId: selectedBusinessId! },
+    { enabled: !!selectedBusinessId }
+  );
+
+  const { data: activity, isLoading: activityLoading } = trpc.dashboard.getRecentActivity.useQuery(
+    { businessId: selectedBusinessId!, limit: 10 },
+    { enabled: !!selectedBusinessId }
+  );
+
+  const { data: notifData, isLoading: notifLoading } = trpc.scheduler.getNotifications.useQuery(
+    { limit: 10 },
+    { enabled: !!user, refetchInterval: 30000 }
+  );
+
+  const markRead = trpc.scheduler.markNotificationRead.useMutation({
+    onSuccess: () => utils.scheduler.getNotifications.invalidate(),
+  });
+  const markAllRead = trpc.scheduler.markAllRead.useMutation({
+    onSuccess: () => utils.scheduler.getNotifications.invalidate(),
+  });
+
+  const { data: scheduleData } = trpc.scheduler.getSchedule.useQuery(
+    { businessId: selectedBusinessId! },
+    { enabled: !!selectedBusinessId }
+  );
+
+  const scheduledDates = useMemo(() => {
+    if (!scheduleData) return [];
+    return scheduleData
+      .filter((a: { scheduledPublishAt?: Date | string | null }) => a.scheduledPublishAt != null)
+      .map((a: { scheduledPublishAt: Date | string | null }) => new Date(a.scheduledPublishAt!));
+  }, [scheduleData]);
+
   useEffect(() => {
-    if (!userLoading && !bizLoading && user && !business) {
+    if (!authLoading && !user) navigate("/login");
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (!authLoading && !bizListLoading && user && businesses && businesses.length === 0) {
       navigate("/onboarding");
     }
-  }, [user, business, userLoading, bizLoading, navigate]);
+  }, [user, businesses, authLoading, bizListLoading, navigate]);
 
-  if (userLoading || bizLoading) {
+  if (authLoading || bizListLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <DashboardLayout>
+        <DashboardSkeleton />
+      </DashboardLayout>
     );
   }
 
   if (!user) return null;
 
-  const currentStage = business?.currentStage ?? 1;
+  const selectedBusiness = businesses?.find(b => b.id === selectedBusinessId);
+  const currentStage = summary?.business?.currentStage ?? selectedBusiness?.currentStage ?? 1;
+  const sc = summary?.statusCounts;
+  const bc = summary?.badgeCounts;
+  const notifications = notifData?.notifications ?? [];
+  const unreadCount = notifData?.unreadCount ?? 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Top nav */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-        <span className="text-xl font-bold text-slate-900 tracking-tight">
-          Blog <span className="text-blue-600">Batcher</span>
-        </span>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-500">
-            {user.name ?? user.email}
-            {user.role === "admin" && (
-              <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                Admin
-              </span>
-            )}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => logout.mutate()}
-            disabled={logout.isPending}
-          >
-            {logout.isPending ? "Signing out…" : "Sign out"}
-          </Button>
-        </div>
-      </header>
+    <DashboardLayout>
+      <div className="max-w-7xl mx-auto space-y-6">
 
-      <main className="max-w-4xl mx-auto px-6 py-12">
-        {/* Business header */}
-        {business && (
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">{business.name}</h1>
-            <p className="text-slate-500 text-sm mt-1">
-              {business.industry ?? ""}
-              {business.location ? ` · ${business.location}` : ""}
-            </p>
+        {/* Header: business switcher + credits */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {businesses && businesses.length > 1 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm text-left">
+                    <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-900 truncate max-w-[180px]">
+                        {selectedBusiness?.name ?? "Select business"}
+                      </div>
+                      <div className="text-xs text-slate-400 truncate max-w-[180px]">
+                        {selectedBusiness?.industry ?? ""}
+                        {selectedBusiness?.location ? ` · ${selectedBusiness.location}` : ""}
+                      </div>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-1" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  {businesses.map(biz => (
+                    <DropdownMenuItem
+                      key={biz.id}
+                      onClick={() => setSelectedBusinessId(biz.id)}
+                      className={`flex flex-col items-start gap-0.5 cursor-pointer ${biz.id === selectedBusinessId ? "bg-blue-50" : ""}`}
+                    >
+                      <span className="font-medium text-slate-900">{biz.name}</span>
+                      <span className="text-xs text-slate-400">
+                        Stage {biz.currentStage} · {biz.articleCounts.total} articles
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-slate-400" />
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900">
+                    {selectedBusiness?.name ?? "Your Dashboard"}
+                  </h1>
+                  {(selectedBusiness?.industry || selectedBusiness?.location) && (
+                    <p className="text-xs text-slate-400">
+                      {selectedBusiness?.industry}
+                      {selectedBusiness?.location ? ` · ${selectedBusiness.location}` : ""}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Credit balance */}
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <CreditCard className="h-4 w-4 text-blue-500" />
+            <div>
+              <div className="text-xs text-slate-400 leading-none">Credits remaining</div>
+              {summaryLoading ? (
+                <Skeleton className="h-5 w-8 mt-0.5" />
+              ) : (
+                <div className="text-lg font-bold text-slate-900 leading-tight">
+                  {summary?.creditBalance ?? 0}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Stage progress */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <Zap className="h-4 w-4 text-blue-500" />
+              Your Blog Batcher Pipeline
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {STAGES.map((stage) => {
+                const isComplete = currentStage > stage.id;
+                const isCurrent = currentStage === stage.id;
+                const isLocked = currentStage < stage.id;
+                return (
+                  <div
+                    key={stage.id}
+                    className={`flex-1 flex flex-col gap-1.5 p-3 rounded-xl border transition-all
+                      ${isCurrent ? "border-blue-200 bg-blue-50 shadow-sm" : ""}
+                      ${isComplete ? "border-emerald-200 bg-emerald-50/40" : ""}
+                      ${isLocked ? "border-slate-200 bg-slate-50/50 opacity-50" : ""}
+                    `}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isComplete ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                      ) : isCurrent ? (
+                        <div className="h-4 w-4 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                          {stage.id}
+                        </div>
+                      ) : (
+                        <Circle className="h-4 w-4 text-slate-300 shrink-0" />
+                      )}
+                      <span className="text-xs font-semibold text-slate-700 truncate">
+                        {stage.label}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-snug hidden sm:block">
+                      {stage.description}
+                    </p>
+                    {isCurrent && (
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs mt-1"
+                        onClick={() => navigate(stage.path)}
+                      >
+                        Continue
+                        <ArrowRight className="ml-1 h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Article status summary */}
+        <div>
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
+            Article Status
+          </h2>
+          {summaryLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+              {Array.from({ length: 8 }).map((_, i) => <StatCardSkeleton key={i} />)}
+            </div>
+          ) : sc ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+              <StatCard label="Total" value={sc.total ?? 0} />
+              <StatCard label="Auth Ready" value={bc?.authority_ready ?? 0} accent="text-emerald-600" />
+              <StatCard label="Strong" value={bc?.strong ?? 0} accent="text-blue-600" />
+              <StatCard label="Needs Review" value={bc?.needs_review ?? 0} accent="text-amber-600" />
+              <StatCard label="Approved" value={sc.approved ?? 0} accent="text-violet-600" />
+              <StatCard label="Scheduled" value={sc.scheduled ?? 0} accent="text-blue-500" />
+              <StatCard label="Published" value={sc.published ?? 0} accent="text-emerald-600" />
+              <StatCard label="Failed" value={sc.failed ?? 0} accent="text-red-500" />
+            </div>
+          ) : (
+            <div className="text-sm text-slate-400 py-4 text-center">
+              No article data yet — start by completing your business profile.
+            </div>
+          )}
+        </div>
+
+        {/* Quick actions */}
+        {summary && (
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => navigate(summary.quickActionRoute)} className="shadow-sm">
+              {summary.quickActionLabel}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            {(sc?.approved ?? 0) > 0 && (
+              <Button variant="outline" onClick={() => navigate("/review")} className="bg-white">
+                <FileText className="mr-2 h-4 w-4" />
+                Review Articles ({sc!.approved})
+              </Button>
+            )}
+            {(sc?.scheduled ?? 0) > 0 && (
+              <Button variant="outline" onClick={() => navigate("/schedule-management")} className="bg-white">
+                <CalendarDays className="mr-2 h-4 w-4" />
+                View Schedule ({sc!.scheduled})
+              </Button>
+            )}
+            {(sc?.failed ?? 0) > 0 && (
+              <Button variant="outline" onClick={() => navigate("/schedule-management")} className="bg-white border-red-200 text-red-600 hover:bg-red-50">
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Failed Publishes ({sc!.failed})
+              </Button>
+            )}
           </div>
         )}
 
-        {/* Stage pipeline */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-8">
-          <h2 className="text-lg font-semibold text-slate-900 mb-6">Your Blog Batcher Pipeline</h2>
-          <div className="space-y-4">
-            {STAGES.map((stage) => {
-              const isComplete = currentStage > stage.id;
-              const isCurrent = currentStage === stage.id;
-              const isLocked = currentStage < stage.id;
+        {/* Bottom row: activity + notifications + calendar */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-              return (
-                <div
-                  key={stage.id}
-                  className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
-                    isCurrent
-                      ? "border-blue-200 bg-blue-50"
-                      : isComplete
-                      ? "border-emerald-200 bg-emerald-50/50"
-                      : "border-slate-200 bg-slate-50/50 opacity-60"
-                  }`}
-                >
-                  <div className="shrink-0">
-                    {isComplete ? (
-                      <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                    ) : isCurrent ? (
-                      <div className="h-6 w-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                        {stage.id}
+          {/* Recent activity feed */}
+          <Card className="lg:col-span-1 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-blue-500" />
+                Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activityLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex gap-3">
+                      <Skeleton className="h-4 w-4 rounded-full mt-0.5 shrink-0" />
+                      <div className="flex-1 space-y-1">
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-2/3" />
                       </div>
-                    ) : (
-                      <Circle className="h-6 w-6 text-slate-300" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-slate-900 text-sm">
-                      Stage {stage.id}: {stage.label}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{stage.description}</div>
-                  </div>
-                  {isCurrent && (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (stage.id === 1) navigate("/onboarding");
-                        else if (stage.id === 2) navigate("/architecture");
-                        else if (stage.id === 3) navigate("/keywords");
-                        else if (stage.id === 4) navigate("/generate");
-                        else if (stage.id === 5) navigate("/review");
-                        else toast.info("Coming soon", { description: `Stage ${stage.id}: ${stage.label} is not yet available.` });
-                      }}
-                      className="shrink-0"
-                    >
-                      {stage.id === 1 ? "Edit Profile" : "Continue"}
-                      <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                  ))}
                 </div>
-              );
-            })}
-          </div>
+              ) : !activity || activity.length === 0 ? (
+                <div className="text-center py-6">
+                  <Activity className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">No automated activity yet.</p>
+                  <p className="text-xs text-slate-300 mt-1">
+                    Activity appears when articles are scheduled and published.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {activity.map((item: {
+                    id: number;
+                    action: string;
+                    articleTitle: string | null;
+                    errorMessage: string | null;
+                    createdAt: Date | string;
+                  }) => {
+                    const Icon = ACTION_ICONS[item.action] ?? Clock;
+                    const color = ACTION_COLORS[item.action] ?? "text-slate-400";
+                    return (
+                      <div key={item.id} className="flex gap-3 items-start">
+                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-slate-700 leading-snug truncate">
+                            {item.articleTitle ?? "Article"}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {ACTION_LABELS[item.action] ?? item.action}
+                            {" · "}
+                            {relativeTime(item.createdAt)}
+                          </p>
+                          {item.errorMessage && (
+                            <p className="text-xs text-red-400 mt-0.5 truncate">{item.errorMessage}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Notifications panel */}
+          <Card className="lg:col-span-1 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-blue-500" />
+                  Notifications
+                  {unreadCount > 0 && (
+                    <Badge className="h-5 px-1.5 text-[10px] bg-blue-600 text-white">
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </CardTitle>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={() => markAllRead.mutate()}
+                    className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
+                  >
+                    <CheckCheck className="h-3 w-3" />
+                    Mark all read
+                  </button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {notifLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex gap-3">
+                      <Skeleton className="h-4 w-4 rounded-full mt-0.5 shrink-0" />
+                      <div className="flex-1 space-y-1">
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-3/4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-center py-6">
+                  <Bell className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">No notifications yet.</p>
+                  <p className="text-xs text-slate-300 mt-1">
+                    You'll be notified when articles publish or fail.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {notifications.map((n: {
+                    id: number;
+                    type: string;
+                    title: string;
+                    message: string;
+                    read: boolean;
+                    createdAt: Date | string;
+                  }) => {
+                    const Icon = NOTIF_ICONS[n.type] ?? Bell;
+                    const color = NOTIF_COLORS[n.type] ?? "text-slate-400";
+                    return (
+                      <div
+                        key={n.id}
+                        className={`flex gap-3 items-start p-2 rounded-lg transition-colors cursor-pointer
+                          ${!n.read ? "bg-blue-50/60 hover:bg-blue-50" : "hover:bg-slate-50"}
+                        `}
+                        onClick={() => {
+                          if (!n.read) markRead.mutate({ notificationId: n.id });
+                        }}
+                      >
+                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm leading-snug ${!n.read ? "font-medium text-slate-800" : "text-slate-600"}`}>
+                            {n.title}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.message}</p>
+                          <p className="text-[11px] text-slate-300 mt-0.5">{relativeTime(n.createdAt)}</p>
+                        </div>
+                        {!n.read && (
+                          <div className="h-2 w-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Publishing calendar */}
+          <Card className="lg:col-span-1 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-blue-500" />
+                Publishing Calendar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MiniCalendar scheduledDates={scheduledDates} />
+              {scheduledDates.length === 0 && (
+                <p className="text-xs text-slate-400 text-center mt-3">
+                  No articles scheduled yet.{" "}
+                  <button
+                    className="text-blue-500 hover:underline"
+                    onClick={() => navigate("/publish")}
+                  >
+                    Set up a schedule
+                  </button>
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Account info */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
-            Account
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            <div>
-              <div className="text-slate-400 text-xs mb-1">Email</div>
-              <div className="font-medium text-slate-800 truncate">{user.email}</div>
-            </div>
-            <div>
-              <div className="text-slate-400 text-xs mb-1">Role</div>
-              <div className="font-medium text-slate-800 capitalize">{user.role}</div>
-            </div>
-            <div>
-              <div className="text-slate-400 text-xs mb-1">Plan</div>
-              <div className="font-medium text-slate-800 capitalize">{user.tier ?? "standard"}</div>
-            </div>
-            <div>
-              <div className="text-slate-400 text-xs mb-1">Verified</div>
-              <div
-                className={`font-medium ${user.emailVerified ? "text-emerald-600" : "text-amber-600"}`}
-              >
-                {user.emailVerified ? "Yes" : "Pending"}
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
