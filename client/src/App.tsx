@@ -14,6 +14,9 @@ import Integrations from "./pages/Integrations";
 import ScheduleManagement from "./pages/ScheduleManagement";
 import SupportCentre from "./pages/SupportCentre";
 import AdminPanel from "./pages/AdminPanel";
+import Billing from "./pages/Billing";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancelled from "./pages/PaymentCancelled";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -47,6 +50,9 @@ function Router() {
       <Route path="/schedule-management" component={ScheduleManagement} />
       <Route path="/support" component={SupportCentre} />
       <Route path="/admin" component={AdminPanel} />
+      <Route path="/billing" component={Billing} />
+      <Route path="/payment-success" component={PaymentSuccess} />
+      <Route path="/payment-cancelled" component={PaymentCancelled} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

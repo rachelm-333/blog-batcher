@@ -45,6 +45,8 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   /** True if the user has been suspended by an admin. Suspended users cannot log in. */
   isSuspended: boolean("isSuspended").default(false).notNull(),
+  /** Stripe Customer ID for billing. Set on first checkout. */
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
 });
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -741,6 +743,10 @@ export const stripePayments = mysqlTable("stripe_payments", {
   stripeEventId: varchar("stripeEventId", { length: 255 }).unique(),
   /** Full Stripe event payload stored for audit purposes. */
   stripeEventPayload: json("stripeEventPayload"),
+  /** Stripe Checkout Session ID (cs_...). Used to look up receipt after redirect. */
+  stripeCheckoutSessionId: varchar("stripeCheckoutSessionId", { length: 255 }),
+  /** Stripe-hosted receipt URL from the charge object. */
+  receiptUrl: text("receiptUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

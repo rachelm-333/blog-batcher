@@ -11,6 +11,7 @@ import { schedulerRouter } from "./routers/scheduler";
 import { dashboardRouter } from "./routers/dashboard";
 import { supportRouter } from "./routers/support";
 import { adminRouter } from "./routers/admin";
+import { paymentsRouter } from "./routers/payments";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -70,25 +71,11 @@ export const appRouter = router({
   // All procedures live in server/routers/admin.ts
   admin: adminRouter,
 
-  // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
-  // Layer 3 (Stripe) will be wired here once Auth is fully verified.
-  //
-  // When ready, add:
-  //   payments: paymentsRouter,
-  //
-  // The paymentsRouter will handle:
-  //   - payments.createCheckoutSession  → Stripe Checkout for 20/50-article packs
-  //   - payments.getPortalUrl           → Stripe Customer Portal
-  //   - payments.history                → User's payment history
-  //
-  // Webhook handler (not a tRPC route) lives at:
-  //   POST /api/stripe/webhook          → server/stripe/webhook.ts
-  //
-  // On successful payment:
-  //   - credits table updated with pack credits (20 or 50)
-  //   - user tier set to 'standard'
-  //   - Stages 2–4 unlocked
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── Layer 13: Payments (Stripe) ─────────────────────────────────────────
+  // One-time checkout sessions, payment history, product catalogue.
+  // All procedures live in server/routers/payments.ts
+  // Webhook handler lives at POST /api/stripe/webhook → server/stripe/webhook.ts
+  payments: paymentsRouter,
 });
 
 export type AppRouter = typeof appRouter;

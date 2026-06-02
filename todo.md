@@ -579,3 +579,96 @@
 
 ### Tests
 - [x] Vitest: adminProcedure guard (non-admin blocked, admin allowed), suspendUser, unsuspendUser, addCredits, removeCredits, listUsers, startImpersonation
+
+## Layer 13: Payments (Stripe)
+
+### Schema additions
+- [ ] stripe_payments table already exists — verify columns: id, userId, stripePaymentIntentId, stripeCustomerId, amount, currency, status, productKey, creditsAllocated, createdAt
+- [ ] Add stripeCustomerId column to users table (nullable text)
+- [ ] Run Drizzle migration and apply to DB
+
+### Products definition (server/stripe/products.ts)
+- [ ] PRODUCTS map: citation_starter (20 articles, 25 credits, $97 AUD), citation_authority (50 articles, 60 credits, $197 AUD), credit_topup (5 credits, $27 AUD)
+- [ ] Each product has: key, name, description, priceAud (cents), credits, articleCount (nullable), tier (nullable)
+
+### Backend — Stripe webhook (server/stripe/webhook.ts)
+- [ ] POST /api/stripe/webhook — raw body, signature verification
+- [ ] Handle checkout.session.completed: allocate credits, update user tier, write stripe_payments row, send confirmation email
+- [ ] Handle payment_intent.payment_failed: write failed payment record, no credit allocation
+- [ ] Test event detection (evt_test_ prefix → return {verified:true})
+- [ ] Register webhook route BEFORE express.json() in server/_core/index.ts
+
+### Backend — tRPC procedures (server/routers/payments.ts)
+- [ ] payments.createCheckoutSession — creates Stripe Checkout Session for a given productKey, returns checkoutUrl
+- [ ] payments.getPaymentHistory — returns user's stripe_payments rows with receipt URL from Stripe API
+- [ ] payments.getProducts — returns PRODUCTS list for frontend display
+- [ ] Wire paymentsRouter into server/routers.ts
+
+### Backend — credit allocation helper
+- [ ] allocateCreditsOnPayment(userId, productKey, paymentIntentId) in server/db.ts — idempotent (check if paymentIntentId already processed), add credits, update tier if applicable, write credit_transaction
+
+### Frontend — Billing page (/billing)
+- [ ] /billing route: payment history table (date, product, amount, status, receipt link)
+- [ ] Upgrade/purchase cards: Citation Starter ($97), Citation Authority ($197), Credit Top-Up ($27)
+- [ ] Checkout redirect: window.open(checkoutUrl, '_blank') + toast "Redirecting to secure checkout..."
+- [ ] Payment success page (/payment-success?session_id=...): confirm credits allocated, show updated balance
+- [ ] Payment cancelled page (/payment-cancelled): clear message, return to billing
+
+### Frontend — Refund policy
+- [ ] Display refund policy on billing/upgrade page: "48-hour pre-generation refund. No refund once generation has begun."
+
+### Frontend — Dashboard integration
+- [ ] /billing link in DashboardLayout sidebar
+- [ ] Credit balance shown in sidebar (already exists — verify it updates after payment)
+
+### Verification (5 checks)
+- [ ] V1: Test payment for each plan — credits allocated correctly after checkout.session.completed webhook
+- [ ] V2: Declined card (4000 0000 0000 0002) — no credits allocated, payment_failed recorded
+- [ ] V3: GST shown on Stripe checkout for AU customer (automatic_tax enabled)
+- [ ] V4: Receipt URL available in Stripe after payment
+- [ ] V5: Billing page shows payment history
+
+### Tests
+- [ ] Vitest: createCheckoutSession (returns URL), allocateCreditsOnPayment (idempotent), getPaymentHistory, webhook handler (success + failure paths)
+
+## Layer 13: Payments (Stripe)
+### Schema
+- [x] Add `stripeCustomerId` column to `users` table
+- [x] Add `stripeCheckoutSessionId` and `receiptUrl` columns to `stripe_payments` table
+- [x] Drizzle schema updated to match DB
+
+### Products definition (server/stripe/products.ts)
+- [x] citation_starter: $97 AUD placeholder, 25 credits, 20 articles
+- [x] citation_authority: $197 AUD placeholder, 60 credits, 50 articles
+- [x] credit_topup: $27 AUD placeholder, 5 credits
+
+### Backend
+- [x] Stripe client singleton (server/stripe/client.ts)
+- [x] allocateCreditsOnPayment — idempotent credit allocation on checkout.session.completed
+- [x] recordFailedPayment — write failed row without allocating credits
+- [x] payments.getProducts — public procedure returning product catalogue
+- [x] payments.createCheckoutSession — protected, creates Stripe Checkout session with AUD, GST (automatic_tax), invoice_creation, allow_promotion_codes, billing_address_collection
+- [x] payments.getPaymentHistory — protected, returns user's payment history
+- [x] payments.getCheckoutSession — protected, retrieves session details for success page
+- [x] Stripe webhook at POST /api/stripe/webhook (raw body, before express.json)
+- [x] Webhook handles checkout.session.completed and payment_intent.payment_failed
+- [x] Webhook test event detection (evt_test_ prefix)
+- [x] paymentsRouter wired into server/routers.ts
+
+### Frontend
+- [x] /billing page with plan cards, payment history table, receipt download links
+- [x] /payment-success page showing session details
+- [x] /payment-cancelled page
+- [x] Billing nav item in DashboardLayout sidebar
+- [x] Routes registered in App.tsx
+
+### Verification (29/29 checks)
+- [x] V1: Product catalogue returns 3 products with correct prices and credits
+- [x] V2: Auth guard blocks unauthenticated calls
+- [x] V3: Credit allocation works correctly for citation_starter
+- [x] V4: Idempotency prevents double-allocation
+- [x] V5: Failed payment writes row without allocating credits
+- [x] V6: Payment history returns user's payments
+
+### Tests
+- [x] Vitest: PRODUCTS catalogue, allocateCreditsOnPayment, recordFailedPayment (297/297 total)

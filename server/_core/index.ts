@@ -15,6 +15,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { parse as parseCookieHeader } from "cookie";
 import { COOKIE_NAME } from "../../shared/const";
 import { scheduledPublishHandler } from "../scheduledPublishHandler";
+import { stripeWebhookHandler } from "../stripe/webhook";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,6 +39,15 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  // ── Stripe webhook MUST be registered BEFORE express.json() ──────────────
+  // Stripe signature verification requires the raw request body.
+  app.post(
+    "/api/stripe/webhook",
+    express.raw({ type: "application/json" }),
+    stripeWebhookHandler
+  );
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
