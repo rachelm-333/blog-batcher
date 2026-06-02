@@ -391,6 +391,7 @@ export const schedulerRouter = router({
       z.object({
         unreadOnly: z.boolean().default(false),
         limit: z.number().min(1).max(100).default(20),
+        businessId: z.number().optional(), // optional: filter notifications to a specific business
       })
     )
     .query(async ({ ctx, input }) => {
@@ -400,6 +401,9 @@ export const schedulerRouter = router({
       const conditions = [eq(notifications.userId, ctx.user.id)];
       if (input.unreadOnly) {
         conditions.push(eq(notifications.read, false));
+      }
+      if (input.businessId) {
+        conditions.push(eq(notifications.businessId, input.businessId));
       }
 
       const rows = await db

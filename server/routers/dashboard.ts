@@ -210,61 +210,22 @@ export const dashboardRouter = router({
 
       if (!bizRows.length) return [];
 
-      // Get article counts per business in one query
-      const allArticles = await db
-        .select({
-          businessId: articles.businessId,
-          status: articles.status,
-        })
-        .from(articles)
-        .where(
-          bizRows.length === 1
-            ? eq(articles.businessId, bizRows[0]!.id)
-            : // For multiple businesses, fetch all and filter client-side
-              eq(articles.businessId, bizRows[0]!.id) // fallback — replaced below
-        );
-
-      // Build a map of businessId → article counts
-      // For multi-business, we do a separate query per business (max ~10 businesses typical)
+      // Fetch article counts for all businesses owned by this user in a single JOIN query
       const countMap: Record<number, { total: number; published: number; scheduled: number }> = {};
-
-      if (bizRows.length === 1) {
-        const bizId = bizRows[0]!.id;
-        countMap[bizId] = {
-          total: allArticles.length,
-          published: allArticles.filter(a => a.status === "published").length,
-          scheduled: allArticles.filter(a => a.status === "scheduled").length,
-        };
-      } else {
-        // Fetch article counts for all businesses
-        const allBizArticles = await db
-          .select({
-            businessId: articles.businessId,
-            status: articles.status,
-          })
-          .from(articles)
-          .where(
-            // Use IN-like logic: filter to only businesses owned by this user
-            eq(articles.businessId, bizRows[0]!.id) // placeholder — overridden below
-          );
-
-        // Actually fetch all articles for all businesses
-        const allArticlesAll = await db
-          .select({ businessId: articles.businessId, status: articles.status })
-          .from(articles)
-          .innerJoin(businesses, and(
-            eq(businesses.id, articles.businessId),
-            eq(businesses.userId, ctx.user.id)
-          ));
-
-        for (const row of allArticlesAll) {
-          if (!countMap[row.businessId]) {
-            countMap[row.businessId] = { total: 0, published: 0, scheduled: 0 };
-          }
-          countMap[row.businessId]!.total++;
-          if (row.status === "published") countMap[row.businessId]!.published++;
-          if (row.status === "scheduled") countMap[row.businessId]!.scheduled++;
+      const allArticlesAll = await db
+        .select({ businessId: articles.businessId, status: articles.status })
+        .from(articles)
+        .innerJoin(businesses, and(
+          eq(businesses.id, articles.businessId),
+          eq(businesses.userId, ctx.user.id)
+        ));
+      for (const row of allArticlesAll) {
+        if (!countMap[row.businessId]) {
+          countMap[row.businessId] = { total: 0, published: 0, scheduled: 0 };
         }
+        countMap[row.businessId]!.total++;
+        if (row.status === "published") countMap[row.businessId]!.published++;
+        if (row.status === "scheduled") countMap[row.businessId]!.scheduled++;
       }
 
       return bizRows.map(biz => ({

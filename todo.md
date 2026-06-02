@@ -708,3 +708,49 @@
 
 ### Tests
 - [x] Vitest: trial.getStatus, trial.startFreeTrial, generation guard (blocks second article), trial abuse prevention
+
+## Layer 15: Multi-Business & Agency Features
+
+### Backend
+- [ ] business.getById(businessId) — fetch specific business by ID with ownership check
+- [ ] business.listAll — list all businesses for the logged-in user (lightweight, for switcher)
+- [ ] Fix getNotifications to accept optional businessId filter for per-business notification isolation
+- [ ] Verify all article/keyword/architecture queries enforce businessId + userId ownership
+- [ ] Fix listBusinesses multi-business article count query (currently has a placeholder bug for single-business path)
+- [ ] business.create — already exists, verify it works for additional businesses (no limit)
+
+### Frontend
+- [ ] Dashboard: "Add New Business" button in business switcher dropdown
+- [ ] Dashboard: notifications filtered by selectedBusinessId when businessId is provided
+- [ ] Onboarding flow: works for additional businesses (not just first-time users — remove redirect if business exists)
+- [ ] DashboardLayout: "Add New Business" link in sidebar
+- [ ] Business switcher: shows all businesses with stage and article count
+- [ ] Credits display: shows account-level balance (not per-business) — already correct
+
+### Verification (6 checks)
+- [ ] V1: Two businesses fully isolated — articles, keywords, schedules separate
+- [ ] V2: Article generated under Business A does not appear under Business B
+- [ ] V3: Business switcher updates all counts and statuses for selected business
+- [ ] V4: Add third business, complete Stage 1 — existing businesses unaffected
+- [ ] V5: Credits spent on Business A visible correctly; Business B unaffected (shared balance)
+- [ ] V6: Admin sees all three businesses in admin panel
+
+### Tests
+- [ ] Vitest: business.getById ownership check, listAll returns only user's businesses, cross-user isolation
+
+## Layer 15: Multi-Business & Agency Features
+- [x] business.getById(businessId) — fetch specific business by ID with ownership check
+- [x] business.listAll — list all businesses for current user
+- [x] getNotifications — optional businessId filter for per-business isolation
+- [x] listBusinesses — fixed to return all businesses for user (removed single-business fallback bug)
+- [x] Dashboard: Add New Business button in business switcher dropdown and single-business view
+- [x] Onboarding: support ?new=1 query param to allow existing users to create additional businesses
+- [x] Data isolation: all procedures enforce businessId + userId ownership via assertOwnership
+- [x] Credits: shared at account level (single credits row per user, not per business)
+- [x] Admin override: admin.listBusinesses returns all businesses across all users
+- [x] V1: User can own multiple businesses — all visible in dashboard switcher
+- [x] V2: Articles isolated per business — no cross-business leakage
+- [x] V3: Dashboard summary isolated per selected business
+- [x] V4: Cross-user business access blocked (assertOwnership throws FORBIDDEN)
+- [x] V5: Credits shared at account level — deduction visible across all businesses
+- [x] V6: Admin sees all businesses; non-admin blocked from admin.listBusinesses

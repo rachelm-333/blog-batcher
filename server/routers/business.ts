@@ -95,6 +95,7 @@ const brandVoiceSchema = z.object({
 export const businessRouter = router({
   // -------------------------------------------------------------------------
   // GET — returns the first business for this user (or null)
+  // Used by onboarding and single-business pages that don't pass a businessId
   // -------------------------------------------------------------------------
   get: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
@@ -126,6 +127,63 @@ export const businessRouter = router({
       existingContent,
       brandVoice: brandVoiceRows[0] ?? null,
     };
+  }),
+
+  // -------------------------------------------------------------------------
+  // GET BY ID — fetch a specific business by ID (with ownership check)
+  // Used by multi-business pages that pass a businessId
+  // -------------------------------------------------------------------------
+  getById: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertOwnership(ctx.user.id, input.businessId);
+      const rows = await db
+        .select()
+        .from(businesses)
+        .where(and(eq(businesses.id, input.businessId), eq(businesses.userId, ctx.user.id)))
+        .limit(1);
+      if (!rows.length) return null;
+      const biz = rows[0]!;
+      const [audiences, services, competitors, existingContent, brandVoiceRows] = await Promise.all([
+        db.select().from(businessAudiences).where(eq(businessAudiences.businessId, biz.id)),
+        db.select().from(businessServices).where(eq(businessServices.businessId, biz.id)),
+        db.select().from(businessCompetitors).where(eq(businessCompetitors.businessId, biz.id)),
+        db.select().from(businessExistingContent).where(eq(businessExistingContent.businessId, biz.id)),
+        db.select().from(brandVoice).where(eq(brandVoice.businessId, biz.id)).limit(1),
+      ]);
+      return {
+        ...biz,
+        audiences,
+        services,
+        competitors,
+        existingContent,
+        brandVoice: brandVoiceRows[0] ?? null,
+      };
+    }),
+
+  // -------------------------------------------------------------------------
+  // LIST ALL — all businesses for the logged-in user (lightweight)
+  // Used by the business switcher and multi-business management
+  // -------------------------------------------------------------------------
+  listAll: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const rows = await db
+      .select({
+        id: businesses.id,
+        name: businesses.name,
+        industry: businesses.industry,
+        location: businesses.location,
+        currentStage: businesses.currentStage,
+        cmsPlatform: businesses.cmsPlatform,
+        createdAt: businesses.createdAt,
+      })
+      .from(businesses)
+      .where(eq(businesses.userId, ctx.user.id))
+      .orderBy(businesses.createdAt);
+    return rows;
   }),
 
   // -------------------------------------------------------------------------

@@ -48,7 +48,9 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  Plus,
 } from "lucide-react";
+import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -299,8 +301,8 @@ export default function Dashboard() {
   );
 
   const { data: notifData, isLoading: notifLoading } = trpc.scheduler.getNotifications.useQuery(
-    { limit: 10 },
-    { enabled: !!user, refetchInterval: 30000 }
+    { limit: 10, businessId: selectedBusinessId ?? undefined },
+    { enabled: !!user && !!selectedBusinessId, refetchInterval: 30000 }
   );
 
   const markRead = trpc.scheduler.markNotificationRead.useMutation({
@@ -386,22 +388,41 @@ export default function Dashboard() {
                       </span>
                     </DropdownMenuItem>
                   ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => navigate("/onboarding?new=1")}
+                    className="flex items-center gap-2 cursor-pointer text-blue-600"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="font-medium">Add New Business</span>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-slate-400" />
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900">
-                    {selectedBusiness?.name ?? "Your Dashboard"}
-                  </h1>
-                  {(selectedBusiness?.industry || selectedBusiness?.location) && (
-                    <p className="text-xs text-slate-400">
-                      {selectedBusiness?.industry}
-                      {selectedBusiness?.location ? ` · ${selectedBusiness.location}` : ""}
-                    </p>
-                  )}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-slate-400" />
+                  <div>
+                    <h1 className="text-xl font-bold text-slate-900">
+                      {selectedBusiness?.name ?? "Your Dashboard"}
+                    </h1>
+                    {(selectedBusiness?.industry || selectedBusiness?.location) && (
+                      <p className="text-xs text-slate-400">
+                        {selectedBusiness?.industry}
+                        {selectedBusiness?.location ? ` · ${selectedBusiness.location}` : ""}
+                      </p>
+                    )}
+                  </div>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={() => navigate("/onboarding?new=1")}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Add Business
+                </Button>
               </div>
             )}
           </div>

@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import Step0Scrape from "./onboarding/Step0Scrape";
 import Step1BusinessDetails from "./onboarding/Step1BusinessDetails";
 import Step2Services from "./onboarding/Step2Services";
@@ -28,25 +28,30 @@ const STEPS = [
 export default function Onboarding() {
   const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  // ?new=1 means the user is adding a second (or third, etc.) business
+  const isNewBusiness = new URLSearchParams(search).get("new") === "1";
   const [step, setStep] = useState(0);
   const [businessId, setBusinessId] = useState<number | null>(null);
   const [scrapeData, setScrapeData] = useState<any>(null);
 
   const utils = trpc.useUtils();
+  // When adding a new business, skip loading the existing business to avoid redirect
   const { data: business, isLoading: bizLoading, refetch } = trpc.business.get.useQuery(undefined, {
-    enabled: !!user,
+    enabled: !!user && !isNewBusiness,
   });
 
   // If user already has a business, pre-populate and skip to step 1
+  // (only when NOT adding a new business)
   useEffect(() => {
-    if (business) {
+    if (!isNewBusiness && business) {
       setBusinessId(business.id);
       // If Stage 1 is already complete (currentStage > 1), redirect to dashboard
       if (business.currentStage > 1) {
         navigate("/dashboard");
       }
     }
-  }, [business, navigate]);
+  }, [business, navigate, isNewBusiness]);
 
   // Auth guard
   useEffect(() => {
