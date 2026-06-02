@@ -12,6 +12,7 @@ import { dashboardRouter } from "./routers/dashboard";
 import { supportRouter } from "./routers/support";
 import { adminRouter } from "./routers/admin";
 import { paymentsRouter } from "./routers/payments";
+import { trialRouter } from "./routers/trial";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -76,6 +77,11 @@ export const appRouter = router({
   // All procedures live in server/routers/payments.ts
   // Webhook handler lives at POST /api/stripe/webhook → server/stripe/webhook.ts
   payments: paymentsRouter,
+
+  // ─── Layer 14: Free Trial Flow ────────────────────────────────────────────
+  // Trial status, start free trial, upgrade options.
+  // All procedures live in server/routers/trial.ts
+  trial: trialRouter,
 });
 
 export type AppRouter = typeof appRouter;

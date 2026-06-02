@@ -17,6 +17,7 @@ import AdminPanel from "./pages/AdminPanel";
 import Billing from "./pages/Billing";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
+import FreeTrial from "./pages/FreeTrial";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/billing" component={Billing} />
       <Route path="/payment-success" component={PaymentSuccess} />
       <Route path="/payment-cancelled" component={PaymentCancelled} />
+      <Route path="/free-trial" component={FreeTrial} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

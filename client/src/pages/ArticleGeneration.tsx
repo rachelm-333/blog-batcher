@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import {
   AlertCircle,
   ArrowRight,
@@ -319,6 +320,9 @@ export default function ArticleGeneration() {
     }
   );
 
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<"trial_complete" | "no_credits" | "trial_blocked">("no_credits");
+
   // Start generation mutation
   const startGen = trpc.articles.startGeneration.useMutation({
     onSuccess: (data) => {
@@ -327,10 +331,18 @@ export default function ArticleGeneration() {
       toast.success(`Generation started — ${data.totalArticles} articles queued`);
     },
     onError: (err) => {
-      toast.error("Could not start generation", {
-        description: `${err.message}. Make sure your business profile and keyword research are complete before generating articles.`,
-        duration: 8000,
-      });
+      if (err.message === "FREE_TRIAL_USED") {
+        setUpgradeReason("trial_blocked");
+        setShowUpgrade(true);
+      } else if (err.message === "INSUFFICIENT_CREDITS") {
+        setUpgradeReason("no_credits");
+        setShowUpgrade(true);
+      } else {
+        toast.error("Could not start generation", {
+          description: `${err.message}. Make sure your business profile and keyword research are complete before generating articles.`,
+          duration: 8000,
+        });
+      }
     },
   });
 
@@ -589,6 +601,13 @@ export default function ArticleGeneration() {
           </div>
         )}
       </main>
+
+      {/* Upgrade prompt — shown when trial is used or credits are insufficient */}
+      <UpgradePrompt
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        reason={upgradeReason}
+      />
     </div>
   );
 }

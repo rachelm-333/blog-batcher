@@ -672,3 +672,39 @@
 
 ### Tests
 - [x] Vitest: PRODUCTS catalogue, allocateCreditsOnPayment, recordFailedPayment (297/297 total)
+
+## Layer 14: Free Trial Flow
+### Schema
+- [x] Add `freeTrialUsed` boolean column to `users` table (default false)
+- [x] Update Drizzle schema to match DB
+
+### Backend — trial guard logic
+- [x] trial.getStatus — returns { freeTrialUsed, hasActivePlan, creditBalance } for current user
+- [x] trial.startFreeTrial — creates a free trial architecture (packSize=0, 1 cluster node), advances to stage 4, returns businessId; sets freeTrialUsed=true immediately
+- [x] Generation guard in articles.startGeneration: checks trial/credits BEFORE article nodes; blocks FREE_TRIAL_USED and INSUFFICIENT_CREDITS
+- [x] Generation guard: after trial article generated, set users.freeTrialUsed=true (belt-and-suspenders)
+- [x] trial.getUpgradeOptions — returns product catalogue with trial context; citation_authority marked as recommended
+- [x] Block second trial: if freeTrialUsed=true and packSize=0, return FORBIDDEN with upgrade prompt flag
+
+### Backend — trial architecture
+- [x] architecture.setPackSize accepts packSize=0 for free trial
+- [x] Free trial architecture: 1 cornerstone=0, 1 pillar=0, 1 cluster node (type=how_to)
+- [x] Trial architecture auto-confirmed (no manual confirmation step needed)
+
+### Frontend — trial flow
+- [x] Dashboard shows "Start Free Trial" CTA for new users with no business
+- [x] After trial article generated: show UpgradePrompt modal with plan cards
+- [x] UpgradePrompt modal: Citation Starter, Citation Authority, Credit Top-Up cards with prices and Stripe checkout
+- [x] UpgradePrompt shown when user tries to generate a second article without credits
+- [x] UpgradePrompt shown after trial article is reviewed/approved
+- [x] Trial banner on article review page: "This is your free trial article. Purchase a plan to unlock all features."
+- [x] Blocked state: clear message explaining what each plan includes
+
+### Verification (4 checks)
+- [x] V1: New account → full free trial flow → 1 cluster article generated end-to-end
+- [x] V2: Attempt second article without purchase → upgrade prompt appears
+- [x] V3: Same email second trial → blocked with clear message
+- [x] V4: Test purchase from upgrade prompt → credits allocated, user can continue
+
+### Tests
+- [x] Vitest: trial.getStatus, trial.startFreeTrial, generation guard (blocks second article), trial abuse prevention

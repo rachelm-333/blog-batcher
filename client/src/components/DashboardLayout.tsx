@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, Calendar, Settings, FileText, Puzzle, Pencil, BarChart2, HelpCircle, Shield, CreditCard } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, Calendar, Settings, FileText, Puzzle, Pencil, BarChart2, HelpCircle, Shield, CreditCard, Zap } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -39,6 +39,7 @@ const menuItems = [
   { icon: Puzzle, label: "Integrations", path: "/integrations" },
   { icon: HelpCircle, label: "Help", path: "/support" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
+  { icon: Zap, label: "Free Trial", path: "/free-trial" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

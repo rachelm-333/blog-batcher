@@ -27,9 +27,12 @@ import {
   articleImages,
   articleNodes,
   articles,
+  blogArchitectures,
   businesses,
+  credits,
   schedules,
   keywords,
+  users,
 } from "../../drizzle/schema";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -194,21 +197,56 @@ export const articlesRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Stage 3 (Keyword Research) must be completed before generating articles." });
       }
 
-      // Check keywords are all approved
+      // ── Trial / credit guard (checked BEFORE article nodes so upgrade prompt shows first) ────
+      const [arch] = await db
+        .select({ packSize: blogArchitectures.packSize })
+        .from(blogArchitectures)
+        .where(eq(blogArchitectures.businessId, input.businessId))
+        .limit(1);
+      const isTrialBusiness = arch?.packSize === 0;
+      if (isTrialBusiness) {
+        // Trial business: block if free trial already used
+        const [userRow] = await db
+          .select({ freeTrialUsed: users.freeTrialUsed })
+          .from(users)
+          .where(eq(users.id, ctx.user.id))
+          .limit(1);
+        if (userRow?.freeTrialUsed) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "FREE_TRIAL_USED",
+          });
+        }
+      } else {
+        // Paid business: require at least 1 credit
+        const [creditRow] = await db
+          .select({ balance: credits.balance })
+          .from(credits)
+          .where(eq(credits.userId, ctx.user.id))
+          .limit(1);
+        if (!creditRow || creditRow.balance < 1) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "INSUFFICIENT_CREDITS",
+          });
+        }
+      }
+      // ── End trial / credit guard ──────────────────────────────────────────────────
+
+      // Check article nodes exist (Stage 2 must be complete)
       const nodeRows = await db
         .select({ id: articleNodes.id })
         .from(articleNodes)
         .where(eq(articleNodes.businessId, input.businessId));
-
       if (!nodeRows.length) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "No article nodes found. Complete Stage 2 first." });
       }
 
+      // Check all keywords are approved
       const kwRows = await db
         .select({ approved: keywords.keywordApproved, paaApproved: keywords.paaApproved })
         .from(keywords)
         .where(eq(keywords.businessId, input.businessId));
-
       const allApproved = kwRows.every(k => k.approved && k.paaApproved);
       if (!allApproved) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "All keywords and PAA questions must be approved before generating articles." });
@@ -247,6 +285,10 @@ export const articlesRouter = router({
         }
       }
 
+      // Capture trial flag for use in background task
+      const isTrialGen = isTrialBusiness;
+      const trialUserId = ctx.user.id;
+
       // Run generation sequentially in background (non-blocking response)
       setImmediate(async () => {
         for (const node of orderedNodes) {
@@ -258,6 +300,20 @@ export const articlesRouter = router({
           }
         }
         console.log(`[Articles] Batch generation complete for business ${input.businessId}`);
+        // Mark trial as used after the trial article is generated
+        if (isTrialGen) {
+          try {
+            const dbInner = await getDb();
+            if (dbInner) {
+              await dbInner.update(users).set({ freeTrialUsed: true }).where(eq(users.id, trialUserId));
+              // Also mark the article as isFreeTrial
+              await dbInner.update(articles).set({ isFreeTrial: true }).where(eq(articles.businessId, input.businessId));
+              console.log(`[Trial] Marked freeTrialUsed=true for user ${trialUserId}`);
+            }
+          } catch (err) {
+            console.error(`[Trial] Failed to mark trial as used:`, err);
+          }
+        }
       });
 
       // Return a deterministic jobId so the client can correlate polls

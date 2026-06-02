@@ -47,6 +47,8 @@ export const users = mysqlTable("users", {
   isSuspended: boolean("isSuspended").default(false).notNull(),
   /** Stripe Customer ID for billing. Set on first checkout. */
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  /** True once the user has consumed their one free trial article. */
+  freeTrialUsed: boolean("freeTrialUsed").default(false).notNull(),
 });
 
 export const usersRelations = relations(users, ({ many, one }) => ({
