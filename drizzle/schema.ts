@@ -1,5 +1,6 @@
 import {
   boolean,
+  decimal,
   int,
   json,
   mysqlEnum,
@@ -42,6 +43,8 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  /** True if the user has been suspended by an admin. Suspended users cannot log in. */
+  isSuspended: boolean("isSuspended").default(false).notNull(),
 });
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -761,12 +764,17 @@ export const adminLog = mysqlTable("admin_log", {
   /** Type of action performed. */
   action: mysqlEnum("action", [
     "grant_credits",
+    "remove_credits",
     "override_article_status",
     "unlock_user",
     "reset_user",
     "view_user_dashboard",
     "flag_test_business",
     "manual_publish_retry",
+    "suspend_user",
+    "unsuspend_user",
+    "add_credits",
+    "impersonate_user",
     "other",
   ]).notNull(),
   /** Target user affected by this action (if applicable). */
@@ -883,4 +891,60 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
 }));
 
 export type Notification = typeof notifications.$inferSelect;
-export type InsertNotification = typeof notifications.$inferInsert;
+export type InsertNotification = typeof notifications.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// App Error Log — captures unhandled server errors and failed automated actions
+// ---------------------------------------------------------------------------
+export const appErrorLog = mysqlTable("app_error_log", {
+  id: int("id").autoincrement().primaryKey(),
+  /** User who triggered the error (null for system/cron errors). */
+  userId: int("userId").references(() => users.id),
+  /** Express route or job name where the error occurred. */
+  route: varchar("route", { length: 255 }),
+  /** Short error message. */
+  errorMessage: text("errorMessage").notNull(),
+  /** Full stack trace (truncated to 4000 chars). */
+  stackTrace: text("stackTrace"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const appErrorLogRelations = relations(appErrorLog, ({ one }) => ({
+  user: one(users, { fields: [appErrorLog.userId], references: [users.id] }),
+}));
+
+export type AppErrorLog = typeof appErrorLog.$inferSelect;
+export type InsertAppErrorLog = typeof appErrorLog.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// API Cost Log — tracks Claude LLM API calls with token counts and estimated cost
+// ---------------------------------------------------------------------------
+export const apiCostLog = mysqlTable("api_cost_log", {
+  id: int("id").autoincrement().primaryKey(),
+  /** User who triggered the API call. */
+  userId: int("userId").references(() => users.id),
+  /** Model name (e.g. claude-3-5-sonnet-20241022). */
+  model: varchar("model", { length: 128 }).notNull(),
+  /** Number of input tokens consumed. */
+  inputTokens: int("inputTokens").default(0).notNull(),
+  /** Number of output tokens generated. */
+  outputTokens: int("outputTokens").default(0).notNull(),
+  /** Estimated cost in USD (input + output at standard rates). */
+  estimatedCostUsd: decimal("estimatedCostUsd", { precision: 10, scale: 6 }).default("0").notNull(),
+  /** Feature that triggered this call. */
+  feature: mysqlEnum("feature", [
+    "article_generation",
+    "keyword_research",
+    "business_scrape",
+    "seo_analysis",
+    "other",
+  ]).default("other").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const apiCostLogRelations = relations(apiCostLog, ({ one }) => ({
+  user: one(users, { fields: [apiCostLog.userId], references: [users.id] }),
+}));
+
+export type ApiCostLog = typeof apiCostLog.$inferSelect;
+export type InsertApiCostLog = typeof apiCostLog.$inferInsert;

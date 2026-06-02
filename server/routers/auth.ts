@@ -236,6 +236,13 @@ export const authRouter = router({
         });
       }
 
+      if (user.isSuspended) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Your account has been suspended. Please contact support at support@blogbatcher.com for assistance.",
+        });
+      }
+
       // Update last signed in
       await db
         .update(users)

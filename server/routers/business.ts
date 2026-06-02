@@ -25,7 +25,7 @@ import {
   businessServices,
   businesses,
 } from "../../drizzle/schema";
-import { invokeLLM } from "../_core/llm";
+import { invokeLLMWithCost } from "../apiCostLogger";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 
@@ -305,17 +305,20 @@ Rules:
 - finalVoiceBrief must be a complete, usable brief that could be sent directly to an AI writing assistant.`;
 
       try {
-        const response = await invokeLLM({
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are a business analyst. Return only valid JSON. No markdown fences, no explanation.",
-            },
-            { role: "user", content: prompt },
-          ],
-          response_format: { type: "json_object" } as any,
-        });
+        const response = await invokeLLMWithCost(
+          {
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are a business analyst. Return only valid JSON. No markdown fences, no explanation.",
+              },
+              { role: "user", content: prompt },
+            ],
+            response_format: { type: "json_object" } as any,
+          },
+          { userId: ctx.user.id, feature: "business_scrape" }
+        );
 
         const raw = (response?.choices?.[0]?.message?.content as string) ?? "{}";
         let parsed: any = {};

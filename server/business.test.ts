@@ -16,8 +16,22 @@ vi.mock("./_core/llm", () => ({
   invokeLLM: vi.fn(),
 }));
 
+// ─── Mock the API cost logger (business.ts now uses invokeLLMWithCost) ────────
+// invokeLLMWithCost wraps invokeLLM. We mock it as a vi.fn() so tests can
+// control the return value directly without hitting the real LLM.
+// business.ts imports from "../apiCostLogger" (relative to server/routers/)
+// test file is in server/ so the mock path must match the resolved module path
+vi.mock("./apiCostLogger", () => ({
+  invokeLLMWithCost: vi.fn(),
+}));
+// Also mock the path as seen from server/routers/business.ts
+vi.mock("../apiCostLogger", () => ({
+  invokeLLMWithCost: vi.fn(),
+}));
+
 import { getDb } from "./db";
 import { invokeLLM } from "./_core/llm";
+import { invokeLLMWithCost } from "./apiCostLogger";
 import { appRouter } from "./routers";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -186,7 +200,7 @@ describe("business.scrape", () => {
       },
     };
 
-    vi.mocked(invokeLLM).mockResolvedValue({
+    vi.mocked(invokeLLMWithCost).mockResolvedValue({
       choices: [
         {
           message: {
@@ -219,11 +233,11 @@ describe("business.scrape", () => {
     expect(result.success).toBe(true);
     expect(result.data.name).toBe("Sunshine Physio");
     expect(result.data.industry).toBe("Physiotherapy");
-    expect(invokeLLM).toHaveBeenCalledOnce();
+    expect(invokeLLMWithCost).toHaveBeenCalledOnce();
   }, 15000);
 
   it("returns success:false if LLM returns invalid JSON", async () => {
-    vi.mocked(invokeLLM).mockResolvedValue({
+    vi.mocked(invokeLLMWithCost).mockResolvedValue({
       choices: [{ message: { content: "not valid json" } }],
     } as any);
 

@@ -513,3 +513,69 @@
 - [x] Vitest: support.getTopics (1 test: 8 topics with articles)
 - [x] Vitest: support.submitContactForm (4 tests: name missing, invalid email, message too short, success with mock)
 - [x] Vitest: HELP_ARTICLES integrity (2 tests: unique slugs, valid topicIds)
+
+## Layer 12: Admin Panel
+
+### Schema additions
+- [x] Add `isSuspended` boolean column to `users` table (default false)
+- [x] Add `app_error_log` table: id, userId (nullable), route, errorMessage, stackTrace, createdAt
+- [x] Add `api_cost_log` table: id, userId, model, inputTokens, outputTokens, estimatedCostUsd, feature (enum: article_gen, keyword_research, business_scrape, other), createdAt
+- [x] Extend `admin_log` action enum to include: suspend_user, unsuspend_user, add_credits, remove_credits, impersonate_user
+- [x] Run Drizzle migration and apply to DB
+
+### Backend — adminProcedure guard
+- [x] `adminProcedure` middleware: checks ctx.user.email === "rachel.m@noize.com.au" OR ctx.user.role === "admin", throws FORBIDDEN otherwise
+- [x] All admin procedures use adminProcedure
+
+### Backend — tRPC procedures (server/routers/admin.ts)
+- [x] admin.listUsers — all users with: name, email, role, tier, isSuspended, creditBalance, businessCount, articleCount, lastSignedIn
+- [x] admin.suspendUser — set isSuspended=true, write admin_log entry
+- [x] admin.unsuspendUser — set isSuspended=false, write admin_log entry
+- [x] admin.addCredits — add N credits to user's credit balance, write credit_transaction + admin_log
+- [x] admin.removeCredits — subtract N credits (floor at 0), write credit_transaction + admin_log
+- [x] admin.listBusinesses — all businesses with user name/email, stage, article counts by status
+- [x] admin.getRevenueSummary — total payments, refunds, credit top-ups from DB (no Stripe API)
+- [x] admin.listErrorLog — paginated app_error_log entries, filterable by userId
+- [x] admin.listApiCostLog — paginated api_cost_log entries, aggregated by user and by day
+- [x] admin.getAuditLog — paginated publish_audit_log entries (reuse from scheduler router)
+- [x] admin.getAdminLog — paginated admin_log entries
+- [x] admin.startImpersonation — sets impersonation cookie (targetUserId), writes admin_log
+- [x] admin.stopImpersonation — clears impersonation cookie
+- [x] Wire adminRouter into server/routers.ts
+
+### Backend — suspension enforcement
+- [x] Login procedure: check isSuspended before issuing session cookie, return FORBIDDEN with "Account suspended" message
+- [x] Impersonation context: if impersonation cookie present, ctx.user = target user (with impersonating admin tracked)
+
+### Backend — API cost logging
+- [x] Wrap invokeLLM in server/schedulerService.ts and server/routers/articles.ts to log token usage to api_cost_log after each call
+- [x] logApiCost(userId, model, inputTokens, outputTokens, feature) helper in server/db.ts
+
+### Backend — app error logging
+- [x] logAppError(userId, route, message, stack) helper in server/db.ts
+- [x] Wire into Express error handler in server/_core/index.ts
+- [x] Wire into scheduledPublishHandler.ts on publish failure
+
+### Frontend — Admin Panel (/admin)
+- [x] /admin route: redirect non-admin users to / with 403 toast
+- [x] Admin layout: tabs for Users, Businesses, Revenue, Error Log, API Costs, Audit Log, Admin Log
+- [x] Users tab: table with name, email, plan, credits, businesses, articles, last active, Suspend/Unsuspend button, Add/Remove Credits dialog
+- [x] Businesses tab: table with business name, user, stage, article counts by status
+- [x] Revenue tab: summary cards (total payments, refunds, credit top-ups) + transaction table
+- [x] Error Log tab: paginated table with timestamp, userId, route, error message (expandable stack trace)
+- [x] API Costs tab: aggregated by user (total tokens, total cost) + by day chart
+- [x] Audit Log tab: searchable publish_audit_log table (reuses Layer 9 data)
+- [x] Admin Log tab: all admin actions with admin name, action, target user, notes, timestamp
+- [x] Impersonation: "View as User" button on Users tab, impersonation banner shown when active, "Stop Impersonating" button
+- [x] /admin link in DashboardLayout sidebar (visible only to admin users)
+
+### Verification (6 checks)
+- [x] V1: Non-admin user → /admin returns 403
+- [x] V2: rachel.m@noize.com.au → full admin access
+- [x] V3: Suspend user → user cannot log in
+- [x] V4: Add credits to user → balance updates on their dashboard
+- [x] V5: API cost log shows Claude API calls with token counts
+- [x] V6: Impersonate user → banner displays
+
+### Tests
+- [x] Vitest: adminProcedure guard (non-admin blocked, admin allowed), suspendUser, unsuspendUser, addCredits, removeCredits, listUsers, startImpersonation

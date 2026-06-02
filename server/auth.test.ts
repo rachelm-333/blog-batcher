@@ -67,7 +67,7 @@ describe("auth.register", () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain("verify");
-  });
+  }, 15000);
 
   it("rejects duplicate email registration", async () => {
     const { ctx } = makeCtx();

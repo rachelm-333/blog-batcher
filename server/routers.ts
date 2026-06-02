@@ -10,6 +10,7 @@ import { integrationsRouter } from "./routers/integrations";
 import { schedulerRouter } from "./routers/scheduler";
 import { dashboardRouter } from "./routers/dashboard";
 import { supportRouter } from "./routers/support";
+import { adminRouter } from "./routers/admin";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -63,6 +64,11 @@ export const appRouter = router({
   // Help articles search, article viewer, contact form.
   // All procedures live in server/routers/support.ts
   support: supportRouter,
+
+  // ─── Layer 12: Admin Panel ─────────────────────────────────────────────────
+  // User management, business overview, revenue, error log, API costs, impersonation.
+  // All procedures live in server/routers/admin.ts
+  admin: adminRouter,
 
   // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
   // Layer 3 (Stripe) will be wired here once Auth is fully verified.

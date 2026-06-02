@@ -20,7 +20,7 @@ import {
   brandVoice,
   keywords,
 } from "../../drizzle/schema";
-import { invokeLLM } from "../_core/llm";
+import { invokeLLMWithCost } from "../apiCostLogger";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
@@ -58,7 +58,8 @@ async function generateKeywordsViaClaude(
   industry: string,
   location: string,
   voiceBrief: string,
-  exclusions: string[]
+  exclusions: string[],
+  userId?: number | null
 ): Promise<Map<number, string>> {
   const nodeDescriptions = nodes.map(
     (n) => `Node ${n.id}: level=${n.level}, type=${n.articleType}, order=${n.sortOrder}`
@@ -85,23 +86,26 @@ Rules:
 
 Return a JSON object mapping node ID to keyword string only. Example: {"1": "plumber Gold Coast", "2": "emergency plumber Gold Coast"}`;
 
-  const response = await invokeLLM({
-    messages: [
-      { role: "system", content: "You are an SEO keyword strategist. Return only valid JSON." },
-      { role: "user", content: prompt },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "keyword_assignments",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: { type: "string" },
+  const response = await invokeLLMWithCost(
+    {
+      messages: [
+        { role: "system", content: "You are an SEO keyword strategist. Return only valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "keyword_assignments",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: { type: "string" },
+          },
         },
       },
     },
-  });
+    { userId, feature: "keyword_research" }
+  );
 
   const content = response?.choices?.[0]?.message?.content ?? "{}";
   const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content)) as Record<string, string>;
@@ -170,7 +174,8 @@ export const keywordsRouter = router({
         biz.industry ?? "",
         biz.location ?? "",
         voice?.finalVoiceBrief ?? "",
-        exclusions
+        exclusions,
+        ctx.user.id
       );
 
       // Enrich with DataForSEO data if credentials are available

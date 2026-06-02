@@ -13,6 +13,7 @@ import PublishSchedule from "./pages/PublishSchedule";
 import Integrations from "./pages/Integrations";
 import ScheduleManagement from "./pages/ScheduleManagement";
 import SupportCentre from "./pages/SupportCentre";
+import AdminPanel from "./pages/AdminPanel";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/integrations" component={Integrations} />
       <Route path="/schedule-management" component={ScheduleManagement} />
       <Route path="/support" component={SupportCentre} />
+      <Route path="/admin" component={AdminPanel} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

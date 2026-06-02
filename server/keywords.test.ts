@@ -143,6 +143,17 @@ vi.mock("./db", () => ({
   getDb: vi.fn(),
 }));
 
+// Mock the API cost logger (keywords.ts now uses invokeLLMWithCost)
+vi.mock("./apiCostLogger", () => ({
+  invokeLLMWithCost: vi.fn().mockResolvedValue({
+    choices: [{ message: { content: JSON.stringify({
+      "1": "plumber Gold Coast",
+      "2": "emergency plumber Brisbane",
+      "3": "hot water system repair",
+    }) } }],
+  }),
+}));
+
 import { getDb } from "./db";
 
 const mockGetDb = vi.mocked(getDb);

@@ -33,6 +33,7 @@ import {
   keywords,
 } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
+import { invokeLLMWithCost } from "./apiCostLogger";
 import { getDb } from "./db";
 
 // ---------------------------------------------------------------------------
@@ -610,7 +611,7 @@ export function runPass1Scorer(params: {
 // Pass 2 — AI quality scorer
 // ---------------------------------------------------------------------------
 
-export async function runPass2Scorer(bodyHtml: string, primaryKeyword: string): Promise<{ score: number; feedback: string }> {
+export async function runPass2Scorer(bodyHtml: string, primaryKeyword: string, userId?: number | null): Promise<{ score: number; feedback: string }> {
   const prompt = `You are an SEO content quality auditor. Score the following article on these 5 criteria (each worth 20 points, total 100):
 
 1. SEARCH INTENT RESOLUTION (20 pts): Does it fully resolve what the searcher is looking for?
@@ -627,10 +628,13 @@ ${bodyHtml.slice(0, 3000)}
 Return JSON: { "score": <0-100 integer>, "feedback": "<one sentence summary>" }`;
 
   try {
-    const result = await invokeLLM({
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-    });
+    const result = await invokeLLMWithCost(
+      {
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      },
+      { userId, feature: "seo_analysis" }
+    );
     const content = result.choices[0]?.message?.content;
     const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
     return {
@@ -690,7 +694,8 @@ export interface GenerationResult {
 export async function generateSingleArticle(
   businessId: number,
   nodeId: number,
-  allOrderedNodes: OrderedNode[]
+  allOrderedNodes: OrderedNode[],
+  userId?: number | null
 ): Promise<GenerationResult> {
   const ctx = await buildArticleContext(businessId, nodeId, allOrderedNodes);
 
@@ -709,11 +714,14 @@ export async function generateSingleArticle(
   let lastGenError: unknown;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const genResult = await invokeLLM({
-        messages: genMessages,
-        response_format: { type: "json_object" },
-        max_tokens: 16000,
-      });
+      const genResult = await invokeLLMWithCost(
+        {
+          messages: genMessages,
+          response_format: { type: "json_object" },
+          max_tokens: 16000,
+        },
+        { userId, feature: "article_generation" }
+      );
       const genContent = genResult.choices[0]?.message?.content;
       const rawContent = typeof genContent === "string" ? genContent : JSON.stringify(genContent);
       // Strip markdown code fences if the model wrapped the JSON anyway
@@ -773,11 +781,14 @@ export async function generateSingleArticle(
   // --- Pass B: AI fingerprint scrub ---
   try {
     const scrubPrompt = buildScrubPrompt(bodyHtml, bodyMarkdown);
-    const scrubResult = await invokeLLM({
-      messages: [{ role: "user", content: scrubPrompt }],
-      response_format: { type: "json_object" },
-      max_tokens: 16000,
-    });
+    const scrubResult = await invokeLLMWithCost(
+      {
+        messages: [{ role: "user", content: scrubPrompt }],
+        response_format: { type: "json_object" },
+        max_tokens: 16000,
+      },
+      { userId, feature: "article_generation" }
+    );
     const scrubContent = scrubResult.choices[0]?.message?.content;
     const scrubParsed = JSON.parse(typeof scrubContent === "string" ? scrubContent : JSON.stringify(scrubContent));
     if (scrubParsed.bodyHtml) bodyHtml = scrubParsed.bodyHtml;
@@ -883,7 +894,7 @@ export async function generateSingleArticle(
   });
 
   // --- Pass 2: AI quality scorer ---
-  const pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword);
+  const pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
 
   // --- Derive badge ---
   const { internalScore, statusBadge } = deriveStatusBadge(pass1.score, pass2.score);
