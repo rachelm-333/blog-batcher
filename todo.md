@@ -754,3 +754,18 @@
 - [x] V4: Cross-user business access blocked (assertOwnership throws FORBIDDEN)
 - [x] V5: Credits shared at account level — deduction visible across all businesses
 - [x] V6: Admin sees all businesses; non-admin blocked from admin.listBusinesses
+
+## Frontend Polish Pass (UI Mockup Alignment)
+- [x] Fix all hardcoded light-theme colors (bg-white, bg-slate, bg-gray, etc.) across all pages
+- [x] Status badges: Authority Ready (emerald), Strong (primary/blue), Needs Review (amber), Published, Scheduled, Failed — consistent dark-theme colors across all screens
+- [x] ArticleGeneration.tsx: LevelBadge (Cornerstone=violet, Pillar=primary, Cluster=secondary), article card border colors
+- [x] ArticleReview.tsx: ScoreBadgePanel, LevelLabel, StatusBadgeChip — all dark-theme compatible
+- [x] Architecture.tsx: warning box, cornerstone badge, tree map colors
+- [x] Keywords.tsx: competition badges, warning boxes, PAA approved rows, cannibalization highlights
+- [x] PublishSchedule.tsx: gate warning box, calendar article badges
+- [x] Dashboard.tsx: mini calendar article highlight, stage complete border/bg, ACTION_COLORS
+- [x] ScheduleManagement.tsx: audit log badge colors (retry, rescheduled)
+- [x] AdminPanel.tsx: credit buttons, impersonation warning, revenue figures
+- [x] Register/VerifyEmail/ResetPassword/FreeTrial/PaymentSuccess: icon bg circles
+- [x] TypeScript: 0 errors after all changes
+- [x] All 318 tests pass after polish changes

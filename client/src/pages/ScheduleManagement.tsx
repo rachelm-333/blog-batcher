@@ -53,18 +53,18 @@ function StatusBadge({ status }: { status: string }) {
 // ---------------------------------------------------------------------------
 function ActionBadge({ action }: { action: string }) {
   const colors: Record<string, string> = {
-    scheduled_publish_attempted: "bg-blue-100 text-blue-800",
-    scheduled_publish_succeeded: "bg-green-100 text-green-800",
-    scheduled_publish_failed: "bg-red-100 text-red-800",
-    retry_attempted: "bg-yellow-100 text-yellow-800",
-    retry_succeeded: "bg-green-100 text-green-800",
-    retry_failed: "bg-red-100 text-red-800",
-    schedule_cancelled: "bg-gray-100 text-gray-800",
-    schedule_rescheduled: "bg-purple-100 text-purple-800",
+    scheduled_publish_attempted: "bg-primary/15 text-primary",
+    scheduled_publish_succeeded: "bg-emerald-500/15 text-emerald-400",
+    scheduled_publish_failed: "bg-destructive/15 text-destructive",
+    retry_attempted: "bg-amber-500/15 text-amber-400",
+    retry_succeeded: "bg-emerald-500/15 text-emerald-400",
+    retry_failed: "bg-destructive/15 text-destructive",
+    schedule_cancelled: "bg-secondary text-foreground",
+    schedule_rescheduled: "bg-violet-500/15 text-violet-400",
   };
   const label = action.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[action] ?? "bg-gray-100 text-gray-800"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[action] ?? "bg-secondary text-foreground"}`}>
       {label}
     </span>
   );
@@ -254,7 +254,7 @@ export default function ScheduleManagement() {
           <Card>
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-blue-500 shrink-0" />
+                <Clock className="h-5 w-5 text-primary shrink-0" />
                 <div>
                   <p className="text-2xl font-bold">{scheduled.length}</p>
                   <p className="text-xs text-muted-foreground">Scheduled</p>

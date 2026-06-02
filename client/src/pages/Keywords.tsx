@@ -110,24 +110,24 @@ function deriveNodeLabel(rows: KwRow[], row: KwRow): string {
 
 function levelBadge(level: string) {
   if (level === "cornerstone")
-    return <Badge className="bg-purple-100 text-purple-700 border-purple-200">Cornerstone</Badge>;
+    return <Badge className="bg-violet-500/15 text-violet-400 border-violet-500/30">Cornerstone</Badge>;
   if (level === "pillar")
-    return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Pillar</Badge>;
-  return <Badge className="bg-slate-100 text-slate-600 border-slate-200">Cluster</Badge>;
+    return <Badge className="bg-primary/15 text-primary border-primary/30">Pillar</Badge>;
+  return <Badge className="bg-secondary text-muted-foreground border-border">Cluster</Badge>;
 }
 
 function msvLabel(msv: number | null) {
-  if (msv === null) return <span className="text-slate-400">—</span>;
+  if (msv === null) return <span className="text-muted-foreground">—</span>;
   if (msv >= 10000) return <span className="text-emerald-600 font-medium">{msv.toLocaleString()}</span>;
-  if (msv >= 1000) return <span className="text-blue-600 font-medium">{msv.toLocaleString()}</span>;
-  return <span className="text-slate-600">{msv.toLocaleString()}</span>;
+  if (msv >= 1000) return <span className="text-primary font-medium">{msv.toLocaleString()}</span>;
+  return <span className="text-muted-foreground">{msv.toLocaleString()}</span>;
 }
 
 function compBadge(comp: string | null) {
-  if (!comp) return <span className="text-slate-400">—</span>;
-  if (comp === "high") return <Badge className="bg-red-100 text-red-700 border-red-200">High</Badge>;
-  if (comp === "medium") return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Medium</Badge>;
-  return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Low</Badge>;
+  if (!comp) return <span className="text-muted-foreground">—</span>;
+  if (comp === "high") return <Badge className="bg-destructive/15 text-destructive border-destructive/30">High</Badge>;
+  if (comp === "medium") return <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">Medium</Badge>;
+  return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">Low</Badge>;
 }
 
 function articleTypeLabel(type: string) {
@@ -190,14 +190,14 @@ function SwapModal({
 
         <div className="space-y-4 mt-2">
           {suggestions.isLoading && (
-            <div className="flex items-center gap-2 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Fetching suggestions…
             </div>
           )}
 
           {!suggestions.isLoading && (suggestions.data?.length ?? 0) > 0 && (
             <div>
-              <p className="text-sm font-medium text-slate-700 mb-2">DataForSEO Suggestions</p>
+              <p className="text-sm font-medium text-foreground mb-2">DataForSEO Suggestions</p>
               <div className="space-y-2">
                 {suggestions.data?.map((s) => (
                   <button
@@ -208,12 +208,12 @@ function SwapModal({
                     }}
                     className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-all ${
                       selectedSuggestion === s.keyword
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-slate-200 hover:border-slate-300 bg-white"
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-border bg-card"
                     }`}
                   >
-                    <span className="font-medium text-slate-900">{s.keyword}</span>
-                    <span className="ml-2 text-slate-400 text-xs">
+                    <span className="font-medium text-foreground">{s.keyword}</span>
+                    <span className="ml-2 text-muted-foreground text-xs">
                       {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
                       {s.competition ? ` · ${s.competition} comp` : ""}
                     </span>
@@ -224,7 +224,7 @@ function SwapModal({
           )}
 
           <div>
-            <p className="text-sm font-medium text-slate-700 mb-1">Or enter manually</p>
+            <p className="text-sm font-medium text-foreground mb-1">Or enter manually</p>
             <Input
               placeholder="Type a custom keyword…"
               value={manualKw}
@@ -433,17 +433,17 @@ export default function Keywords() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-blue-500" />
+          <Sparkles className="h-5 w-5 text-primary" />
           Auto-Assign Keywords
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted-foreground">
           Blog Batcher will assign one primary keyword to every article slot in your architecture
           using DataForSEO data and your brand voice brief. You can swap any keyword in the next
           step.
         </p>
-        <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 text-sm text-slate-600 space-y-1">
+        <div className="bg-background rounded-xl border border-border p-4 text-sm text-muted-foreground space-y-1">
           <div><span className="font-medium">Business:</span> {business.name}</div>
           <div><span className="font-medium">Location:</span> {business.location ?? "—"}</div>
           <div><span className="font-medium">Industry:</span> {business.industry ?? "—"}</div>
@@ -469,7 +469,7 @@ export default function Keywords() {
   const renderKeywordReview = () => (
     <div className="space-y-4">
       {cannibalizationConflicts.length > 0 && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-sm text-amber-400">
           <div className="flex items-start gap-3 mb-2">
             <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
             <p className="font-semibold">
@@ -480,11 +480,11 @@ export default function Keywords() {
           {conflictPairs.length > 0 && (
             <ul className="ml-8 space-y-1.5">
               {conflictPairs.map((pair, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs text-amber-700">
+                <li key={i} className="flex items-center gap-2 text-xs text-amber-400">
                   <span className={`px-1.5 py-0.5 rounded font-medium ${
                     pair.type === "Exact duplicate"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-amber-100 text-amber-700"
+                      ? "bg-destructive/15 text-destructive"
+                      : "bg-amber-500/15 text-amber-400"
                   }`}>
                     {pair.type}
                   </span>
@@ -535,21 +535,21 @@ export default function Keywords() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Level</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Node</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Primary Keyword</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">MSV</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Competition</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Actions</th>
+                <tr className="border-b border-border bg-background">
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Level</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Node</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Type</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Primary Keyword</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">MSV</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Competition</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {kwLoading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-slate-400">
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                     </td>
                   </tr>
@@ -557,15 +557,15 @@ export default function Keywords() {
                   kwData?.map((kw) => (
                     <tr
                       key={kw.id}
-                      className={`border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${
-                        kw.cannibalizationWarning ? "bg-amber-50/50" : ""
+                      className={`border-b border-border hover:bg-background/50 transition-colors ${
+                        kw.cannibalizationWarning ? "bg-amber-500/5" : ""
                       }`}
                     >
                       <td className="px-4 py-3">{levelBadge(kw.nodeLevel)}</td>
-                      <td className="px-4 py-3 text-xs font-mono text-slate-500">
+                      <td className="px-4 py-3 text-xs font-mono text-muted-foreground">
                         {kwData ? deriveNodeLabel(kwData, kw) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
                         {articleTypeLabel(kw.nodeArticleType)}
                       </td>
                       <td className="px-4 py-3">
@@ -573,18 +573,18 @@ export default function Keywords() {
                           {kw.cannibalizationWarning && (
                             <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                           )}
-                          <span className="font-medium text-slate-900">{kw.primaryKeyword}</span>
+                          <span className="font-medium text-foreground">{kw.primaryKeyword}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">{msvLabel(kw.monthlySearchVolume)}</td>
                       <td className="px-4 py-3">{compBadge(kw.competitionLevel)}</td>
                       <td className="px-4 py-3">
                         {kw.keywordApproved ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                          <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
                             <CheckCircle2 className="h-3 w-3 mr-1" /> Approved
                           </Badge>
                         ) : (
-                          <Badge className="bg-slate-100 text-slate-500 border-slate-200">Pending</Badge>
+                          <Badge className="bg-secondary text-muted-foreground border-border">Pending</Badge>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -644,7 +644,7 @@ export default function Keywords() {
   const renderPAAReview = () => (
     <div className="space-y-4">
       {fetchPAA.isPending && (
-        <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+        <div className="flex items-center gap-3 p-4 bg-primary/10 border border-primary/30 rounded-xl text-sm text-primary">
           <Loader2 className="h-4 w-4 animate-spin" />
           Fetching People Also Ask questions from DataForSEO…
         </div>
@@ -667,7 +667,7 @@ export default function Keywords() {
               Re-fetch PAA
             </Button>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Select the best PAA question for each article. This becomes the opening answer block.
           </p>
         </CardHeader>
@@ -678,7 +678,7 @@ export default function Keywords() {
               <div
                 key={kw.id}
                 className={`p-4 rounded-xl border ${
-                  kw.paaApproved ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-white"
+                  kw.paaApproved ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-card"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
@@ -689,19 +689,19 @@ export default function Keywords() {
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                       )}
                     </div>
-                    <p className="font-medium text-slate-900 text-sm">{kw.primaryKeyword}</p>
+                    <p className="font-medium text-foreground text-sm">{kw.primaryKeyword}</p>
                   </div>
                 </div>
 
                 {questions.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">No PAA questions found for this keyword.</p>
+                  <p className="text-xs text-muted-foreground italic">No PAA questions found for this keyword.</p>
                 ) : kw.paaApproved ? (
-                  <div className="text-sm text-emerald-700 font-medium">
+                  <div className="text-sm text-emerald-400 font-medium">
                     ✓ {kw.approvedPaaQuestion}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                       Select a question:
                     </p>
                     <Select
@@ -750,8 +750,8 @@ export default function Keywords() {
     <Card>
       <CardContent className="py-12 text-center space-y-4">
         <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-        <h2 className="text-xl font-bold text-slate-900">Stage 3 Complete</h2>
-        <p className="text-slate-500 text-sm max-w-sm mx-auto">
+        <h2 className="text-xl font-bold text-foreground">Stage 3 Complete</h2>
+        <p className="text-muted-foreground text-sm max-w-sm mx-auto">
           All keywords and PAA questions are approved. Your articles are ready for generation.
         </p>
         <Button onClick={() => navigate("/dashboard")}>
@@ -775,11 +775,11 @@ export default function Keywords() {
   const stepIndex = STEPS.findIndex((s) => s.id === subStage);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       {/* Top nav */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-        <span className="text-xl font-bold text-slate-900 tracking-tight">
-          Blog <span className="text-blue-600">Batcher</span>
+      <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between">
+        <span className="text-xl font-bold text-foreground tracking-tight">
+          Blog <span className="text-primary">Batcher</span>
         </span>
         <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="h-4 w-4 mr-1.5" />
@@ -790,8 +790,8 @@ export default function Keywords() {
       <main className="max-w-5xl mx-auto px-6 py-10">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Stage 3: Keyword Research</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Stage 3: Keyword Research</h1>
+          <p className="text-muted-foreground text-sm mt-1">
             {business.name} · {(kwData?.length ?? 0)} article slots
           </p>
         </div>
@@ -806,10 +806,10 @@ export default function Keywords() {
                 <div
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     isCurrent
-                      ? "bg-blue-600 text-white"
+                      ? "bg-primary text-white"
                       : isComplete
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-slate-100 text-slate-400"
+                      ? "bg-emerald-500/15 text-emerald-400"
+                      : "bg-secondary text-muted-foreground"
                   }`}
                 >
                   {isComplete ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
@@ -818,7 +818,7 @@ export default function Keywords() {
                 {i < STEPS.length - 1 && (
                   <div
                     className={`h-px w-6 mx-1 ${
-                      i < stepIndex ? "bg-emerald-300" : "bg-slate-200"
+                      i < stepIndex ? "bg-emerald-300" : "bg-secondary"
                     }`}
                   />
                 )}

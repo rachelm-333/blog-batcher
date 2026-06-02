@@ -203,6 +203,7 @@ export const dashboardRouter = router({
           currentStage: businesses.currentStage,
           cmsPlatform: businesses.cmsPlatform,
           createdAt: businesses.createdAt,
+          websiteUrl: businesses.websiteUrl,
         })
         .from(businesses)
         .where(eq(businesses.userId, ctx.user.id))

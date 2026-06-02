@@ -34,9 +34,9 @@ function NotifIcon({ type }: { type: string }) {
     case "retry_failed":
       return <XCircle className="h-4 w-4 text-red-500 shrink-0" />;
     case "schedule_cancelled":
-      return <XCircle className="h-4 w-4 text-gray-500 shrink-0" />;
+      return <XCircle className="h-4 w-4 text-muted-foreground shrink-0" />;
     case "schedule_rescheduled":
-      return <RefreshCw className="h-4 w-4 text-blue-500 shrink-0" />;
+      return <RefreshCw className="h-4 w-4 text-primary shrink-0" />;
     default:
       return <Bell className="h-4 w-4 text-muted-foreground shrink-0" />;
   }
@@ -144,7 +144,7 @@ export function NotificationBell() {
                             {notif.title}
                           </p>
                           {!notif.read && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">

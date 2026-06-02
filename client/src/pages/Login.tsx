@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -37,24 +37,29 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/">
-            <span className="text-2xl font-bold text-slate-900 tracking-tight cursor-pointer">
-              Blog <span className="text-blue-600">Batcher</span>
-            </span>
+            <div className="inline-flex items-center gap-2 cursor-pointer">
+              <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <span className="text-2xl font-bold text-foreground tracking-tight">
+                Blog<span className="text-primary">Batcher</span>
+              </span>
+            </div>
           </Link>
-          <p className="text-slate-500 mt-2 text-sm">AI-powered blog articles at scale</p>
+          <p className="text-muted-foreground mt-2 text-sm">AI-powered blog articles at scale</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <h1 className="text-xl font-semibold text-slate-900 mb-1">Sign in to your account</h1>
-          <p className="text-sm text-slate-500 mb-6">Welcome back. Enter your details below.</p>
+        <div className="bg-card rounded-2xl border border-border p-8 shadow-xl">
+          <h1 className="text-xl font-semibold text-foreground mb-1">Sign in to your account</h1>
+          <p className="text-sm text-muted-foreground mb-6">Welcome back. Enter your details below.</p>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-5">
+            <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg px-4 py-3 text-sm mb-5">
               {error}
               {error.includes("verify your email") && (
                 <div className="mt-2">
@@ -66,7 +71,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="email" className="text-slate-700 font-medium">Email address</Label>
+              <Label htmlFor="email" className="text-foreground font-medium">Email address</Label>
               <Input
                 id="email"
                 type="email"
@@ -75,14 +80,14 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="mt-1.5"
+                className="mt-1.5 bg-background border-border"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
-                <Link href="/forgot-password" className="text-xs text-blue-600 hover:underline">
+                <Label htmlFor="password" className="text-foreground font-medium">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-primary hover:text-primary/80 transition-colors">
                   Forgot password?
                 </Link>
               </div>
@@ -95,12 +100,12 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="pr-10"
+                  className="pr-10 bg-background border-border"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -110,7 +115,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full mt-2"
+              className="w-full mt-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
               disabled={login.isPending}
             >
               {login.isPending ? (
@@ -121,13 +126,20 @@ export default function Login() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-slate-500 mt-6">
+          <p className="text-center text-sm text-muted-foreground mt-6">
             Don't have an account?{" "}
-            <Link href="/register" className="text-blue-600 font-medium hover:underline">
+            <Link href="/register" className="text-primary font-medium hover:text-primary/80 transition-colors">
               Create one free
             </Link>
           </p>
         </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-6">
+          By signing in you agree to our{" "}
+          <a href="#" className="text-primary hover:underline">Terms of Service</a>{" "}
+          and{" "}
+          <a href="#" className="text-primary hover:underline">Privacy Policy</a>.
+        </p>
       </div>
     </div>
   );
@@ -145,7 +157,7 @@ function ResendVerificationLink({ email }: { email: string }) {
     <button
       onClick={() => resend.mutate({ email })}
       disabled={resend.isPending || !email}
-      className="text-blue-600 font-medium text-sm hover:underline disabled:opacity-50"
+      className="text-primary font-medium text-sm hover:underline disabled:opacity-50"
     >
       {resend.isPending ? "Sending…" : "Resend verification email"}
     </button>

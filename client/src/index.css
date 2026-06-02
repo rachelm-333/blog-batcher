@@ -42,83 +42,105 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ─── Mockup palette CSS vars ─────────────────────────── */
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.015 65);
-  --secondary: oklch(0.98 0.001 286.375);
-  --secondary-foreground: oklch(0.4 0.015 65);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
+  --navy:   #0F0F1A;
+  --navy2:  #1A1A2E;
+  --navy3:  #252540;
+  --purple: #6C63FF;
+  --purple2: #5A52E0;
+  --green:  #22C55E;
+  --amber:  #F59E0B;
+  --red:    #EF4444;
+  --text:   #F1F1F5;
+  --text2:  #A0A0B8;
+  --border-col: #2E2E4A;
+  --white:  #FFFFFF;
+  --card-bg: #1E1E35;
+
+  /* shadcn/ui OKLCH tokens — dark by default */
+  --radius: 0.5rem;
+  --background: oklch(0.082 0.015 264);
+  --foreground: oklch(0.96 0.005 264);
+  --card: oklch(0.13 0.018 264);
+  --card-foreground: oklch(0.96 0.005 264);
+  --popover: oklch(0.13 0.018 264);
+  --popover-foreground: oklch(0.96 0.005 264);
+  --primary: oklch(0.65 0.22 264);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.18 0.018 264);
+  --secondary-foreground: oklch(0.96 0.005 264);
+  --muted: oklch(0.18 0.018 264);
+  --muted-foreground: oklch(0.65 0.01 264);
+  --accent: oklch(0.18 0.018 264);
+  --accent-foreground: oklch(0.96 0.005 264);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.235 0.015 65);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
+  --border: oklch(0.22 0.018 264);
+  --input: oklch(0.22 0.018 264);
+  --ring: oklch(0.65 0.22 264);
+  --chart-1: oklch(0.65 0.22 264);
+  --chart-2: oklch(0.65 0.18 142);
+  --chart-3: oklch(0.75 0.18 85);
+  --chart-4: oklch(0.65 0.18 217);
+  --chart-5: oklch(0.65 0.22 27);
+  --sidebar: oklch(0.11 0.018 264);
+  --sidebar-foreground: oklch(0.96 0.005 264);
+  --sidebar-primary: oklch(0.65 0.22 264);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.18 0.018 264);
+  --sidebar-accent-foreground: oklch(0.96 0.005 264);
+  --sidebar-border: oklch(0.22 0.018 264);
+  --sidebar-ring: oklch(0.65 0.22 264);
 }
 
+/* dark class = same as :root since we're always dark */
 .dark {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.85 0.005 65);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.85 0.005 65);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.85 0.005 65);
-  --secondary: oklch(0.24 0.006 286.033);
-  --secondary-foreground: oklch(0.7 0.005 65);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground:  oklch(0.92 0.005 65);
-  --destructive: oklch(0.704 0.191 22.216);
+  --background: oklch(0.082 0.015 264);
+  --foreground: oklch(0.96 0.005 264);
+  --card: oklch(0.13 0.018 264);
+  --card-foreground: oklch(0.96 0.005 264);
+  --popover: oklch(0.13 0.018 264);
+  --popover-foreground: oklch(0.96 0.005 264);
+  --primary: oklch(0.65 0.22 264);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.18 0.018 264);
+  --secondary-foreground: oklch(0.96 0.005 264);
+  --muted: oklch(0.18 0.018 264);
+  --muted-foreground: oklch(0.65 0.01 264);
+  --accent: oklch(0.18 0.018 264);
+  --accent-foreground: oklch(0.96 0.005 264);
+  --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.488 0.243 264.376);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.85 0.005 65);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground:  oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.488 0.243 264.376);
+  --border: oklch(0.22 0.018 264);
+  --input: oklch(0.22 0.018 264);
+  --ring: oklch(0.65 0.22 264);
+  --chart-1: oklch(0.65 0.22 264);
+  --chart-2: oklch(0.65 0.18 142);
+  --chart-3: oklch(0.75 0.18 85);
+  --chart-4: oklch(0.65 0.18 217);
+  --chart-5: oklch(0.65 0.22 27);
+  --sidebar: oklch(0.11 0.018 264);
+  --sidebar-foreground: oklch(0.96 0.005 264);
+  --sidebar-primary: oklch(0.65 0.22 264);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.18 0.018 264);
+  --sidebar-accent-foreground: oklch(0.96 0.005 264);
+  --sidebar-border: oklch(0.22 0.018 264);
+  --sidebar-ring: oklch(0.65 0.22 264);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -134,24 +156,11 @@
 }
 
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -162,16 +171,80 @@
 
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
   }
+
+  /* ─── Status Badges (mockup-aligned) ─────────────────── */
+  .badge-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-pending   { background: rgba(245,158,11,0.15); color: #F59E0B; }
+  .badge-approved  { background: rgba(34,197,94,0.15);  color: #22C55E; }
+  .badge-published { background: rgba(108,99,255,0.15); color: #6C63FF; }
+  .badge-scheduled { background: rgba(59,130,246,0.15); color: #60A5FA; }
+  .badge-failed    { background: rgba(239,68,68,0.15);  color: #EF4444; }
+  .badge-ready     { background: rgba(34,197,94,0.15);  color: #22C55E; }
+  .badge-strong    { background: rgba(245,158,11,0.15); color: #F59E0B; }
+  .badge-review    { background: rgba(239,68,68,0.15);  color: #EF4444; }
+
+  /* ─── Generation progress bar ────────────────────────── */
+  .gen-bar { background: rgba(255,255,255,0.1); border-radius: 8px; height: 10px; margin: 12px 0; }
+  .gen-bar-fill {
+    background: linear-gradient(90deg, #6C63FF, #A78BFA);
+    height: 10px;
+    border-radius: 8px;
+    transition: width 0.5s;
+  }
+
+  /* ─── Impersonation Banner ───────────────────────────── */
+  .impersonation-banner {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 9999;
+    background: linear-gradient(90deg, #F59E0B, #EF4444);
+    color: white;
+    text-align: center;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  /* ─── Notice boxes ───────────────────────────────────── */
+  .notice {
+    background: rgba(108,99,255,0.08);
+    border: 1px solid rgba(108,99,255,0.25);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #A0A0B8;
+  }
+  .notice.warn  { background: rgba(245,158,11,0.08);  border-color: rgba(245,158,11,0.25);  color: #F59E0B; }
+  .notice.error { background: rgba(239,68,68,0.08);   border-color: rgba(239,68,68,0.25);   color: #EF4444; }
+  .notice.success { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25);   color: #22C55E; }
+
+  /* ─── Scrollbar ──────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #1A1A2E; }
+  ::-webkit-scrollbar-thumb { background: #2E2E4A; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #A0A0B8; }
 }

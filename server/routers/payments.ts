@@ -13,7 +13,7 @@ import { eq, desc } from "drizzle-orm";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getStripe } from "../stripe/client";
 import { PRODUCTS, ProductKey } from "../stripe/products";
-import { stripePayments, users } from "../../drizzle/schema";
+import { stripePayments, users, credits } from "../../drizzle/schema";
 import { getDb } from "../db";
 
 export const paymentsRouter = router({
@@ -143,6 +143,18 @@ export const paymentsRouter = router({
             ? "Citation Authority — 50 Articles"
             : "Credit Top-Up — 5 Credits",
     }));
+  }),
+
+  // ── Get credit balance for sidebar display ──────────────────────────────────
+  getBalance: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const [row] = await db
+      .select({ balance: credits.balance })
+      .from(credits)
+      .where(eq(credits.userId, ctx.user.id))
+      .limit(1);
+    return { balance: row?.balance ?? 0 };
   }),
 
   // ── Get session details after redirect (for success page) ─────────────────

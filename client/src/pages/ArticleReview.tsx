@@ -92,7 +92,7 @@ function StatusBadgeChip({
 }) {
   if (status === "published") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">
         <CheckCircle2 className="h-3 w-3" />
         Published
       </span>
@@ -100,14 +100,14 @@ function StatusBadgeChip({
   }
   if (status === "scheduled") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary">
         ⏰ Scheduled
       </span>
     );
   }
   if (status === "failed") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-destructive/15 text-destructive">
         <XCircle className="h-3 w-3" />
         Publish Failed
       </span>
@@ -115,7 +115,7 @@ function StatusBadgeChip({
   }
   if (status === "approved") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">
         <CheckCircle2 className="h-3 w-3" />
         Approved
       </span>
@@ -123,14 +123,14 @@ function StatusBadgeChip({
   }
   if (!badge) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-muted-foreground">
         ⏳ Pending Review
       </span>
     );
   }
   if (badge === "authority_ready") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">
         <Trophy className="h-3 w-3" />
         Authority Ready
       </span>
@@ -138,14 +138,14 @@ function StatusBadgeChip({
   }
   if (badge === "strong") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary">
         <Zap className="h-3 w-3" />
         Strong
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400">
       <AlertTriangle className="h-3 w-3" />
       Needs Review
     </span>
@@ -155,20 +155,20 @@ function StatusBadgeChip({
 function LevelLabel({ level }: { level: "cornerstone" | "pillar" | "cluster" }) {
   if (level === "cornerstone") {
     return (
-      <span className="text-xs font-bold uppercase tracking-wide text-purple-600">
+      <span className="text-xs font-bold uppercase tracking-wide text-violet-400">
         Cornerstone
       </span>
     );
   }
   if (level === "pillar") {
     return (
-      <span className="text-xs font-bold uppercase tracking-wide text-blue-500">
+      <span className="text-xs font-bold uppercase tracking-wide text-primary">
         Pillar
       </span>
     );
   }
   return (
-    <span className="text-xs font-bold uppercase tracking-wide text-gray-400">
+    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
       Cluster
     </span>
   );
@@ -177,33 +177,33 @@ function LevelLabel({ level }: { level: "cornerstone" | "pillar" | "cluster" }) 
 function ScoreBadgePanel({ badge }: { badge: StatusBadge }) {
   if (badge === "authority_ready") {
     return (
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
         <div className="text-2xl">✅</div>
         <div>
-          <div className="text-sm font-bold text-emerald-800">Authority Ready</div>
-          <div className="text-xs text-emerald-600">All 16 points met. Publish with confidence.</div>
+          <div className="text-sm font-bold text-emerald-400">Authority Ready</div>
+          <div className="text-xs text-emerald-500">All 16 points met. Publish with confidence.</div>
         </div>
       </div>
     );
   }
   if (badge === "strong") {
     return (
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/10 border border-primary/30">
         <div className="text-2xl">⚡</div>
         <div>
-          <div className="text-sm font-bold text-blue-800">Strong</div>
-          <div className="text-xs text-blue-600">14–15 points met. Good to publish.</div>
+          <div className="text-sm font-bold text-primary">Strong</div>
+          <div className="text-xs text-primary">14–15 points met. Good to publish.</div>
         </div>
       </div>
     );
   }
   if (badge === "needs_review") {
     return (
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
         <div className="text-2xl">⚠️</div>
         <div>
-          <div className="text-sm font-bold text-amber-800">Needs Review</div>
-          <div className="text-xs text-amber-600">Below 14 points. Review SEO fields before publishing.</div>
+          <div className="text-sm font-bold text-amber-400">Needs Review</div>
+          <div className="text-xs text-amber-500">Below 14 points. Review SEO fields before publishing.</div>
         </div>
       </div>
     );
@@ -607,7 +607,7 @@ export default function ArticleReview() {
               <ScoreBadgePanel badge={selectedItem.statusBadge as StatusBadge} />
 
               {/* Over-editing warning */}
-              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-400">
                 <AlertTriangle className="inline h-3 w-3 mr-1" />
                 Over-editing keyword placement can reduce your ranking potential. We recommend publishing as-is.
               </div>
@@ -748,7 +748,7 @@ export default function ArticleReview() {
                 </div>
               ) : selectedItem.status === "failed" ? (
                 <div className="space-y-2">
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive">
                     <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
                     <div>
                       <div className="font-semibold">Publish failed</div>
@@ -760,7 +760,7 @@ export default function ArticleReview() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="w-full text-xs border-red-200 text-red-700 hover:bg-red-50"
+                    className="w-full text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
                     onClick={() => selectedItem.id && retryPublish.mutate({ articleId: selectedItem.id })}
                     disabled={retryPublish.isPending}
                   >
@@ -774,7 +774,7 @@ export default function ArticleReview() {
                 </div>
               ) : selectedItem.status === "published" ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
                     <CheckCircle2 className="h-4 w-4" />
                     Article published successfully.
                   </div>
@@ -791,7 +791,7 @@ export default function ArticleReview() {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
                   <CheckCircle2 className="h-4 w-4" />
                   Article approved. Proceed to Publish &amp; Schedule when all articles are ready.
                 </div>

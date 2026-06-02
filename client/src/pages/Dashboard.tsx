@@ -86,13 +86,13 @@ const ACTION_ICONS: Record<string, React.ElementType> = {
 };
 
 const ACTION_COLORS: Record<string, string> = {
-  scheduled_publish_attempted: "text-blue-500",
+  scheduled_publish_attempted: "text-primary",
   scheduled_publish_succeeded: "text-emerald-500",
   scheduled_publish_failed: "text-amber-500",
-  retry_attempted: "text-blue-400",
+  retry_attempted: "text-primary",
   retry_succeeded: "text-emerald-500",
   retry_failed: "text-red-500",
-  schedule_cancelled: "text-slate-400",
+  schedule_cancelled: "text-muted-foreground",
   schedule_rescheduled: "text-violet-500",
 };
 
@@ -108,7 +108,7 @@ const NOTIF_COLORS: Record<string, string> = {
   publish_success: "text-emerald-500",
   publish_failed: "text-amber-500",
   retry_failed: "text-red-500",
-  schedule_cancelled: "text-slate-400",
+  schedule_cancelled: "text-muted-foreground",
   schedule_rescheduled: "text-violet-500",
 };
 
@@ -139,16 +139,16 @@ function getMonthDays(year: number, month: number) {
 
 function StatCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-1 shadow-sm">
-      <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</span>
-      <span className={`text-2xl font-bold ${accent ?? "text-slate-900"}`}>{value}</span>
+    <div className="bg-card rounded-xl border border-border p-4 flex flex-col gap-1 shadow-sm">
+      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className={`text-2xl font-bold ${accent ?? "text-foreground"}`}>{value}</span>
     </div>
   );
 }
 
 function StatCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-2 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-4 flex flex-col gap-2 shadow-sm">
       <Skeleton className="h-3 w-20" />
       <Skeleton className="h-8 w-12" />
     </div>
@@ -200,17 +200,17 @@ function MiniCalendar({ scheduledDates }: { scheduledDates: Date[] }) {
   return (
     <div className="select-none">
       <div className="flex items-center justify-between mb-3">
-        <button onClick={prevMonth} className="p-1 rounded hover:bg-slate-100 transition-colors">
-          <ChevronLeft className="h-4 w-4 text-slate-500" />
+        <button onClick={prevMonth} className="p-1 rounded hover:bg-secondary transition-colors">
+          <ChevronLeft className="h-4 w-4 text-muted-foreground" />
         </button>
-        <span className="text-sm font-semibold text-slate-700">{monthLabel}</span>
-        <button onClick={nextMonth} className="p-1 rounded hover:bg-slate-100 transition-colors">
-          <ChevronRight className="h-4 w-4 text-slate-500" />
+        <span className="text-sm font-semibold text-foreground">{monthLabel}</span>
+        <button onClick={nextMonth} className="p-1 rounded hover:bg-secondary transition-colors">
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
       </div>
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
-          <div key={d} className="text-[10px] font-semibold text-slate-400 py-1">{d}</div>
+          <div key={d} className="text-[10px] font-semibold text-muted-foreground py-1">{d}</div>
         ))}
         {cells.map((day, i) => {
           if (!day) return <div key={`e-${i}`} />;
@@ -223,9 +223,9 @@ function MiniCalendar({ scheduledDates }: { scheduledDates: Date[] }) {
             <div
               key={day}
               className={`text-xs py-1 rounded-md font-medium transition-colors
-                ${isToday ? "bg-blue-600 text-white" : ""}
-                ${hasArticle && !isToday ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300" : ""}
-                ${!isToday && !hasArticle ? "text-slate-600 hover:bg-slate-100" : ""}
+                ${isToday ? "bg-primary text-white" : ""}
+                ${hasArticle && !isToday ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30" : ""}
+                ${!isToday && !hasArticle ? "text-muted-foreground hover:bg-secondary" : ""}
               `}
             >
               {day}
@@ -234,7 +234,7 @@ function MiniCalendar({ scheduledDates }: { scheduledDates: Date[] }) {
         })}
       </div>
       {scheduledSet.size > 0 && (
-        <p className="text-xs text-slate-400 mt-2 text-center">
+        <p className="text-xs text-muted-foreground mt-2 text-center">
           {scheduledSet.size} article{scheduledSet.size !== 1 ? "s" : ""} scheduled this month
         </p>
       )}
@@ -361,18 +361,18 @@ export default function Dashboard() {
             {businesses && businesses.length > 1 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm text-left">
-                    <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                  <button className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card hover:bg-background transition-colors shadow-sm text-left">
+                    <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-900 truncate max-w-[180px]">
+                      <div className="text-sm font-semibold text-foreground truncate max-w-[180px]">
                         {selectedBusiness?.name ?? "Select business"}
                       </div>
-                      <div className="text-xs text-slate-400 truncate max-w-[180px]">
+                      <div className="text-xs text-muted-foreground truncate max-w-[180px]">
                         {selectedBusiness?.industry ?? ""}
                         {selectedBusiness?.location ? ` · ${selectedBusiness.location}` : ""}
                       </div>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-1" />
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 ml-1" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-64">
@@ -380,10 +380,10 @@ export default function Dashboard() {
                     <DropdownMenuItem
                       key={biz.id}
                       onClick={() => setSelectedBusinessId(biz.id)}
-                      className={`flex flex-col items-start gap-0.5 cursor-pointer ${biz.id === selectedBusinessId ? "bg-blue-50" : ""}`}
+                      className={`flex flex-col items-start gap-0.5 cursor-pointer ${biz.id === selectedBusinessId ? "bg-primary/10" : ""}`}
                     >
-                      <span className="font-medium text-slate-900">{biz.name}</span>
-                      <span className="text-xs text-slate-400">
+                      <span className="font-medium text-foreground">{biz.name}</span>
+                      <span className="text-xs text-muted-foreground">
                         Stage {biz.currentStage} · {biz.articleCounts.total} articles
                       </span>
                     </DropdownMenuItem>
@@ -391,7 +391,7 @@ export default function Dashboard() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => navigate("/onboarding?new=1")}
-                    className="flex items-center gap-2 cursor-pointer text-blue-600"
+                    className="flex items-center gap-2 cursor-pointer text-primary"
                   >
                     <Plus className="h-4 w-4" />
                     <span className="font-medium">Add New Business</span>
@@ -401,13 +401,13 @@ export default function Dashboard() {
             ) : (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-slate-400" />
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <h1 className="text-xl font-bold text-slate-900">
+                    <h1 className="text-xl font-bold text-foreground">
                       {selectedBusiness?.name ?? "Your Dashboard"}
                     </h1>
                     {(selectedBusiness?.industry || selectedBusiness?.location) && (
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         {selectedBusiness?.industry}
                         {selectedBusiness?.location ? ` · ${selectedBusiness.location}` : ""}
                       </p>
@@ -417,7 +417,7 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  className="text-primary border-primary/30 hover:bg-primary/10"
                   onClick={() => navigate("/onboarding?new=1")}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
@@ -428,14 +428,14 @@ export default function Dashboard() {
           </div>
 
           {/* Credit balance */}
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <CreditCard className="h-4 w-4 text-blue-500" />
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card shadow-sm">
+            <CreditCard className="h-4 w-4 text-primary" />
             <div>
-              <div className="text-xs text-slate-400 leading-none">Credits remaining</div>
+              <div className="text-xs text-muted-foreground leading-none">Credits remaining</div>
               {summaryLoading ? (
                 <Skeleton className="h-5 w-8 mt-0.5" />
               ) : (
-                <div className="text-lg font-bold text-slate-900 leading-tight">
+                <div className="text-lg font-bold text-foreground leading-tight">
                   {summary?.creditBalance ?? 0}
                 </div>
               )}
@@ -446,8 +446,8 @@ export default function Dashboard() {
         {/* Stage progress */}
         <Card className="shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
-              <Zap className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary" />
               Your Blog Batcher Pipeline
             </CardTitle>
           </CardHeader>
@@ -461,26 +461,26 @@ export default function Dashboard() {
                   <div
                     key={stage.id}
                     className={`flex-1 flex flex-col gap-1.5 p-3 rounded-xl border transition-all
-                      ${isCurrent ? "border-blue-200 bg-blue-50 shadow-sm" : ""}
-                      ${isComplete ? "border-emerald-200 bg-emerald-50/40" : ""}
-                      ${isLocked ? "border-slate-200 bg-slate-50/50 opacity-50" : ""}
+                      ${isCurrent ? "border-primary/30 bg-primary/10 shadow-sm" : ""}
+                      ${isComplete ? "border-emerald-500/30 bg-emerald-500/5" : ""}
+                      ${isLocked ? "border-border bg-background/50 opacity-50" : ""}
                     `}
                   >
                     <div className="flex items-center gap-2">
                       {isComplete ? (
                         <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                       ) : isCurrent ? (
-                        <div className="h-4 w-4 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                        <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center text-white text-[10px] font-bold shrink-0">
                           {stage.id}
                         </div>
                       ) : (
-                        <Circle className="h-4 w-4 text-slate-300 shrink-0" />
+                        <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
                       )}
-                      <span className="text-xs font-semibold text-slate-700 truncate">
+                      <span className="text-xs font-semibold text-foreground truncate">
                         {stage.label}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-snug hidden sm:block">
+                    <p className="text-[11px] text-muted-foreground leading-snug hidden sm:block">
                       {stage.description}
                     </p>
                     {isCurrent && (
@@ -502,7 +502,7 @@ export default function Dashboard() {
 
         {/* Article status summary */}
         <div>
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Article Status
           </h2>
           {summaryLoading ? (
@@ -513,15 +513,15 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
               <StatCard label="Total" value={sc.total ?? 0} />
               <StatCard label="Auth Ready" value={bc?.authority_ready ?? 0} accent="text-emerald-600" />
-              <StatCard label="Strong" value={bc?.strong ?? 0} accent="text-blue-600" />
+              <StatCard label="Strong" value={bc?.strong ?? 0} accent="text-primary" />
               <StatCard label="Needs Review" value={bc?.needs_review ?? 0} accent="text-amber-600" />
               <StatCard label="Approved" value={sc.approved ?? 0} accent="text-violet-600" />
-              <StatCard label="Scheduled" value={sc.scheduled ?? 0} accent="text-blue-500" />
+              <StatCard label="Scheduled" value={sc.scheduled ?? 0} accent="text-primary" />
               <StatCard label="Published" value={sc.published ?? 0} accent="text-emerald-600" />
               <StatCard label="Failed" value={sc.failed ?? 0} accent="text-red-500" />
             </div>
           ) : (
-            <div className="text-sm text-slate-400 py-4 text-center">
+            <div className="text-sm text-muted-foreground py-4 text-center">
               No article data yet — start by completing your business profile.
             </div>
           )}
@@ -535,19 +535,19 @@ export default function Dashboard() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             {(sc?.approved ?? 0) > 0 && (
-              <Button variant="outline" onClick={() => navigate("/review")} className="bg-white">
+              <Button variant="outline" onClick={() => navigate("/review")} className="bg-card">
                 <FileText className="mr-2 h-4 w-4" />
                 Review Articles ({sc!.approved})
               </Button>
             )}
             {(sc?.scheduled ?? 0) > 0 && (
-              <Button variant="outline" onClick={() => navigate("/schedule-management")} className="bg-white">
+              <Button variant="outline" onClick={() => navigate("/schedule-management")} className="bg-card">
                 <CalendarDays className="mr-2 h-4 w-4" />
                 View Schedule ({sc!.scheduled})
               </Button>
             )}
             {(sc?.failed ?? 0) > 0 && (
-              <Button variant="outline" onClick={() => navigate("/schedule-management")} className="bg-white border-red-200 text-red-600 hover:bg-red-50">
+              <Button variant="outline" onClick={() => navigate("/schedule-management")} className="bg-card border-destructive/30 text-destructive hover:bg-destructive/10">
                 <AlertTriangle className="mr-2 h-4 w-4" />
                 Failed Publishes ({sc!.failed})
               </Button>
@@ -561,8 +561,8 @@ export default function Dashboard() {
           {/* Recent activity feed */}
           <Card className="lg:col-span-1 shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-500" />
+              <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
                 Recent Activity
               </CardTitle>
             </CardHeader>
@@ -581,9 +581,9 @@ export default function Dashboard() {
                 </div>
               ) : !activity || activity.length === 0 ? (
                 <div className="text-center py-6">
-                  <Activity className="h-8 w-8 text-slate-200 mx-auto mb-2" />
-                  <p className="text-sm text-slate-400">No automated activity yet.</p>
-                  <p className="text-xs text-slate-300 mt-1">
+                  <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No automated activity yet.</p>
+                  <p className="text-xs text-muted-foreground mt-1">
                     Activity appears when articles are scheduled and published.
                   </p>
                 </div>
@@ -597,15 +597,15 @@ export default function Dashboard() {
                     createdAt: Date | string;
                   }) => {
                     const Icon = ACTION_ICONS[item.action] ?? Clock;
-                    const color = ACTION_COLORS[item.action] ?? "text-slate-400";
+                    const color = ACTION_COLORS[item.action] ?? "text-muted-foreground";
                     return (
                       <div key={item.id} className="flex gap-3 items-start">
                         <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-700 leading-snug truncate">
+                          <p className="text-sm text-foreground leading-snug truncate">
                             {item.articleTitle ?? "Article"}
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-muted-foreground">
                             {ACTION_LABELS[item.action] ?? item.action}
                             {" · "}
                             {relativeTime(item.createdAt)}
@@ -626,11 +626,11 @@ export default function Dashboard() {
           <Card className="lg:col-span-1 shadow-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-blue-500" />
+                <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-primary" />
                   Notifications
                   {unreadCount > 0 && (
-                    <Badge className="h-5 px-1.5 text-[10px] bg-blue-600 text-white">
+                    <Badge className="h-5 px-1.5 text-[10px] bg-primary text-white">
                       {unreadCount}
                     </Badge>
                   )}
@@ -638,7 +638,7 @@ export default function Dashboard() {
                 {unreadCount > 0 && (
                   <button
                     onClick={() => markAllRead.mutate()}
-                    className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
+                    className="text-xs text-primary hover:text-primary/70 flex items-center gap-1 transition-colors"
                   >
                     <CheckCheck className="h-3 w-3" />
                     Mark all read
@@ -661,9 +661,9 @@ export default function Dashboard() {
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="text-center py-6">
-                  <Bell className="h-8 w-8 text-slate-200 mx-auto mb-2" />
-                  <p className="text-sm text-slate-400">No notifications yet.</p>
-                  <p className="text-xs text-slate-300 mt-1">
+                  <Bell className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No notifications yet.</p>
+                  <p className="text-xs text-muted-foreground mt-1">
                     You'll be notified when articles publish or fail.
                   </p>
                 </div>
@@ -678,12 +678,12 @@ export default function Dashboard() {
                     createdAt: Date | string;
                   }) => {
                     const Icon = NOTIF_ICONS[n.type] ?? Bell;
-                    const color = NOTIF_COLORS[n.type] ?? "text-slate-400";
+                    const color = NOTIF_COLORS[n.type] ?? "text-muted-foreground";
                     return (
                       <div
                         key={n.id}
                         className={`flex gap-3 items-start p-2 rounded-lg transition-colors cursor-pointer
-                          ${!n.read ? "bg-blue-50/60 hover:bg-blue-50" : "hover:bg-slate-50"}
+                          ${!n.read ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-background"}
                         `}
                         onClick={() => {
                           if (!n.read) markRead.mutate({ notificationId: n.id });
@@ -691,14 +691,14 @@ export default function Dashboard() {
                       >
                         <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm leading-snug ${!n.read ? "font-medium text-slate-800" : "text-slate-600"}`}>
+                          <p className={`text-sm leading-snug ${!n.read ? "font-medium text-foreground" : "text-muted-foreground"}`}>
                             {n.title}
                           </p>
-                          <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.message}</p>
-                          <p className="text-[11px] text-slate-300 mt-0.5">{relativeTime(n.createdAt)}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{relativeTime(n.createdAt)}</p>
                         </div>
                         {!n.read && (
-                          <div className="h-2 w-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                          <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
                         )}
                       </div>
                     );
@@ -711,18 +711,18 @@ export default function Dashboard() {
           {/* Publishing calendar */}
           <Card className="lg:col-span-1 shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-blue-500" />
+              <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-primary" />
                 Publishing Calendar
               </CardTitle>
             </CardHeader>
             <CardContent>
               <MiniCalendar scheduledDates={scheduledDates} />
               {scheduledDates.length === 0 && (
-                <p className="text-xs text-slate-400 text-center mt-3">
+                <p className="text-xs text-muted-foreground text-center mt-3">
                   No articles scheduled yet.{" "}
                   <button
-                    className="text-blue-500 hover:underline"
+                    className="text-primary hover:underline"
                     onClick={() => navigate("/publish")}
                   >
                     Set up a schedule

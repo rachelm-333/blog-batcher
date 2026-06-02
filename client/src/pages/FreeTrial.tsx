@@ -134,8 +134,8 @@ export default function FreeTrial() {
       <DashboardLayout>
         <div className="max-w-2xl mx-auto py-12 text-center space-y-6">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center">
-              <Zap className="h-7 w-7 text-blue-500" />
+            <div className="h-14 w-14 rounded-full bg-primary/15 flex items-center justify-center">
+              <Zap className="h-7 w-7 text-primary" />
             </div>
             <h1 className="text-2xl font-bold">Your trial is in progress</h1>
             <p className="text-muted-foreground">

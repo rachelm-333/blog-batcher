@@ -62,13 +62,13 @@ const PUBLISH_METHODS: {
     id: "wix",
     label: "Wix",
     description: "Publish directly to your Wix site via API",
-    icon: <span className="text-2xl font-black text-blue-600">W</span>,
+    icon: <span className="text-2xl font-black text-primary">W</span>,
   },
   {
     id: "wordpress",
     label: "WordPress",
     description: "REST API + Application Password",
-    icon: <span className="text-2xl font-black text-blue-800">WP</span>,
+    icon: <span className="text-2xl font-black text-primary">WP</span>,
   },
   {
     id: "zapier",
@@ -80,7 +80,7 @@ const PUBLISH_METHODS: {
     id: "export_zip",
     label: "Export ZIP",
     description: "HTML + Markdown + meta + schema + schedule CSV",
-    icon: <Download className="h-6 w-6 text-gray-600" />,
+    icon: <Download className="h-6 w-6 text-muted-foreground" />,
   },
 ];
 
@@ -320,14 +320,14 @@ export default function PublishSchedule() {
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
         {/* Gate warning */}
         {!allApproved && (
-          <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700 flex items-start gap-3">
+          <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-400 flex items-start gap-3">
             <span className="text-lg">⚠️</span>
             <div>
               <div className="font-semibold">All articles must be approved before publishing.</div>
               <div className="text-xs mt-1">
                 {totalCount - approvedCount} article{totalCount - approvedCount !== 1 ? "s" : ""} still need approval.{" "}
                 <button
-                  className="underline text-amber-700"
+                  className="underline text-amber-400"
                   onClick={() => navigate("/review")}
                 >
                   Go to Review →
@@ -542,10 +542,10 @@ export default function PublishSchedule() {
                             key={j}
                             className={`text-[10px] px-1 py-0.5 rounded mb-0.5 truncate font-medium ${
                               a.level === "cornerstone"
-                                ? "bg-purple-100 text-purple-700"
+                                ? "bg-violet-500/15 text-violet-400"
                                 : a.level === "pillar"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-600"
+                                ? "bg-primary/15 text-primary"
+                                : "bg-secondary text-muted-foreground"
                             }`}
                             title={a.title}
                           >

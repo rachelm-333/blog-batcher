@@ -72,7 +72,7 @@ function StatusBadgeChip({ badge }: { badge: StatusBadge }) {
   if (!badge) return null;
   if (badge === "authority_ready") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">
         <Trophy className="h-3 w-3" />
         Authority Ready
       </span>
@@ -80,14 +80,14 @@ function StatusBadgeChip({ badge }: { badge: StatusBadge }) {
   }
   if (badge === "strong") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary">
         <Star className="h-3 w-3" />
         Strong
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400">
       <AlertCircle className="h-3 w-3" />
       Needs Review
     </span>
@@ -97,7 +97,7 @@ function StatusBadgeChip({ badge }: { badge: StatusBadge }) {
 function ArticleStatusChip({ status }: { status: ArticleStatus }) {
   if (status === "generating") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-500/15 text-violet-400">
         <Loader2 className="h-3 w-3 animate-spin" />
         Generating…
       </span>
@@ -105,7 +105,7 @@ function ArticleStatusChip({ status }: { status: ArticleStatus }) {
   }
   if (status === "failed") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/15 text-destructive">
         <AlertCircle className="h-3 w-3" />
         Failed
       </span>
@@ -113,7 +113,7 @@ function ArticleStatusChip({ status }: { status: ArticleStatus }) {
   }
   if (status === "pending_generation") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-muted-foreground">
         <FileText className="h-3 w-3" />
         Queued
       </span>
@@ -121,7 +121,7 @@ function ArticleStatusChip({ status }: { status: ArticleStatus }) {
   }
   if (status === "generated" || status === "pending_approval" || status === "approved") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400">
         <CheckCircle2 className="h-3 w-3" />
         Generated
       </span>
@@ -133,7 +133,7 @@ function ArticleStatusChip({ status }: { status: ArticleStatus }) {
 function LevelBadge({ level }: { level: "cornerstone" | "pillar" | "cluster" }) {
   if (level === "cornerstone") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-500/15 text-violet-400">
         <Zap className="h-3 w-3" />
         Cornerstone
       </span>
@@ -141,13 +141,13 @@ function LevelBadge({ level }: { level: "cornerstone" | "pillar" | "cluster" }) 
   }
   if (level === "pillar") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary">
         Pillar
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-muted-foreground">
       Cluster
     </span>
   );
@@ -179,12 +179,12 @@ function ArticleCard({
     <div
       className={`rounded-xl border transition-all ${
         isGenerating
-          ? "border-violet-200 bg-violet-50/30"
+          ? "border-violet-500/30 bg-violet-500/5"
           : isFailed
-          ? "border-red-200 bg-red-50/30"
+          ? "border-destructive/30 bg-destructive/5"
           : isDone
-          ? "border-slate-200 bg-white"
-          : "border-slate-200 bg-slate-50/50 opacity-70"
+          ? "border-border bg-card"
+          : "border-border bg-background/50 opacity-70"
       }`}
     >
       <div
@@ -198,7 +198,7 @@ function ArticleCard({
               ? "bg-purple-400"
               : article.level === "pillar"
               ? "bg-indigo-400"
-              : "bg-slate-300"
+              : "bg-muted"
           }`}
         />
 
@@ -210,15 +210,15 @@ function ArticleCard({
               <StatusBadgeChip badge={article.statusBadge} />
             )}
           </div>
-          <div className="mt-1 text-sm font-medium text-slate-800 truncate">
+          <div className="mt-1 text-sm font-medium text-foreground truncate">
             {article.title ?? (
-              <span className="text-slate-400 italic">
+              <span className="text-muted-foreground italic">
                 {isGenerating ? "Writing article…" : "Waiting…"}
               </span>
             )}
           </div>
           {isDone && (
-            <div className="text-xs text-slate-400 mt-0.5">
+            <div className="text-xs text-muted-foreground mt-0.5">
               {article.wordCount ? `${article.wordCount.toLocaleString()} words` : ""}
               {article.urlSlug ? ` · /${article.urlSlug}` : ""}
             </div>
@@ -249,7 +249,7 @@ function ArticleCard({
             </Button>
           )}
           {isDone && (
-            <span className="text-slate-300">
+            <span className="text-muted-foreground">
               {expanded ? (
                 <ChevronDown className="h-4 w-4" />
               ) : (
@@ -262,26 +262,26 @@ function ArticleCard({
 
       {/* Expanded detail */}
       {expanded && isDone && (
-        <div className="px-4 pb-4 pt-0 border-t border-slate-100 mt-0">
+        <div className="px-4 pb-4 pt-0 border-t border-border mt-0">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 text-xs">
             <div>
-              <div className="text-slate-400 mb-0.5">Article Type</div>
-              <div className="font-medium text-slate-700 capitalize">
+              <div className="text-muted-foreground mb-0.5">Article Type</div>
+              <div className="font-medium text-foreground capitalize">
                 {article.articleType.replace(/_/g, " ")}
               </div>
             </div>
             {article.wordCount && (
               <div>
-                <div className="text-slate-400 mb-0.5">Word Count</div>
-                <div className="font-medium text-slate-700">
+                <div className="text-muted-foreground mb-0.5">Word Count</div>
+                <div className="font-medium text-foreground">
                   {article.wordCount.toLocaleString()}
                 </div>
               </div>
             )}
             {article.internalScore !== null && article.internalScore !== undefined && (
               <div>
-                <div className="text-slate-400 mb-0.5">Quality Score</div>
-                <div className="font-medium text-slate-700">{article.internalScore}/100</div>
+                <div className="text-muted-foreground mb-0.5">Quality Score</div>
+                <div className="font-medium text-foreground">{article.internalScore}/100</div>
               </div>
             )}
           </div>
@@ -423,22 +423,22 @@ export default function ArticleGeneration() {
   const canProceed = isComplete && completed > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       {/* Top nav */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate("/dashboard")}
-            className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             ← Dashboard
           </button>
-          <span className="text-slate-300">|</span>
-          <span className="text-xl font-bold text-slate-900 tracking-tight">
-            Blog <span className="text-blue-600">Batcher</span>
+          <span className="text-muted-foreground">|</span>
+          <span className="text-xl font-bold text-foreground tracking-tight">
+            Blog <span className="text-primary">Batcher</span>
           </span>
         </div>
-        <div className="text-sm text-slate-500">
+        <div className="text-sm text-muted-foreground">
           Stage 4: Article Generation
         </div>
       </header>
@@ -446,8 +446,8 @@ export default function ArticleGeneration() {
       <main className="max-w-3xl mx-auto px-6 py-10">
         {/* Page header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Article Generation</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Article Generation</h1>
+          <p className="text-muted-foreground text-sm mt-1">
             Articles are written one at a time in order: Cornerstones first, then Pillars, then Clusters.
             Each article goes through a 16-point Authority Standard check and an AI fingerprint scrub.
           </p>
@@ -455,12 +455,12 @@ export default function ArticleGeneration() {
 
         {/* Start generation card */}
         {!hasStarted && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
-              <Sparkles className="h-8 w-8 text-blue-500" />
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-8 mb-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="h-8 w-8 text-primary" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900 mb-2">Ready to Generate</h2>
-            <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">
+            <h2 className="text-lg font-semibold text-foreground mb-2">Ready to Generate</h2>
+            <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
               Your keywords and PAA questions are approved. Click below to start writing your articles.
               Generation runs in the background — you can leave this page and come back.
             </p>
@@ -487,9 +487,9 @@ export default function ArticleGeneration() {
 
         {/* Progress bar */}
         {hasStarted && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-6 mb-6">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-medium text-slate-700">
+              <div className="text-sm font-medium text-foreground">
                 {isGenerating ? (
                   <span className="flex items-center gap-1.5">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />
@@ -504,7 +504,7 @@ export default function ArticleGeneration() {
                   "Queued"
                 )}
               </div>
-              <div className="text-sm text-slate-500">
+              <div className="text-sm text-muted-foreground">
                 {completed}/{total}
                 {failed > 0 && (
                   <span className="ml-2 text-red-500">{failed} failed</span>
@@ -516,15 +516,15 @@ export default function ArticleGeneration() {
             {isGenerating && (() => {
               const currentArticle = articles.find(a => a.status === "generating");
               return currentArticle?.title ? (
-                <div className="mt-2 text-xs text-slate-500">
+                <div className="mt-2 text-xs text-muted-foreground">
                   Now writing: <span className="font-medium">{currentArticle.title}</span>
                 </div>
               ) : (
-                <div className="mt-2 text-xs text-slate-400">Each article takes 30–90 seconds. This page auto-updates.</div>
+                <div className="mt-2 text-xs text-muted-foreground">Each article takes 30–90 seconds. This page auto-updates.</div>
               );
             })()}
             {!isGenerating && (
-              <div className="mt-2 text-xs text-slate-400">
+              <div className="mt-2 text-xs text-muted-foreground">
                 {isComplete ? "Generation complete." : "Waiting to start…"}
               </div>
             )}
@@ -534,7 +534,7 @@ export default function ArticleGeneration() {
         {/* Article list */}
         {articles.length > 0 && (
           <div className="space-y-3 mb-8">
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Articles ({articles.length})
             </h2>
             {articles.map((article) => (
@@ -556,8 +556,8 @@ export default function ArticleGeneration() {
           <div className="space-y-3">
             {/* Failed articles warning */}
             {failed > 0 && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                <div className="text-sm font-medium text-red-700">
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3">
+                <div className="text-sm font-medium text-destructive">
                   {failed} article{failed !== 1 ? "s" : ""} failed to generate
                 </div>
                 <div className="text-xs text-red-600 mt-0.5">
@@ -571,17 +571,17 @@ export default function ArticleGeneration() {
             <div
               className={`rounded-2xl border p-6 flex items-center justify-between ${
                 allDone
-                  ? "bg-emerald-50 border-emerald-200"
-                  : "bg-amber-50 border-amber-200"
+                  ? "bg-emerald-500/10 border-emerald-500/30"
+                  : "bg-amber-500/10 border-amber-500/30"
               }`}
             >
               <div>
-                <div className="font-semibold text-slate-900 text-sm">
+                <div className="font-semibold text-foreground text-sm">
                   {allDone
                     ? "All articles are ready for review"
                     : `${completed} article${completed !== 1 ? "s" : ""} ready — ${failed} failed`}
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5">
+                <div className="text-xs text-muted-foreground mt-0.5">
                   {allDone
                     ? "Proceed to Stage 5 to review, edit, and approve your articles."
                     : "Retry failed articles first, or proceed with completed articles only."}

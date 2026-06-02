@@ -36,7 +36,7 @@ export default function PaymentSuccess() {
             <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
           ) : (
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
+              <div className="h-16 w-16 rounded-full bg-emerald-500/15 flex items-center justify-center">
                 <CheckCircle2 className="h-9 w-9 text-green-600" />
               </div>
             </div>

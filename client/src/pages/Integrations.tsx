@@ -72,7 +72,7 @@ const PLATFORMS: PlatformConfig[] = [
     id: "wordpress",
     name: "WordPress",
     description: "Publish directly to your WordPress site via REST API. Supports Yoast SEO, RankMath, AIOSEO, and no plugin.",
-    icon: <Globe className="w-6 h-6 text-blue-500" />,
+    icon: <Globe className="w-6 h-6 text-primary" />,
     available: true,
     helpUrl: "https://wordpress.com/support/application-passwords/",
     helpText: "You need an Application Password from WordPress Admin → Users → Your Profile → Application Passwords.",
@@ -183,7 +183,7 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
   }
   if (status === "failed") {
     return (
-      <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30 text-xs gap-1">
+      <Badge className="bg-destructive/15 text-destructive border-destructive/30 text-xs gap-1">
         <XCircle className="w-3 h-3" /> Connection failed
       </Badge>
     );

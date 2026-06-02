@@ -30,7 +30,7 @@ interface UpgradePromptProps {
 }
 
 const PLAN_ICONS: Record<string, React.ReactNode> = {
-  citation_starter: <Zap className="h-5 w-5 text-blue-500" />,
+  citation_starter: <Zap className="h-5 w-5 text-primary" />,
   citation_authority: <Star className="h-5 w-5 text-amber-500" />,
   credit_topup: <CreditCard className="h-5 w-5 text-emerald-500" />,
 };

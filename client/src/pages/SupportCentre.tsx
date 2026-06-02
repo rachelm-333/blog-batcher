@@ -103,9 +103,9 @@ function ContentBlockRenderer({ block }: { block: ContentBlock }) {
       );
     case "tip":
       return (
-        <div className="flex gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md mb-3">
-          <Lightbulb className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">{block.text}</p>
+        <div className="flex gap-3 p-3 bg-primary/10 border border-primary/30 rounded-md mb-3">
+          <Lightbulb className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-primary leading-relaxed">{block.text}</p>
         </div>
       );
     case "warning":
@@ -140,7 +140,7 @@ function ContactForm() {
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+        <div className="h-12 w-12 rounded-full bg-emerald-500/15 flex items-center justify-center">
           <Mail className="h-6 w-6 text-green-600" />
         </div>
         <h3 className="font-semibold text-foreground">Message sent</h3>

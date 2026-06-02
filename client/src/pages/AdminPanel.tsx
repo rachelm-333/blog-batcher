@@ -212,7 +212,7 @@ function UsersTab() {
                     {u.isSuspended ? (
                       <Badge variant="destructive">Suspended</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-green-600 border-green-600">Active</Badge>
+                      <Badge variant="outline" className="text-emerald-400 border-emerald-500/50">Active</Badge>
                     )}
                   </TableCell>
                   <TableCell>
@@ -242,7 +242,7 @@ function UsersTab() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-green-600 border-green-600"
+                        className="text-emerald-400 border-emerald-500/50"
                         onClick={() => {
                           setCreditDialog({ userId: u.id, userName: u.name ?? u.email ?? "User", currentBalance: u.creditBalance, mode: "add" });
                           setCreditAmount("10");
@@ -255,7 +255,7 @@ function UsersTab() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-orange-600 border-orange-600"
+                        className="text-amber-400 border-amber-500/50"
                         onClick={() => {
                           setCreditDialog({ userId: u.id, userName: u.name ?? u.email ?? "User", currentBalance: u.creditBalance, mode: "remove" });
                           setCreditAmount("10");
@@ -337,7 +337,7 @@ function UsersTab() {
             <Button
               onClick={handleCreditSubmit}
               disabled={addCreditsMutation.isPending || removeCreditsMutation.isPending}
-              className={creditDialog?.mode === "remove" ? "bg-orange-600 hover:bg-orange-700" : ""}
+              className={creditDialog?.mode === "remove" ? "bg-amber-500 hover:bg-amber-600" : ""}
             >
               {creditDialog?.mode === "add" ? "Add Credits" : "Remove Credits"}
             </Button>
@@ -352,9 +352,9 @@ function UsersTab() {
             <DialogTitle>Impersonate User</DialogTitle>
           </DialogHeader>
           <div className="py-2 space-y-3">
-            <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
-              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-              <div className="text-sm text-amber-800 dark:text-amber-200">
+              <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md">
+              <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
+              <div className="text-sm text-amber-300">
                 <p className="font-medium">You are about to impersonate <strong>{impersonateDialog?.userName}</strong>.</p>
                 <p className="mt-1">A banner will be shown at the top of every page while impersonation is active. Your session will be replaced for up to 2 hours.</p>
               </div>
@@ -486,14 +486,14 @@ function RevenueTab() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Payments</CardTitle></CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">${data?.totalPaymentsUsd.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-emerald-400">${data?.totalPaymentsUsd.toFixed(2)}</div>
                 <div className="text-xs text-muted-foreground">{data?.paymentCount} transactions</div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Refunds</CardTitle></CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">${data?.totalRefundsUsd.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-destructive">${data?.totalRefundsUsd.toFixed(2)}</div>
                 <div className="text-xs text-muted-foreground">{data?.refundCount} refunds</div>
               </CardContent>
             </Card>
@@ -625,7 +625,7 @@ function ErrorLogTab() {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     <div className="flex flex-col items-center gap-2">
-                      <CheckCircle className="h-8 w-8 text-green-500" />
+                      <CheckCircle className="h-8 w-8 text-emerald-400" />
                       <span>No errors logged — all systems healthy</span>
                     </div>
                   </TableCell>
