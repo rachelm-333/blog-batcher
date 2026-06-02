@@ -7,6 +7,7 @@ import { keywordsRouter } from "./routers/keywords";
 import { articlesRouter } from "./routers/articles";
 import { scheduleRouter } from "./routers/schedule";
 import { integrationsRouter } from "./routers/integrations";
+import { schedulerRouter } from "./routers/scheduler";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -45,6 +46,11 @@ export const appRouter = router({
   // WordPress, Wix, Zapier connection management.
   // All procedures live in server/routers/integrations.ts
   integrations: integrationsRouter,
+
+  // ─── Layer 9: Scheduling & Automation ────────────────────────────────────
+  // Heartbeat job management, audit log, in-app notifications.
+  // All procedures live in server/routers/scheduler.ts
+  scheduler: schedulerRouter,
 
   // ─── STRIPE PLACEHOLDER ───────────────────────────────────────────────────
   // Layer 3 (Stripe) will be wired here once Auth is fully verified.

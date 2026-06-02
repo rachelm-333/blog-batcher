@@ -14,6 +14,7 @@ import { articles, articleNodes } from "../../drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { parse as parseCookieHeader } from "cookie";
 import { COOKIE_NAME } from "../../shared/const";
+import { scheduledPublishHandler } from "../scheduledPublishHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -146,6 +147,11 @@ async function startServer() {
       res.status(500).json({ error: "Export failed" });
     }
   });
+
+  // ── Layer 9: Scheduled publish heartbeat callback ────────────────────────
+  // MUST be registered BEFORE tRPC middleware — /api/scheduled/* is not auto-registered.
+  // The Manus platform POSTs here when a scheduled publish job fires.
+  app.post("/api/scheduled/publish-article", scheduledPublishHandler);
 
   // tRPC API
   app.use(

@@ -21,15 +21,22 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, Calendar, Settings, FileText, Puzzle, Pencil, BarChart2 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { NotificationBell } from "./NotificationBell";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: FileText, label: "Architecture", path: "/architecture" },
+  { icon: BarChart2, label: "Keywords", path: "/keywords" },
+  { icon: Pencil, label: "Generate", path: "/generate" },
+  { icon: Users, label: "Review", path: "/review" },
+  { icon: Calendar, label: "Publish & Schedule", path: "/publish" },
+  { icon: Calendar, label: "Schedule Management", path: "/schedule-management" },
+  { icon: Puzzle, label: "Integrations", path: "/integrations" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -255,8 +262,16 @@ function DashboardLayoutContent({
                 </div>
               </div>
             </div>
+            <div className="flex items-center gap-1 pr-2">
+              <NotificationBell />
+            </div>
           </div>
         )}
+      {!isMobile && (
+        <div className="flex items-center justify-end gap-1 px-4 py-2 border-b h-12">
+          <NotificationBell />
+        </div>
+      )}
         <main className="flex-1 p-4">{children}</main>
       </SidebarInset>
     </>

@@ -11,6 +11,7 @@ import ArticleGeneration from "./pages/ArticleGeneration";
 import ArticleReview from "./pages/ArticleReview";
 import PublishSchedule from "./pages/PublishSchedule";
 import Integrations from "./pages/Integrations";
+import ScheduleManagement from "./pages/ScheduleManagement";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/review" component={ArticleReview} />
       <Route path="/publish" component={PublishSchedule} />
       <Route path="/integrations" component={Integrations} />
+      <Route path="/schedule-management" component={ScheduleManagement} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

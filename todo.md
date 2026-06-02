@@ -370,3 +370,56 @@
 - [x] Deletion confirmed (post no longer accessible)
 - NOTE: Wix auto-generates slugs from title — custom slugs not supported via 3rd-party API (documented in Integrations UI)
 - NOTE: Wix does not echo seoData.tags in GET /posts response — tags applied to page HTML head on live site (confirmed Wix API behaviour)
+
+## Layer 9: Scheduling & Automation
+
+### Schema changes
+- [x] Add `publish_audit_log` table: id, articleId, businessId, action (enum), result (enum), errorMessage, attemptNumber, triggeredBy (enum: user/heartbeat), newScheduledAt, createdAt
+- [x] Add `scheduleCronTaskUid` varchar(65) column to `articles` table (Heartbeat job UID for cancel/reschedule)
+- [x] Add `retryScheduledAt` timestamp column to `articles` table (when the retry heartbeat fires)
+- [x] Add `publishRetryCount` int column to `articles` table (0 = no retries yet, 1 = one retry attempted)
+- [x] Run Drizzle migration and apply to DB (migration 0003 applied)
+
+### Backend — Heartbeat handler
+- [x] `/api/scheduled/publish-article` Express handler: authenticate via sdk.authenticateRequest (isCron check), look up article by scheduleCronTaskUid, call executeScheduledPublish(), write to publish_audit_log, on success update status=published, on failure create retry heartbeat (15 min) if retryCount=0, else mark publish_failed + notifyOwner
+- [x] Register handler in server/_core/index.ts before Vite fallthrough
+- [x] Retry heartbeat: create new heartbeat job for 15 minutes later, store new taskUid in article.scheduleCronTaskUid, increment publishRetryCount
+
+### Backend — tRPC procedures (server/routers/scheduler.ts)
+- [x] scheduler.scheduleArticle — create heartbeat job for article's scheduledPublishAt, store taskUid on article
+- [x] scheduler.cancelSchedule — delete heartbeat job, clear scheduleCronTaskUid, set article status back to approved
+- [x] scheduler.reschedule — update heartbeat job cron to new date, update scheduledPublishAt on article
+- [x] scheduler.getAuditLog — return publish_audit_log entries for a business (paginated)
+- [x] scheduler.getSchedule — return all scheduled/published/failed articles for a business with their scheduled dates and job status
+- [x] scheduler.getNotifications, markNotificationRead, markAllRead
+- [x] scheduler.simulatePublish — directly invokes executeScheduledPublish for testing without waiting for heartbeat
+- [x] Wire schedulerRouter into server/routers.ts
+
+### In-app notifications
+- [x] `notifications` table: id, userId, businessId, type (enum), title, message, articleId, read, createdAt
+- [x] scheduler.getNotifications — return notifications for the logged-in user (unreadOnly filter, limit)
+- [x] scheduler.markNotificationRead — mark one notification as read
+- [x] scheduler.markAllRead — mark all notifications for user as read
+- [x] NotificationBell component in DashboardLayout header (unread count badge, dropdown)
+- [x] Notification dropdown: list of recent notifications with type icon, title, message, timestamp
+- [x] Auto-create notification on: scheduled publish success, retry failure (NOT on first failure — only after retry also fails)
+
+### Frontend — Schedule Management page (/schedule-management)
+- [x] Schedule management page: list all articles with scheduled dates, status badges (Scheduled/Published/Failed)
+- [x] Cancel button per article (removes heartbeat job, returns to approved)
+- [x] Reschedule date picker per article (dialog with datetime-local input, updates heartbeat job to new date)
+- [x] Audit log tab: table of all automated publish attempts with timestamp, action badge, result, error, attemptNumber
+- [x] Simulate Publish button (play icon) for testing without waiting for heartbeat
+- [x] /schedule-management route registered in App.tsx
+- [x] Dashboard sidebar nav link to /schedule-management
+- [x] Stats row: Scheduled / Published / Failed counts
+
+### Verification (4/4 PASSED)
+- [x] V1: dateToCron("2 minutes from now") generates correct 6-field UTC cron string
+- [x] V2: Publish success path → article=published, audit log written, notification created, heartbeat deleted
+- [x] V3: Publish failure → retry in 15min, audit log written, no premature notification; retry failure → article=publish_failed, 2 audit entries, failure notification
+- [x] V4: Cancel → heartbeat deleted, article=approved, audit log written
+
+### Tests (16 new tests, 240/240 total pass)
+- [x] Vitest: dateToCron (8 tests), cancelSchedule (4 tests), reschedule (3 tests), getAuditLog (2 tests), getNotifications (1 test), markNotificationRead (1 test), markAllRead (1 test)
+- NOTE: Heartbeat jobs fire on the deployed site (production URL). simulatePublish tRPC procedure allows testing publish logic in dev without waiting for a heartbeat.

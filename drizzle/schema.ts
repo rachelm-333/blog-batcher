@@ -511,6 +511,24 @@ export const articles = mysqlTable("articles", {
   cmsPostId: varchar("cmsPostId", { length: 255 }),
   /** CMS post URL returned after successful publish. */
   cmsPostUrl: varchar("cmsPostUrl", { length: 2048 }),
+  /**
+   * Manus Heartbeat task UID for the scheduled publish job.
+   * Set when a heartbeat job is created for this article.
+   * Cleared when the job fires or is cancelled.
+   * Used to cancel or reschedule the job via deleteHeartbeatJob / updateHeartbeatJob.
+   */
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
+  /**
+   * Timestamp when the retry heartbeat is scheduled to fire.
+   * Set to scheduledPublishAt + 15 minutes when the first publish attempt fails.
+   */
+  retryScheduledAt: timestamp("retryScheduledAt"),
+  /**
+   * Number of automated publish retries attempted.
+   * 0 = no retries yet, 1 = one retry attempted.
+   * Maximum retries: 1 (after which article is marked publish_failed).
+   */
+  publishRetryCount: int("publishRetryCount").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -779,3 +797,90 @@ export const adminLogRelations = relations(adminLog, ({ one }) => ({
 
 export type AdminLog = typeof adminLog.$inferSelect;
 export type InsertAdminLog = typeof adminLog.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// PUBLISH AUDIT LOG
+// Records every automated publish attempt (scheduled, retry, cancel) with
+// timestamp, article ID, action, and result. Used for Layer 9 audit trail.
+// ---------------------------------------------------------------------------
+export const publishAuditLog = mysqlTable("publish_audit_log", {
+  id: int("id").autoincrement().primaryKey(),
+  articleId: int("articleId").notNull().references(() => articles.id),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  /**
+   * Action performed by the automated system.
+   * scheduled_publish_attempted: heartbeat fired and publish was attempted
+   * scheduled_publish_succeeded: publish completed successfully
+   * scheduled_publish_failed: publish attempt failed (first attempt)
+   * retry_attempted: retry heartbeat fired (15 min after first failure)
+   * retry_succeeded: retry publish completed successfully
+   * retry_failed: retry also failed — article marked publish_failed
+   * schedule_cancelled: user cancelled the scheduled job
+   * schedule_rescheduled: user changed the scheduled publish date
+   */
+  action: mysqlEnum("action", [
+    "scheduled_publish_attempted",
+    "scheduled_publish_succeeded",
+    "scheduled_publish_failed",
+    "retry_attempted",
+    "retry_succeeded",
+    "retry_failed",
+    "schedule_cancelled",
+    "schedule_rescheduled",
+  ]).notNull(),
+  /** Outcome of the action. */
+  result: mysqlEnum("result", ["success", "failure", "cancelled", "rescheduled"]).notNull(),
+  /** Error message if the action failed. */
+  errorMessage: text("errorMessage"),
+  /** Which attempt this is: 1 = first attempt, 2 = retry. */
+  attemptNumber: int("attemptNumber").default(1).notNull(),
+  /** What triggered this action. */
+  triggeredBy: mysqlEnum("triggeredBy", ["user", "heartbeat"]).default("heartbeat").notNull(),
+  /** New scheduled date (for reschedule actions). */
+  newScheduledAt: timestamp("newScheduledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const publishAuditLogRelations = relations(publishAuditLog, ({ one }) => ({
+  article: one(articles, { fields: [publishAuditLog.articleId], references: [articles.id] }),
+  business: one(businesses, { fields: [publishAuditLog.businessId], references: [businesses.id] }),
+}));
+
+export type PublishAuditLog = typeof publishAuditLog.$inferSelect;
+export type InsertPublishAuditLog = typeof publishAuditLog.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// NOTIFICATIONS
+// In-app notifications for the user. Created by the automated publish system
+// on success, failure, and retry failure. Displayed in the notification bell.
+// ---------------------------------------------------------------------------
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  businessId: int("businessId").references(() => businesses.id),
+  articleId: int("articleId").references(() => articles.id),
+  /** Type of notification. */
+  type: mysqlEnum("type", [
+    "publish_success",
+    "publish_failed",
+    "retry_failed",
+    "schedule_cancelled",
+    "schedule_rescheduled",
+  ]).notNull(),
+  /** Short notification title shown in the bell dropdown. */
+  title: varchar("title", { length: 255 }).notNull(),
+  /** Full notification message. */
+  message: text("message").notNull(),
+  /** Whether the user has read this notification. */
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+  business: one(businesses, { fields: [notifications.businessId], references: [businesses.id] }),
+  article: one(articles, { fields: [notifications.articleId], references: [articles.id] }),
+}));
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;

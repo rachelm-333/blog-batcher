@@ -22,6 +22,13 @@
       "when": 1780298842545,
       "tag": "0002_tan_snowbird",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1780359344116,
+      "tag": "0003_breezy_barracuda",
+      "breakpoints": true
     }
   ]
 }
