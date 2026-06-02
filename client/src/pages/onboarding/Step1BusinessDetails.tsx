@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Loader2, Plus, X } from "lucide-react";
+import { HelpLink } from "@/components/HelpLink";
 
 interface Audience {
   label: string;
@@ -99,11 +100,17 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="space-y-2">
-          <Label>Business Name *</Label>
+          <div className="flex items-center gap-1.5">
+            <Label>Business Name *</Label>
+            <HelpLink slug="business-profile-setup" label="Why your business name matters" />
+          </div>
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label>Industry / Category</Label>
+          <div className="flex items-center gap-1.5">
+            <Label>Industry / Category</Label>
+            <HelpLink slug="business-profile-setup" label="How industry affects your articles" />
+          </div>
           <Input
             value={industry}
             onChange={(e) => setIndustry(e.target.value)}
@@ -111,7 +118,10 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
           />
         </div>
         <div className="space-y-2">
-          <Label>Location</Label>
+          <div className="flex items-center gap-1.5">
+            <Label>Location</Label>
+            <HelpLink slug="business-profile-setup" label="How location is used for local SEO" />
+          </div>
           <Input
             value={location}
             onChange={(e) => setLocation(e.target.value)}
@@ -180,7 +190,10 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-base font-medium">Target Audiences</Label>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-base font-medium">Target Audiences</Label>
+              <HelpLink slug="business-profile-setup" label="How to describe your target audience" />
+            </div>
             <p className="text-sm text-muted-foreground mt-0.5">
               Who are your customers? Add 2–5 audience groups.
             </p>

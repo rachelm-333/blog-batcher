@@ -38,6 +38,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { HelpLink } from "@/components/HelpLink";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -314,7 +315,10 @@ export default function Keywords() {
       await refetchKw();
       setSubStage("keyword-review");
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error(err.message, {
+      description: "Keyword assignment failed. Check that your DataForSEO credentials are connected in Settings, then try again.",
+      duration: 8000,
+    }),
   });
 
   const approveOne = trpc.keywords.approveOne.useMutation({
@@ -330,7 +334,10 @@ export default function Keywords() {
       await refetchKw();
       setSubStage("paa-review");
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error(err.message, {
+      description: "Could not approve keywords. Resolve any cannibalization conflicts first, then try again.",
+      duration: 8000,
+    }),
   });
 
   const fetchPAA = trpc.keywords.fetchPAA.useMutation({
@@ -338,7 +345,10 @@ export default function Keywords() {
       toast.success(`PAA questions fetched for ${data.fetched} keywords`);
       await refetchKw();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error(err.message, {
+      description: "Could not fetch People Also Ask questions. This requires a DataForSEO connection — check your integration settings.",
+      duration: 8000,
+    }),
   });
 
   const approvePAA = trpc.keywords.approvePAA.useMutation({
@@ -492,7 +502,10 @@ export default function Keywords() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Keyword Review</CardTitle>
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-base">Keyword Review</CardTitle>
+              <HelpLink slug="keyword-assignment" label="How keywords are assigned to articles" />
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -640,7 +653,10 @@ export default function Keywords() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">People Also Ask Review</CardTitle>
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-base">People Also Ask Review</CardTitle>
+              <HelpLink slug="people-also-ask" label="What is People Also Ask and why it matters" />
+            </div>
             <Button
               variant="outline"
               size="sm"

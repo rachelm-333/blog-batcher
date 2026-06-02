@@ -32,6 +32,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { HelpLink } from "@/components/HelpLink";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -163,32 +164,42 @@ export default function PublishSchedule() {
   }, [scheduleData?.schedule?.id]);
 
   // Mutations
-  const saveSchedule = trpc.schedule.save.useMutation({
+    const saveSchedule = trpc.schedule.save.useMutation({
     onSuccess: () => {
       toast.success("Schedule saved.");
       refetchSchedule();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error("Could not save schedule", {
+      description: `${err.message}. Make sure all articles are approved before scheduling.`,
+      duration: 8000,
+    }),
   });
-
   const confirmSchedule = trpc.schedule.confirm.useMutation({
     onSuccess: (data) => {
       toast.success(`${data.scheduledCount} articles scheduled!`);
       refetchSchedule();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error("Could not confirm schedule", {
+      description: `${err.message}. All articles must be approved and a start date must be selected.`,
+      duration: 8000,
+    }),
   });
-
   const publishAll = trpc.articles.publishAll.useMutation({
     onSuccess: (data) => {
       if (data.failed > 0) {
-        toast.error(`Published ${data.published}/${data.total} articles. ${data.failed} failed — check the Review screen for details.`);
+        toast.error(`Published ${data.published}/${data.total} articles. ${data.failed} failed.`, {
+          description: "Check the Schedule Management page for details on failed articles. You can retry them individually.",
+          duration: 10000,
+        });
       } else {
         toast.success(`All ${data.published} articles published successfully!`);
       }
       refetchSchedule();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error("Publish failed", {
+      description: `${err.message}. Check your CMS connection in Integrations and try again.`,
+      duration: 8000,
+    }),
   });
 
   // Derived state
@@ -328,7 +339,10 @@ export default function PublishSchedule() {
 
         {/* Publishing Method */}
         <section>
-          <h2 className="text-base font-bold text-foreground mb-1">Publishing Method</h2>
+          <div className="flex items-center gap-1.5 mb-1">
+            <h2 className="text-base font-bold text-foreground">Publishing Method</h2>
+            <HelpLink slug="connecting-your-cms" label="How to connect your CMS" />
+          </div>
           <p className="text-xs text-muted-foreground mb-4">
             Choose how your articles will be delivered to your website.
           </p>
@@ -364,7 +378,10 @@ export default function PublishSchedule() {
 
         {/* Publish As */}
         <section>
-          <h2 className="text-base font-bold text-foreground mb-1">Publish As</h2>
+          <div className="flex items-center gap-1.5 mb-1">
+            <h2 className="text-base font-bold text-foreground">Publish As</h2>
+            <HelpLink slug="scheduled-vs-drafts" label="Scheduled vs Drafts — what's the difference?" />
+          </div>
           <div className="flex gap-3">
             {(["scheduled", "drafts"] as PublishAs[]).map((opt) => (
               <button
@@ -389,7 +406,10 @@ export default function PublishSchedule() {
 
         {/* Publishing Cadence */}
         <section>
-          <h2 className="text-base font-bold text-foreground mb-1">Publishing Cadence</h2>
+          <div className="flex items-center gap-1.5 mb-1">
+            <h2 className="text-base font-bold text-foreground">Publishing Cadence</h2>
+            <HelpLink slug="publishing-cadence" label="How to choose your publishing cadence" />
+          </div>
           <p className="text-xs text-muted-foreground mb-4">
             How frequently should articles be published?
           </p>

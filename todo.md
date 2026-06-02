@@ -455,3 +455,61 @@
 - [x] Vitest: dashboard.getSummary (5 tests: correct counts, badge counts, credit=0, quick action stage 1, quick action stage 5, FORBIDDEN)
 - [x] Vitest: dashboard.getRecentActivity (3 tests: returns entries with titles, empty array, FORBIDDEN)
 - [x] Vitest: dashboard.listBusinesses (3 tests: empty, single business with counts, multiple businesses)
+
+## Layer 11: Support Centre
+
+### Help content data (shared/helpContent.ts)
+- [x] 8 topic categories: Getting Started, Business Profile, Blog Architecture, Keyword Research, Article Generation, Review & Editing, Publishing & Scheduling, Account & Billing
+- [x] ~3-5 articles per topic, each with: id, topicId, title, slug, body (content blocks), tags[]
+- [x] Articles cover: 5-stage walkthrough, CMS connections (WordPress/Wix/Zapier), API keys/Application Passwords, 16-point Authority Standard, architecture types, publish failure recovery, credits
+
+### Backend — tRPC procedures (server/routers/support.ts)
+- [x] support.search — full-text search across article titles, body, and tags; returns matching articles with snippet
+- [x] support.getArticle — return a single help article by slug
+- [x] support.getTopics — return all topics with their article list (for sidebar navigation)
+- [x] support.submitContactForm — validate name/email/subject/message, send email to rachel.m@noize.com.au via Resend, return success
+- [x] Wire supportRouter into server/routers.ts
+
+### Frontend — Support Centre page (client/src/pages/SupportCentre.tsx)
+- [x] Route: /support — accessible from dashboard sidebar nav (HelpCircle icon)
+- [x] Search bar at top — debounced, searches across all articles, shows results inline
+- [x] Empty state for no search results — "No articles found for X. Try a different term or contact support."
+- [x] Topic sidebar: 8 categories with article count badges
+- [x] Article viewer: renders article body with headings, paragraphs, code blocks, tips, warnings
+- [x] Contact form section: name, email, subject, message — submits via support.submitContactForm
+- [x] Contact form success state: "Your message has been sent. We'll get back to you within 1 business day."
+- [x] URL hash navigation: /support#article-slug opens the article directly (for contextual help links)
+- [x] /support route registered in App.tsx
+- [x] Dashboard sidebar nav link: "Help" with HelpCircle icon
+
+### Contextual help icons (HelpCircle) in app pages
+- [x] Shared HelpLink component: small HelpCircle icon that opens /support#article-slug in a new tab
+- [x] Step1BusinessDetails.tsx: help icons on Industry, Target Audience, Brand Voice fields
+- [x] Architecture.tsx: help icons on Cornerstone/Pillar/Cluster article type selector
+- [x] Keywords.tsx: help icons on Keyword Research, PAA sections
+- [x] ArticleReview.tsx: help icons on status badge, SEO score fields
+- [x] PublishSchedule.tsx: help icons on publish cadence selector, scheduling calendar
+- [x] Integrations.tsx: help icons on API Key, Application Password, SEO Plugin, Wix API Key fields
+
+### Error messages with actionable next-step instructions
+- [x] Integrations page: CMS connection errors include "Double-check your credentials and make sure your CMS is accessible" + help link
+- [x] Article generation errors: include "Make sure your business profile and keyword research are complete" + HelpLink in error state
+- [x] Publish failure errors: include "Check your CMS connection in Integrations and try again"
+- [x] Keywords errors: include DataForSEO connection instructions
+- [x] All error toasts include duration:8000ms so users have time to read the instruction
+
+### Verification (5/5 PASSED — 26/26 sub-checks)
+- [x] V1: Search for a term in a help article — results appear (searchHelpArticles("keyword") returns >0 results)
+- [x] V2: Search for a non-existent term — empty array returned, UI shows empty state message
+- [x] V3: HelpLink component used in 6/6 complex pages, navigates to /support#slug
+- [x] V4: submitContactForm sends to rachel.m@noize.com.au via Resend, replyTo set to submitter email
+- [x] V5: ArticleGeneration, Keywords, Integrations, PublishSchedule all have actionable error messages
+
+### Tests (16 new tests, 267/267 total pass)
+- [x] Vitest: searchHelpArticles (4 tests: known term, unknown term, case-insensitive, tag matching)
+- [x] Vitest: getArticleSnippet (1 test)
+- [x] Vitest: support.search (2 tests: results for known query, empty for unknown)
+- [x] Vitest: support.getArticle (2 tests: valid slug, unknown slug)
+- [x] Vitest: support.getTopics (1 test: 8 topics with articles)
+- [x] Vitest: support.submitContactForm (4 tests: name missing, invalid email, message too short, success with mock)
+- [x] Vitest: HELP_ARTICLES integrity (2 tests: unique slugs, valid topicIds)

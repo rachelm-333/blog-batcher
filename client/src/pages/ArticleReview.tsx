@@ -43,6 +43,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { HelpLink } from "@/components/HelpLink";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -613,7 +614,10 @@ export default function ArticleReview() {
 
               {/* URL Slug */}
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-foreground">URL Slug</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs font-semibold text-foreground">URL Slug</Label>
+                  <HelpLink slug="url-slug-best-practices" label="How to write a good URL slug" />
+                </div>
                 <Input
                   value={seoEdits.urlSlug}
                   onChange={e => setSeoEdits(prev => ({ ...prev, urlSlug: e.target.value }))}
@@ -625,7 +629,10 @@ export default function ArticleReview() {
 
               {/* Meta Title */}
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-foreground">Meta Title</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs font-semibold text-foreground">Meta Title</Label>
+                  <HelpLink slug="meta-title-description" label="Meta title best practices" />
+                </div>
                 <Input
                   value={seoEdits.metaTitle}
                   onChange={e => setSeoEdits(prev => ({ ...prev, metaTitle: e.target.value }))}
@@ -640,7 +647,10 @@ export default function ArticleReview() {
 
               {/* Meta Description */}
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-foreground">Meta Description</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs font-semibold text-foreground">Meta Description</Label>
+                  <HelpLink slug="meta-title-description" label="Meta description best practices" />
+                </div>
                 <Textarea
                   value={seoEdits.metaDescription}
                   onChange={e => setSeoEdits(prev => ({ ...prev, metaDescription: e.target.value }))}
@@ -655,7 +665,10 @@ export default function ArticleReview() {
 
               {/* Focus Keyword */}
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-foreground">Focus Keyword</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs font-semibold text-foreground">Focus Keyword</Label>
+                  <HelpLink slug="focus-keyword" label="What is a focus keyword?" />
+                </div>
                 <Input
                   value={seoEdits.focusKeyword}
                   onChange={e => setSeoEdits(prev => ({ ...prev, focusKeyword: e.target.value }))}

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { HelpLink } from "@/components/HelpLink";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -300,7 +301,10 @@ export default function Architecture() {
         {/* ── Step 1: Pack Selection ─────────────────────────────────────────── */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">1. Select Your Pack</CardTitle>
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-base">1. Select Your Pack</CardTitle>
+              <HelpLink slug="how-many-articles" label="How to choose the right number of articles" />
+            </div>
             <CardDescription>Choose how many articles you want in this batch. This is locked once selected.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -346,7 +350,10 @@ export default function Architecture() {
         {arch?.packSize && (
           <Card>
             <CardHeader>
+              <div className="flex items-center gap-1.5">
               <CardTitle className="text-base">2. Configure Architecture</CardTitle>
+              <HelpLink slug="cornerstone-pillar-cluster" label="What are Cornerstone, Pillar, and Cluster articles?" />
+            </div>
               <CardDescription>
                 Adjust the number of cornerstones and pillars. Clusters per pillar are always 3.
               </CardDescription>

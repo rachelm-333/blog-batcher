@@ -30,6 +30,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { HelpLink } from "@/components/HelpLink";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -326,7 +327,10 @@ export default function ArticleGeneration() {
       toast.success(`Generation started — ${data.totalArticles} articles queued`);
     },
     onError: (err) => {
-      toast.error("Could not start generation", { description: err.message });
+      toast.error("Could not start generation", {
+        description: `${err.message}. Make sure your business profile and keyword research are complete before generating articles.`,
+        duration: 8000,
+      });
     },
   });
 
@@ -340,7 +344,10 @@ export default function ArticleGeneration() {
     },
     onError: (err) => {
       setRetryingId(null);
-      toast.error("Regeneration failed", { description: err.message });
+      toast.error("Regeneration failed", {
+        description: `${err.message}. If this keeps happening, try refreshing the page or contact support.`,
+        duration: 8000,
+      });
     },
   });
 
@@ -542,7 +549,10 @@ export default function ArticleGeneration() {
                   {failed} article{failed !== 1 ? "s" : ""} failed to generate
                 </div>
                 <div className="text-xs text-red-600 mt-0.5">
-                  Retry the failed articles above before proceeding, or click “Proceed anyway” to continue with the {completed} completed article{completed !== 1 ? "s" : ""}.
+                  Retry the failed articles above before proceeding, or click "Proceed anyway" to continue with the {completed} completed article{completed !== 1 ? "s" : ""}.
+                </div>
+                <div className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                  <HelpLink slug="article-generation-failed" label="Why did my articles fail to generate?" />
                 </div>
               </div>
             )}

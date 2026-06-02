@@ -34,6 +34,7 @@ import {
   Webhook,
   Clock,
 } from "lucide-react";
+import { HelpLink } from "@/components/HelpLink";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -214,7 +215,10 @@ function PlatformCard({
       toast.success(`${platform.name} credentials saved`);
       onSaved();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toast.error("Could not save credentials", {
+      description: `${err.message}. Check that all required fields are filled in correctly.`,
+      duration: 8000,
+    }),
   });
 
   const testMutation = trpc.integrations.testConnection.useMutation({
@@ -222,13 +226,19 @@ function PlatformCard({
       if (result.success) {
         toast.success(`${platform.name} connection verified successfully`);
       } else {
-        toast.error(`Connection failed: ${result.error}`);
+        toast.error(`Connection failed: ${result.error}`, {
+          description: "Double-check your credentials and make sure your CMS is accessible. See the help icon above for setup instructions.",
+          duration: 10000,
+        });
       }
       onSaved();
       setTesting(false);
     },
     onError: (err) => {
-      toast.error(err.message);
+      toast.error("Connection test failed", {
+        description: `${err.message}. Make sure your CMS is online and the credentials are correct.`,
+        duration: 8000,
+      });
       setTesting(false);
     },
   });
@@ -298,7 +308,12 @@ function PlatformCard({
           <div className="space-y-3">
             {platform.fields.map((field) => (
               <div key={field.key} className="space-y-1">
-                <Label className="text-xs font-medium">{field.label}</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs font-medium">{field.label}</Label>
+                  {field.key === "seoPlugin" && <HelpLink slug="seo-plugins" label="Which SEO plugin should I use?" />}
+                  {field.key === "applicationPassword" && <HelpLink slug="wordpress-application-password" label="How to create a WordPress Application Password" />}
+                  {field.key === "apiKey" && <HelpLink slug="wix-api-key" label="How to get your Wix API Key" />}
+                </div>
                 {field.type === "select" ? (
                   <Select
                     value={fields[field.key] ?? ""}
@@ -406,7 +421,10 @@ export default function IntegrationsPage() {
       <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold">CMS Integrations</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">CMS Integrations</h1>
+            <HelpLink slug="connecting-your-cms" label="How to connect your CMS" />
+          </div>
           <p className="text-muted-foreground text-sm mt-1">
             Connect your CMS to publish articles directly from Blog Batcher.
           </p>
