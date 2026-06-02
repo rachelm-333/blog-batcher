@@ -52,6 +52,8 @@ export interface WordPressCredentials {
 export interface WixCredentials {
   apiKey: string;
   siteId: string;
+  /** Required for 3rd-party API key authentication. Wix member/account ID. */
+  memberId?: string;
 }
 
 export interface ZapierCredentials {
@@ -325,44 +327,71 @@ export async function publishToWix(
 
   try {
     // ── Step 1: Create draft post ────────────────────────────────────────────
-    const createPayload: Record<string, unknown> = {
-      post: {
+    // NOTE: Wix Blog API v3 auto-generates the slug from the title.
+    // The slug field in draftPost is read-only for 3rd-party apps.
+    // memberId is required for 3rd-party API key authentication.
+    const draftBody: Record<string, unknown> = {
+      draftPost: {
         title: article.title,
+        // Strip HTML tags for richContent plain-text representation
         richContent: {
           nodes: [
             {
               type: "PARAGRAPH",
-              nodes: [{ type: "TEXT", textData: { text: "" } }],
+              id: "p1",
+              nodes: [
+                {
+                  type: "TEXT",
+                  id: "t1",
+                  nodes: [],
+                  textData: {
+                    text: article.bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 5000),
+                    decorations: [],
+                  },
+                },
+              ],
+              paragraphData: {},
+            },
+          ],
+          metadata: { version: 1 },
+        },
+        memberId: credentials.memberId,
+        seoData: {
+          tags: [
+            {
+              type: "title",
+              children: article.metaTitle,
+              custom: false,
+              isDisabled: false,
+            },
+            {
+              type: "meta",
+              props: { name: "description", content: article.metaDescription },
+              custom: false,
+              isDisabled: false,
+            },
+            {
+              type: "meta",
+              props: { name: "keywords", content: article.focusKeyword },
+              custom: false,
+              isDisabled: false,
             },
           ],
         },
-        // Wix Blog API accepts plain HTML via the htmlContent field
-        htmlContent: article.bodyHtml,
-        excerpt: article.metaDescription,
-        seoData: {
-          tags: [
-            { type: "title", children: article.metaTitle },
-            { type: "meta", props: { name: "description", content: article.metaDescription } },
-            { type: "meta", props: { name: "keywords", content: article.focusKeyword } },
-          ],
-        },
-        slug: article.urlSlug,
       },
     };
 
     if (article.scheduledPublishAt && article.scheduledPublishAt > new Date()) {
-      createPayload.post = {
-        ...(createPayload.post as object),
-        scheduledPublishTime: article.scheduledPublishAt.toISOString(),
-      };
+      (draftBody.draftPost as Record<string, unknown>).scheduledPublishTime =
+        article.scheduledPublishAt.toISOString();
     }
 
     const createRes = await fetch(
-      "https://www.wixapis.com/blog/v3/posts/drafts",
+      "https://www.wixapis.com/blog/v3/draft-posts",
       {
         method: "POST",
         headers: baseHeaders,
-        body: JSON.stringify(createPayload),
+        body: JSON.stringify(draftBody),
       }
     );
 
@@ -384,7 +413,7 @@ export async function publishToWix(
 
     // ── Step 2: Publish the draft ────────────────────────────────────────────
     const publishRes = await fetch(
-      `https://www.wixapis.com/blog/v3/posts/drafts/${draftId}/publish`,
+      `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
       {
         method: "POST",
         headers: baseHeaders,

@@ -361,3 +361,12 @@
 ### Honest Gap
 - [ ] Real WordPress site publish test — requires a live WordPress URL + application password from user
   (mocked HTTP server used instead: verifies exact request structure, auth header, payload, and error handling)
+
+### Real Wix Integration (10/10 pass — live site verified)
+- [x] Draft created via POST /blog/v3/draft-posts with title, memberId, seoData, richContent
+- [x] Draft published via POST /blog/v3/draft-posts/{id}/publish
+- [x] Published post verified in /blog/v3/posts/{id} (title, memberId, slug confirmed)
+- [x] Test post deleted via DELETE /blog/v3/draft-posts/{id}
+- [x] Deletion confirmed (post no longer accessible)
+- NOTE: Wix auto-generates slugs from title — custom slugs not supported via 3rd-party API (documented in Integrations UI)
+- NOTE: Wix does not echo seoData.tags in GET /posts response — tags applied to page HTML head on live site (confirmed Wix API behaviour)
