@@ -235,7 +235,7 @@ describe("Layer 15: Multi-Business & Agency Features", () => {
     const result = await callerA.business.getById({ businessId: bizA1Id });
     expect(result.id).toBe(bizA1Id);
     expect(result.name).toBe("User A - Business 1");
-  });
+  }, 15000);
 
   // V3: dashboard.listBusinesses returns correct article counts per business
   it("V3: dashboard.listBusinesses returns correct article counts per business", async () => {

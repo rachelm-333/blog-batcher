@@ -12,6 +12,8 @@
  * Gate: all articles must be approved before publish options unlock.
  */
 
+import DashboardLayout from "@/components/DashboardLayout";
+import StageStepper from "@/components/StageStepper";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { trpc } from "@/lib/trpc";
@@ -293,10 +295,13 @@ export default function PublishSchedule() {
     year: "numeric",
   });
 
+  const currentStage = business?.currentStage ?? 6;
   return (
-    <div className="min-h-screen bg-background">
+    <DashboardLayout>
+    <div style={{ background:"#faf9f5", minHeight:"100%" }}>
+      <StageStepper currentStage={currentStage} />
       {/* Header */}
-      <div className="border-b border-border bg-card px-6 py-4">
+      <div style={{ borderBottom:"1px solid #e5e7eb", background:"#fff", padding:"16px 24px" }}>
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
@@ -588,5 +593,6 @@ export default function PublishSchedule() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 }

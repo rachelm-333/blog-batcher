@@ -1,3 +1,5 @@
+import DashboardLayout from "@/components/DashboardLayout";
+import StageStepper from "@/components/StageStepper";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -277,27 +279,30 @@ export default function Architecture() {
   }
 
   const locked = arch?.confirmed ?? false;
+  const currentStage = businessData?.currentStage ?? 2;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card border-b border-border px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+    <DashboardLayout>
+    <div style={{ background:"#faf9f5", minHeight:"100%" }}>
+      <StageStepper currentStage={currentStage} />
+      {/* Page header */}
+      <div style={{ background:"#fff", borderBottom:"1px solid #e5e7eb", padding:"16px 24px" }}>
+        <div style={{ maxWidth:900, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Stage 2 — Blog Architecture</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <h1 style={{ fontSize:18, fontWeight:700, color:"#1a1a2e", margin:0 }}>Stage 2 — Blog Architecture</h1>
+            <p style={{ fontSize:13, color:"#6b7280", marginTop:4, marginBottom:0 }}>
               Define the structure of your content batch before keyword research begins.
             </p>
           </div>
           {locked && (
-                <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 gap-1">
-              <CheckCircle className="w-3.5 h-3.5" /> Architecture Confirmed
-            </Badge>
+            <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px", borderRadius:99, fontSize:12, fontWeight:600, background:"#dcfce7", color:"#166534" }}>
+              <CheckCircle style={{ width:13, height:13 }} /> Architecture Confirmed
+            </span>
           )}
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+      <div style={{ maxWidth:900, margin:"0 auto", padding:"32px 24px", display:"flex", flexDirection:"column", gap:24 }}>
         {/* ── Step 1: Pack Selection ─────────────────────────────────────────── */}
         <Card>
           <CardHeader>
@@ -510,5 +515,6 @@ export default function Architecture() {
         )}
       </div>
     </div>
+    </DashboardLayout>
   );
 }

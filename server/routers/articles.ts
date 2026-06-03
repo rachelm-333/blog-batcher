@@ -198,12 +198,14 @@ export const articlesRouter = router({
       }
 
       // ── Trial / credit guard (checked BEFORE article nodes so upgrade prompt shows first) ────
+      // Admin users bypass all credit gates
       const [arch] = await db
         .select({ packSize: blogArchitectures.packSize })
         .from(blogArchitectures)
         .where(eq(blogArchitectures.businessId, input.businessId))
         .limit(1);
       const isTrialBusiness = arch?.packSize === 0;
+      if (ctx.user.role !== 'admin') {
       if (isTrialBusiness) {
         // Trial business: block if free trial already used
         const [userRow] = await db
@@ -231,6 +233,7 @@ export const articlesRouter = router({
           });
         }
       }
+      } // end admin bypass
       // ── End trial / credit guard ──────────────────────────────────────────────────
 
       // Check article nodes exist (Stage 2 must be complete)

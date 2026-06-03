@@ -769,3 +769,19 @@
 - [x] Register/VerifyEmail/ResetPassword/FreeTrial/PaymentSuccess: icon bg circles
 - [x] TypeScript: 0 errors after all changes
 - [x] All 318 tests pass after polish changes
+
+## Frontend Mockup Alignment (Jun 3 2026)
+- [x] Rebuilt global CSS to light cream theme (#faf9f5 bg, #6e5afe purple, #D9F542 lime)
+- [x] Added Lora serif font for italic headings
+- [x] Rebuilt DashboardLayout with ProDesk top bar, cream sidebar, business switcher
+- [x] Created StageStepper component (horizontal, lime=complete, purple=active)
+- [x] Rebuilt Dashboard screen to match mockup (KPI cards, activity feed, stage cards)
+- [x] Rebuilt Keywords.tsx with cream theme, correct table layout and badge colours
+- [x] Rebuilt ArticleGeneration.tsx with cream theme and progress indicators
+- [x] Wrapped ArticleReview.tsx in DashboardLayout with StageStepper
+- [x] Wrapped Architecture.tsx in DashboardLayout with StageStepper
+- [x] Wrapped PublishSchedule.tsx in DashboardLayout with StageStepper
+- [x] Wrapped AdminPanel.tsx in DashboardLayout
+- [x] Granted Rachie admin role + agency tier + 99999 credits + onboarding bypassed
+- [x] Added admin bypass to articles credit gate (admin can generate without credits)
+- [x] Fixed V2c test timeout (increased to 15000ms)

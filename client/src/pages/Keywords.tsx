@@ -1,49 +1,25 @@
 /**
- * Layer 5 — Stage 3: SEO Keyword Research
- *
- * Three sub-stages:
- *   1. Assign — trigger auto-assignment via DataForSEO + Claude
- *   2. Keyword Review — review/swap/approve each keyword row
- *   3. PAA Review — approve one PAA question per article
+ * Stage 3 — Keyword Research
+ * Matches the BlogBatcher mockup: light cream theme, horizontal stage stepper,
+ * serif italic heading, table with Level/Title/Keyword/MSV/Competition/Status/Actions
  */
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import DashboardLayout from "@/components/DashboardLayout";
+import StageStepper from "@/components/StageStepper";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { trpc } from "@/lib/trpc";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
-  RefreshCw,
-  Sparkles,
+  AlertTriangle, CheckCircle2, Loader2, RefreshCw, ArrowRight, Sparkles, BarChart2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useLocation } from "wouter";
-import { HelpLink } from "@/components/HelpLink";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
+/* ─── Types ─────────────────────────────────────────────── */
 type KwRow = {
   id: number;
   articleNodeId: number;
@@ -61,159 +37,120 @@ type KwRow = {
   nodeParentCornerstoneId: number | null;
   nodeParentPillarId: number | null;
 };
-
 type SubStage = "assign" | "keyword-review" | "paa-review" | "complete";
 
-/**
- * Derive a human-readable node label from hierarchy fields.
- * Uses the same naming convention as the architecture rules engine:
- *   Cornerstone N, Pillar N.P, Cluster N.P.C
- */
+/* ─── Helpers ────────────────────────────────────────────── */
 function deriveNodeLabel(rows: KwRow[], row: KwRow): string {
   if (row.nodeLevel === "cornerstone") {
-    const cornerstones = rows
-      .filter((r) => r.nodeLevel === "cornerstone")
-      .sort((a, b) => a.nodeSortOrder - b.nodeSortOrder);
-    const idx = cornerstones.findIndex((r) => r.articleNodeId === row.articleNodeId);
-    return `Cornerstone ${idx + 1}`;
+    const cs = rows.filter(r => r.nodeLevel === "cornerstone").sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+    return `Cornerstone ${cs.findIndex(r => r.articleNodeId === row.articleNodeId) + 1}`;
   }
   if (row.nodeLevel === "pillar") {
-    const cornerstones = rows
-      .filter((r) => r.nodeLevel === "cornerstone")
-      .sort((a, b) => a.nodeSortOrder - b.nodeSortOrder);
-    const cIdx = cornerstones.findIndex((r) => r.articleNodeId === row.nodeParentCornerstoneId);
-    const pillarsUnderCornerstone = rows
-      .filter((r) => r.nodeLevel === "pillar" && r.nodeParentCornerstoneId === row.nodeParentCornerstoneId)
-      .sort((a, b) => a.nodeSortOrder - b.nodeSortOrder);
-    const pIdx = pillarsUnderCornerstone.findIndex((r) => r.articleNodeId === row.articleNodeId);
-    return `Pillar ${cIdx + 1}.${pIdx + 1}`;
+    const cs = rows.filter(r => r.nodeLevel === "cornerstone").sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+    const cIdx = cs.findIndex(r => r.articleNodeId === row.nodeParentCornerstoneId);
+    const ps = rows.filter(r => r.nodeLevel === "pillar" && r.nodeParentCornerstoneId === row.nodeParentCornerstoneId).sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+    return `Pillar ${cIdx + 1}.${ps.findIndex(r => r.articleNodeId === row.articleNodeId) + 1}`;
   }
-  // cluster
-  const cornerstones = rows
-    .filter((r) => r.nodeLevel === "cornerstone")
-    .sort((a, b) => a.nodeSortOrder - b.nodeSortOrder);
-  const cIdx = cornerstones.findIndex((r) => r.articleNodeId === row.nodeParentCornerstoneId);
-  const pillarsUnderCornerstone = rows
-    .filter((r) => r.nodeLevel === "pillar" && r.nodeParentCornerstoneId === row.nodeParentCornerstoneId)
-    .sort((a, b) => a.nodeSortOrder - b.nodeSortOrder);
-  const pIdx = pillarsUnderCornerstone.findIndex((r) => r.articleNodeId === row.nodeParentPillarId);
-  const clustersUnderPillar = rows
-    .filter((r) => r.nodeLevel === "cluster" && r.nodeParentPillarId === row.nodeParentPillarId)
-    .sort((a, b) => a.nodeSortOrder - b.nodeSortOrder);
-  const clIdx = clustersUnderPillar.findIndex((r) => r.articleNodeId === row.articleNodeId);
-  return `Cluster ${cIdx + 1}.${pIdx + 1}.${clIdx + 1}`;
+  const cs = rows.filter(r => r.nodeLevel === "cornerstone").sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+  const cIdx = cs.findIndex(r => r.articleNodeId === row.nodeParentCornerstoneId);
+  const ps = rows.filter(r => r.nodeLevel === "pillar" && r.nodeParentCornerstoneId === row.nodeParentCornerstoneId).sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+  const pIdx = ps.findIndex(r => r.articleNodeId === row.nodeParentPillarId);
+  const cl = rows.filter(r => r.nodeLevel === "cluster" && r.nodeParentPillarId === row.nodeParentPillarId).sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+  return `Cluster ${cIdx + 1}.${pIdx + 1}.${cl.findIndex(r => r.articleNodeId === row.articleNodeId) + 1}`;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function levelBadge(level: string) {
-  if (level === "cornerstone")
-    return <Badge className="bg-violet-500/15 text-violet-400 border-violet-500/30">Cornerstone</Badge>;
-  if (level === "pillar")
-    return <Badge className="bg-primary/15 text-primary border-primary/30">Pillar</Badge>;
-  return <Badge className="bg-secondary text-muted-foreground border-border">Cluster</Badge>;
+function LevelBadge({ level }: { level: string }) {
+  if (level === "cornerstone") return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#ede9ff", color:"#6e5afe", whiteSpace:"nowrap" }}>
+      ◆ Cornerstone
+    </span>
+  );
+  if (level === "pillar") return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#dbeafe", color:"#1e40af", whiteSpace:"nowrap" }}>
+      ▲ Pillar
+    </span>
+  );
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#f3f4f6", color:"#6b7280", whiteSpace:"nowrap" }}>
+      ● Cluster
+    </span>
+  );
 }
 
-function msvLabel(msv: number | null) {
-  if (msv === null) return <span className="text-muted-foreground">—</span>;
-  if (msv >= 10000) return <span className="text-emerald-600 font-medium">{msv.toLocaleString()}</span>;
-  if (msv >= 1000) return <span className="text-primary font-medium">{msv.toLocaleString()}</span>;
-  return <span className="text-muted-foreground">{msv.toLocaleString()}</span>;
+function CompBadge({ comp }: { comp: string | null }) {
+  if (!comp) return <span style={{ color:"#9ca3af" }}>—</span>;
+  if (comp === "high") return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#dc2626", fontWeight:600 }}>
+      <BarChart2 style={{ width:13, height:13 }} /> High
+    </span>
+  );
+  if (comp === "medium") return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#d97706", fontWeight:600 }}>
+      <BarChart2 style={{ width:13, height:13 }} /> Medium
+    </span>
+  );
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#16a34a", fontWeight:600 }}>
+      <BarChart2 style={{ width:13, height:13 }} /> Low
+    </span>
+  );
 }
 
-function compBadge(comp: string | null) {
-  if (!comp) return <span className="text-muted-foreground">—</span>;
-  if (comp === "high") return <Badge className="bg-destructive/15 text-destructive border-destructive/30">High</Badge>;
-  if (comp === "medium") return <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">Medium</Badge>;
-  return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">Low</Badge>;
+function StatusBadge({ approved }: { approved: boolean }) {
+  if (approved) return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#dcfce7", color:"#166534" }}>
+      <CheckCircle2 style={{ width:11, height:11 }} /> Approved
+    </span>
+  );
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:600, background:"#f3f4f6", color:"#6b7280" }}>
+      Pending
+    </span>
+  );
 }
 
-function articleTypeLabel(type: string) {
-  return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-// ---------------------------------------------------------------------------
-// Swap Modal
-// ---------------------------------------------------------------------------
-
-function SwapModal({
-  open,
-  onClose,
-  businessId,
-  kwRow,
-  onSwapped,
-}: {
-  open: boolean;
-  onClose: () => void;
-  businessId: number;
-  kwRow: KwRow | null;
-  onSwapped: () => void;
+/* ─── Swap Modal ─────────────────────────────────────────── */
+function SwapModal({ open, onClose, businessId, kwRow, onSwapped }: {
+  open: boolean; onClose: () => void; businessId: number; kwRow: KwRow | null; onSwapped: () => void;
 }) {
   const [manualKw, setManualKw] = useState("");
-  const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
-
+  const [selected, setSelected] = useState<string | null>(null);
   const suggestions = trpc.keywords.getSuggestions.useQuery(
     { businessId, keyword: kwRow?.primaryKeyword ?? "" },
     { enabled: open && !!kwRow }
   );
-
   const swapMutation = trpc.keywords.swap.useMutation({
-    onSuccess: () => {
-      toast.success("Keyword swapped successfully");
-      onSwapped();
-      onClose();
-    },
+    onSuccess: () => { toast.success("Keyword swapped"); onSwapped(); onClose(); },
     onError: (err) => toast.error(err.message),
   });
-
   const handleSwap = () => {
     if (!kwRow) return;
-    const kw = selectedSuggestion ?? manualKw.trim();
-    if (!kw) {
-      toast.error("Please select a suggestion or enter a keyword");
-      return;
-    }
+    const kw = selected ?? manualKw.trim();
+    if (!kw) { toast.error("Please select or enter a keyword"); return; }
     swapMutation.mutate({ businessId, keywordId: kwRow.id, newKeyword: kw });
   };
-
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Swap Keyword</DialogTitle>
-          <DialogDescription>
-            Replace <strong>{kwRow?.primaryKeyword}</strong> with a different keyword.
-          </DialogDescription>
+          <DialogDescription>Replace <strong>{kwRow?.primaryKeyword}</strong> with a different keyword.</DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-4 mt-2">
+        <div style={{ display:"flex", flexDirection:"column", gap:16, marginTop:8 }}>
           {suggestions.isLoading && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Fetching suggestions…
+            <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:"#9ca3af" }}>
+              <Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Fetching suggestions…
             </div>
           )}
-
           {!suggestions.isLoading && (suggestions.data?.length ?? 0) > 0 && (
             <div>
-              <p className="text-sm font-medium text-foreground mb-2">DataForSEO Suggestions</p>
-              <div className="space-y-2">
-                {suggestions.data?.map((s) => (
-                  <button
-                    key={s.keyword}
-                    onClick={() => {
-                      setSelectedSuggestion(s.keyword);
-                      setManualKw("");
-                    }}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-all ${
-                      selectedSuggestion === s.keyword
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-border bg-card"
-                    }`}
-                  >
-                    <span className="font-medium text-foreground">{s.keyword}</span>
-                    <span className="ml-2 text-muted-foreground text-xs">
+              <p style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:8 }}>DataForSEO Suggestions</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                {suggestions.data?.map(s => (
+                  <button key={s.keyword} onClick={() => { setSelected(s.keyword); setManualKw(""); }}
+                    style={{ textAlign:"left", padding:"10px 14px", borderRadius:8, border: selected === s.keyword ? "1.5px solid #6e5afe" : "1px solid #e5e7eb", background: selected === s.keyword ? "#ede9ff" : "#fff", cursor:"pointer", transition:"all 160ms" }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e" }}>{s.keyword}</span>
+                    <span style={{ fontSize:12, color:"#9ca3af", marginLeft:8 }}>
                       {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
                       {s.competition ? ` · ${s.competition} comp` : ""}
                     </span>
@@ -222,30 +159,16 @@ function SwapModal({
               </div>
             </div>
           )}
-
           <div>
-            <p className="text-sm font-medium text-foreground mb-1">Or enter manually</p>
-            <Input
-              placeholder="Type a custom keyword…"
-              value={manualKw}
-              onChange={(e) => {
-                setManualKw(e.target.value);
-                setSelectedSuggestion(null);
-              }}
-            />
+            <p style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>Or enter manually</p>
+            <Input placeholder="Type a custom keyword…" value={manualKw}
+              onChange={e => { setManualKw(e.target.value); setSelected(null); }} />
           </div>
-
-          <div className="flex gap-2 justify-end pt-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSwap} disabled={swapMutation.isPending}>
-              {swapMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Swapping…</>
-              ) : (
-                "Confirm Swap"
-              )}
-            </Button>
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+            <button className="btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn-primary" onClick={handleSwap} disabled={swapMutation.isPending}>
+              {swapMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Swapping…</> : "Confirm Swap"}
+            </button>
           </div>
         </div>
       </DialogContent>
@@ -253,586 +176,334 @@ function SwapModal({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main page
-// ---------------------------------------------------------------------------
-
+/* ─── Main component ─────────────────────────────────────── */
 export default function Keywords() {
-  const [, navigate] = useLocation();
+  const { user, loading: userLoading } = useAuth();
+  const [, setLocation] = useLocation();
   const [subStage, setSubStage] = useState<SubStage>("assign");
   const [swapTarget, setSwapTarget] = useState<KwRow | null>(null);
 
-  const { data: user, isLoading: userLoading } = trpc.auth.me.useQuery();
-  const { data: business, isLoading: bizLoading } = trpc.business.get.useQuery(undefined, {
-    enabled: !!user,
-  });
-
+  const { data: businesses, isLoading: bizLoading } = trpc.business.listAll.useQuery(undefined, { retry: false });
+  const business = businesses?.[0];
   const businessId = business?.id ?? 0;
+  const currentStage = business?.currentStage ?? 1;
 
-  const {
-    data: kwData,
-    isLoading: kwLoading,
-    refetch: refetchKw,
-  } = trpc.keywords.getAll.useQuery(
+  const { data: kwData, isLoading: kwLoading, refetch: refetchKw } = trpc.keywords.getAll.useQuery(
     { businessId },
     { enabled: !!businessId }
   );
 
-  // Auth guard
-  useEffect(() => {
-    if (!userLoading && !user) navigate("/login");
-  }, [user, userLoading, navigate]);
-
-  // Stage guard — must have completed Stage 2
-  useEffect(() => {
-    if (!bizLoading && business && (business.currentStage ?? 1) < 3) {
-      navigate("/architecture");
-    }
-  }, [business, bizLoading, navigate]);
-
-  // Determine sub-stage from existing data
-  useEffect(() => {
-    if (!kwData) return;
-    if (kwData.length === 0) {
-      setSubStage("assign");
-      return;
-    }
-    const allKwApproved = kwData.every((k) => k.keywordApproved);
-    const allPaaApproved = kwData.every((k) => k.paaApproved);
-    if (allPaaApproved) {
-      setSubStage("complete");
-    } else if (allKwApproved) {
-      setSubStage("paa-review");
-    } else {
-      setSubStage("keyword-review");
-    }
+  // Auto-advance sub-stage based on data
+  useMemo(() => {
+    if (!kwData?.length) return;
+    const allKwApproved = kwData.every(k => k.keywordApproved);
+    const allPaaApproved = kwData.every(k => k.paaApproved);
+    if (allPaaApproved) { setSubStage("complete"); return; }
+    if (allKwApproved) { setSubStage("paa-review"); return; }
+    if (kwData.some(k => k.primaryKeyword)) setSubStage("keyword-review");
   }, [kwData]);
 
-  // Mutations
-  const assignAll = trpc.keywords.assignAll.useMutation({
+  const assignMutation = trpc.keywords.assignAll.useMutation({
     onSuccess: async (data) => {
       toast.success(`${data.assigned} keywords assigned`);
       await refetchKw();
       setSubStage("keyword-review");
     },
-    onError: (err) => toast.error(err.message, {
-      description: "Keyword assignment failed. Check that your DataForSEO credentials are connected in Settings, then try again.",
-      duration: 8000,
-    }),
+    onError: (err) => toast.error(err.message, { description: "Check your DataForSEO credentials in Settings.", duration: 8000 }),
   });
-
   const approveOne = trpc.keywords.approveOne.useMutation({
-    onSuccess: async () => {
-      await refetchKw();
-    },
+    onSuccess: async () => { await refetchKw(); },
     onError: (err) => toast.error(err.message),
   });
-
   const approveAll = trpc.keywords.approveAll.useMutation({
     onSuccess: async (data) => {
-      toast.success(`${data.approved} keywords approved`);
+      toast.success(`Keywords approved`);
       await refetchKw();
       setSubStage("paa-review");
     },
-    onError: (err) => toast.error(err.message, {
-      description: "Could not approve keywords. Resolve any cannibalization conflicts first, then try again.",
-      duration: 8000,
-    }),
+    onError: (err) => toast.error(err.message, { description: "Resolve cannibalization conflicts first.", duration: 8000 }),
   });
-
   const fetchPAA = trpc.keywords.fetchPAA.useMutation({
-    onSuccess: async (data) => {
-      toast.success(`PAA questions fetched for ${data.fetched} keywords`);
-      await refetchKw();
-    },
-    onError: (err) => toast.error(err.message, {
-      description: "Could not fetch People Also Ask questions. This requires a DataForSEO connection — check your integration settings.",
-      duration: 8000,
-    }),
+    onSuccess: async (data) => { toast.success(`PAA fetched for ${data.fetched} keywords`); await refetchKw(); },
+    onError: (err) => toast.error(err.message, { description: "Check your DataForSEO integration.", duration: 8000 }),
   });
-
   const approvePAA = trpc.keywords.approvePAA.useMutation({
     onSuccess: async (data) => {
       await refetchKw();
-      if (data.stageAdvanced) {
-        toast.success("All PAA approved! Moving to Article Generation.");
-        setSubStage("complete");
-      }
+      if (data.stageAdvanced) { toast.success("All PAA approved! Moving to Article Generation."); setSubStage("complete"); }
     },
     onError: (err) => toast.error(err.message),
   });
 
-  // Derived state
-  const cannibalizationConflicts = useMemo(() => {
-    if (!kwData) return [];
-    return kwData.filter((k) => k.cannibalizationWarning);
-  }, [kwData]);
-
-  /**
-   * Build explicit conflict pairs for the warning banner.
-   * Reconstructed client-side from flagged rows so the banner can show
-   * "Cornerstone 1 vs Pillar 2.1" with exact-duplicate / semantic-overlap labels.
-   */
-  const conflictPairs = useMemo(() => {
-    if (!kwData || cannibalizationConflicts.length === 0) return [];
-    const flagged = cannibalizationConflicts;
-    const pairs: Array<{ labelA: string; kwA: string; labelB: string; kwB: string; type: string }> = [];
-    for (let i = 0; i < flagged.length; i++) {
-      for (let j = i + 1; j < flagged.length; j++) {
-        const a = flagged[i]!;
-        const b = flagged[j]!;
-        const normA = a.primaryKeyword.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
-        const normB = b.primaryKeyword.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
-        const type = normA === normB ? "Exact duplicate" : "Semantic overlap";
-        pairs.push({
-          labelA: deriveNodeLabel(kwData, a),
-          kwA: a.primaryKeyword,
-          labelB: deriveNodeLabel(kwData, b),
-          kwB: b.primaryKeyword,
-          type,
-        });
-      }
-    }
-    return pairs;
-  }, [kwData, cannibalizationConflicts]);
-
-  const allKwApproved = useMemo(
-    () => (kwData?.length ?? 0) > 0 && kwData!.every((k) => k.keywordApproved),
-    [kwData]
-  );
-
-  const allPaaFetched = useMemo(
-    () =>
-      (kwData?.length ?? 0) > 0 &&
-      kwData!.every((k) => {
-        const q = k.paaQuestions as string[] | null;
-        return q && q.length > 0;
-      }),
-    [kwData]
-  );
-
-  const allPaaApproved = useMemo(
-    () => (kwData?.length ?? 0) > 0 && kwData!.every((k) => k.paaApproved),
-    [kwData]
-  );
+  const cannibalizationConflicts = useMemo(() => kwData?.filter(k => k.cannibalizationWarning) ?? [], [kwData]);
+  const allKwApproved = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => k.keywordApproved), [kwData]);
+  const allPaaFetched = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => { const q = k.paaQuestions as string[]|null; return q && q.length > 0; }), [kwData]);
+  const allPaaApproved = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => k.paaApproved), [kwData]);
+  const approvedCount = useMemo(() => kwData?.filter(k => k.keywordApproved).length ?? 0, [kwData]);
+  const totalCount = kwData?.length ?? 0;
 
   if (userLoading || bizLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <DashboardLayout>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", minHeight:400 }}>
+          <Loader2 style={{ width:32, height:32, color:"#6e5afe" }} className="animate-spin" />
+        </div>
+      </DashboardLayout>
     );
   }
-
   if (!user || !business) return null;
 
-  // ---------------------------------------------------------------------------
-  // Sub-stage: Assign
-  // ---------------------------------------------------------------------------
+  /* ── Assign sub-stage ── */
   const renderAssign = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Auto-Assign Keywords
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Blog Batcher will assign one primary keyword to every article slot in your architecture
-          using DataForSEO data and your brand voice brief. You can swap any keyword in the next
-          step.
+    <div style={{ maxWidth:600 }}>
+      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:28 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:"#ede9ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <Sparkles style={{ width:18, height:18, color:"#6e5afe" }} />
+          </div>
+          <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Auto-Assign Keywords</h2>
+        </div>
+        <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:20 }}>
+          Blog Batcher will assign one primary keyword to every article slot in your architecture using DataForSEO data and your brand voice brief. You can swap any keyword in the next step.
         </p>
-        <div className="bg-background rounded-xl border border-border p-4 text-sm text-muted-foreground space-y-1">
-          <div><span className="font-medium">Business:</span> {business.name}</div>
-          <div><span className="font-medium">Location:</span> {business.location ?? "—"}</div>
-          <div><span className="font-medium">Industry:</span> {business.industry ?? "—"}</div>
+        <div style={{ background:"#faf9f5", border:"1px solid #e5e7eb", borderRadius:8, padding:"14px 16px", marginBottom:20, fontSize:13, color:"#6b7280", display:"flex", flexDirection:"column", gap:4 }}>
+          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Business:</span> {business.name}</div>
+          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Location:</span> {business.location ?? "—"}</div>
+          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Industry:</span> {business.industry ?? "—"}</div>
         </div>
-        <Button
-          onClick={() => assignAll.mutate({ businessId })}
-          disabled={assignAll.isPending}
-          className="w-full"
+        <button
+          className="btn-primary"
+          onClick={() => assignMutation.mutate({ businessId })}
+          disabled={assignMutation.isPending}
         >
-          {assignAll.isPending ? (
-            <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Assigning keywords…</>
-          ) : (
-            <><Sparkles className="h-4 w-4 mr-2" /> Assign Keywords</>
-          )}
-        </Button>
-      </CardContent>
-    </Card>
-  );
-
-  // ---------------------------------------------------------------------------
-  // Sub-stage: Keyword Review
-  // ---------------------------------------------------------------------------
-  const renderKeywordReview = () => (
-    <div className="space-y-4">
-      {cannibalizationConflicts.length > 0 && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-sm text-amber-400">
-          <div className="flex items-start gap-3 mb-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-            <p className="font-semibold">
-              {cannibalizationConflicts.length} keyword conflict
-              {cannibalizationConflicts.length !== 1 ? "s" : ""} detected — swap before approving all
-            </p>
-          </div>
-          {conflictPairs.length > 0 && (
-            <ul className="ml-8 space-y-1.5">
-              {conflictPairs.map((pair, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs text-amber-400">
-                  <span className={`px-1.5 py-0.5 rounded font-medium ${
-                    pair.type === "Exact duplicate"
-                      ? "bg-destructive/15 text-destructive"
-                      : "bg-amber-500/15 text-amber-400"
-                  }`}>
-                    {pair.type}
-                  </span>
-                  <span>
-                    <strong>{pair.labelA}</strong> &ldquo;{pair.kwA}&rdquo; conflicts with{" "}
-                    <strong>{pair.labelB}</strong> &ldquo;{pair.kwB}&rdquo;
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <CardTitle className="text-base">Keyword Review</CardTitle>
-              <HelpLink slug="keyword-assignment" label="How keywords are assigned to articles" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => assignAll.mutate({ businessId })}
-                disabled={assignAll.isPending}
-              >
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Re-assign All
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => approveAll.mutate({ businessId })}
-                disabled={approveAll.isPending || cannibalizationConflicts.length > 0}
-              >
-                {approveAll.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                ) : (
-                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                )}
-                Approve All
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-background">
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Level</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Node</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Primary Keyword</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">MSV</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Competition</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {kwLoading ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                      <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                    </td>
-                  </tr>
-                ) : (
-                  kwData?.map((kw) => (
-                    <tr
-                      key={kw.id}
-                      className={`border-b border-border hover:bg-background/50 transition-colors ${
-                        kw.cannibalizationWarning ? "bg-amber-500/5" : ""
-                      }`}
-                    >
-                      <td className="px-4 py-3">{levelBadge(kw.nodeLevel)}</td>
-                      <td className="px-4 py-3 text-xs font-mono text-muted-foreground">
-                        {kwData ? deriveNodeLabel(kwData, kw) : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {articleTypeLabel(kw.nodeArticleType)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          {kw.cannibalizationWarning && (
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          )}
-                          <span className="font-medium text-foreground">{kw.primaryKeyword}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">{msvLabel(kw.monthlySearchVolume)}</td>
-                      <td className="px-4 py-3">{compBadge(kw.competitionLevel)}</td>
-                      <td className="px-4 py-3">
-                        {kw.keywordApproved ? (
-                          <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
-                            <CheckCircle2 className="h-3 w-3 mr-1" /> Approved
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-secondary text-muted-foreground border-border">Pending</Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => setSwapTarget(kw)}
-                          >
-                            Swap
-                          </Button>
-                          {!kw.keywordApproved && (
-                            <Button
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() =>
-                                approveOne.mutate({ businessId, keywordId: kw.id })
-                              }
-                              disabled={approveOne.isPending}
-                            >
-                              Approve
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {allKwApproved && (
-        <div className="flex justify-end">
-          <Button
-            onClick={() => {
-              setSubStage("paa-review");
-              if (!allPaaFetched) {
-                fetchPAA.mutate({ businessId });
-              }
-            }}
-          >
-            Proceed to PAA Review
-            <ArrowRight className="ml-1.5 h-4 w-4" />
-          </Button>
-        </div>
-      )}
+          {assignMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Assigning…</> : <><Sparkles style={{ width:14, height:14 }} /> Assign Keywords</>}
+        </button>
+      </div>
     </div>
   );
 
-  // ---------------------------------------------------------------------------
-  // Sub-stage: PAA Review
-  // ---------------------------------------------------------------------------
+  /* ── Keyword Review sub-stage ── */
+  const renderKeywordReview = () => (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {/* Cannibalization warning */}
+      {cannibalizationConflicts.length > 0 && (
+        <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"12px 16px", display:"flex", gap:10 }}>
+          <AlertTriangle style={{ width:16, height:16, color:"#d97706", flexShrink:0, marginTop:2 }} />
+          <div>
+            <p style={{ fontSize:13, fontWeight:600, color:"#92400e", margin:"0 0 4px" }}>Keyword cannibalization detected</p>
+            <p style={{ fontSize:12, color:"#78350f", margin:0 }}>
+              {cannibalizationConflicts.length} keyword{cannibalizationConflicts.length > 1 ? "s" : ""} may compete with each other. Swap one to resolve.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tip banner */}
+      <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"10px 16px", display:"flex", gap:10, alignItems:"flex-start" }}>
+        <span style={{ fontSize:14, flexShrink:0 }}>💡</span>
+        <p style={{ fontSize:12, color:"#78350f", margin:0, lineHeight:1.6 }}>
+          Aim for a mix of competition levels. A few <strong>high-volume cornerstones</strong> plus easy-win clusters ranks faster than chasing only the big terms.
+        </p>
+      </div>
+
+      {/* Table */}
+      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid #e5e7eb" }}>
+          <h3 style={{ fontSize:14, fontWeight:700, color:"#1a1a2e", margin:0 }}>Proposed articles</h3>
+          <span style={{ fontSize:12, color:"#9ca3af" }}>{approvedCount} / {totalCount} approved</span>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ background:"#faf9f5" }}>
+                {["Level", "Article title", "Keyword", "MSV", "Competition", "Status", ""].map(h => (
+                  <th key={h} style={{ textAlign:"left", padding:"10px 16px", fontSize:11, fontWeight:600, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {kwLoading ? (
+                <tr><td colSpan={7} style={{ textAlign:"center", padding:32 }}>
+                  <Loader2 style={{ width:20, height:20, color:"#6e5afe" }} className="animate-spin" />
+                </td></tr>
+              ) : kwData?.map(kw => (
+                <tr key={kw.id} style={{ borderBottom:"1px solid #f3f4f6", background: kw.cannibalizationWarning ? "#fffbeb" : "transparent" }}>
+                  <td style={{ padding:"12px 16px" }}><LevelBadge level={kw.nodeLevel} /></td>
+                  <td style={{ padding:"12px 16px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      {kw.cannibalizationWarning && <AlertTriangle style={{ width:13, height:13, color:"#d97706", flexShrink:0 }} />}
+                      <span style={{ fontSize:13, fontWeight:500, color:"#1a1a2e" }}>
+                        {kwData ? deriveNodeLabel(kwData, kw) : "—"}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ padding:"12px 16px" }}>
+                    <span style={{ fontSize:12, fontFamily:"monospace", color:"#6b7280", background:"#f3f4f6", padding:"2px 6px", borderRadius:4 }}>{kw.primaryKeyword}</span>
+                  </td>
+                  <td style={{ padding:"12px 16px", fontSize:13, fontWeight:600, color: kw.monthlySearchVolume && kw.monthlySearchVolume >= 1000 ? "#16a34a" : "#6b7280" }}>
+                    {kw.monthlySearchVolume !== null ? kw.monthlySearchVolume.toLocaleString() : "—"}
+                  </td>
+                  <td style={{ padding:"12px 16px" }}><CompBadge comp={kw.competitionLevel} /></td>
+                  <td style={{ padding:"12px 16px" }}><StatusBadge approved={kw.keywordApproved} /></td>
+                  <td style={{ padding:"12px 16px" }}>
+                    <div style={{ display:"flex", gap:6 }}>
+                      <button className="btn-ghost" style={{ padding:"5px 12px", fontSize:12 }} onClick={() => setSwapTarget(kw)}>Swap</button>
+                      {!kw.keywordApproved && (
+                        <button className="btn-primary" style={{ padding:"5px 12px", fontSize:12 }}
+                          onClick={() => approveOne.mutate({ businessId, keywordId: kw.id })}
+                          disabled={approveOne.isPending}>
+                          Approve
+                        </button>
+                      )}
+                      {kw.keywordApproved && (
+                        <button className="btn-ghost" style={{ padding:"5px 12px", fontSize:12 }}
+                          onClick={() => approveOne.mutate({ businessId, keywordId: kw.id })}>
+                          Undo
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Bottom actions */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <button className="btn-ghost" onClick={() => setLocation("/architecture")}>← Back to architecture</button>
+        {allKwApproved && (
+          <button className="btn-primary" onClick={() => {
+            setSubStage("paa-review");
+            if (!allPaaFetched) fetchPAA.mutate({ businessId });
+          }}>
+            Generate {totalCount} articles <ArrowRight style={{ width:14, height:14 }} />
+          </button>
+        )}
+        {!allKwApproved && (
+          <button className="btn-primary" onClick={() => approveAll.mutate({ businessId })} disabled={approveAll.isPending || cannibalizationConflicts.length > 0}>
+            {approveAll.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Approving…</> : "Approve all"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  /* ── PAA Review sub-stage ── */
   const renderPAAReview = () => (
-    <div className="space-y-4">
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
       {fetchPAA.isPending && (
-        <div className="flex items-center gap-3 p-4 bg-primary/10 border border-primary/30 rounded-xl text-sm text-primary">
-          <Loader2 className="h-4 w-4 animate-spin" />
+        <div style={{ background:"#ede9ff", border:"1px solid #c4b5fd", borderRadius:10, padding:"12px 16px", display:"flex", gap:10, alignItems:"center", fontSize:13, color:"#6e5afe" }}>
+          <Loader2 style={{ width:14, height:14 }} className="animate-spin" />
           Fetching People Also Ask questions from DataForSEO…
         </div>
       )}
-
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <CardTitle className="text-base">People Also Ask Review</CardTitle>
-              <HelpLink slug="people-also-ask" label="What is People Also Ask and why it matters" />
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchPAA.mutate({ businessId })}
-              disabled={fetchPAA.isPending}
-            >
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-              Re-fetch PAA
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Select the best PAA question for each article. This becomes the opening answer block.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {kwData?.map((kw) => {
+      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden" }}>
+        <div style={{ padding:"14px 20px", borderBottom:"1px solid #e5e7eb" }}>
+          <h3 style={{ fontSize:14, fontWeight:700, color:"#1a1a2e", margin:0 }}>People Also Ask</h3>
+          <p style={{ fontSize:12, color:"#9ca3af", margin:"4px 0 0" }}>Select one PAA question per article to use as an H2 subheading</p>
+        </div>
+        <div style={{ padding:20, display:"flex", flexDirection:"column", gap:16 }}>
+          {kwData?.map(kw => {
             const questions = (kw.paaQuestions as string[] | null) ?? [];
             return (
-              <div
-                key={kw.id}
-                className={`p-4 rounded-xl border ${
-                  kw.paaApproved ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-card"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      {levelBadge(kw.nodeLevel)}
-                      {kw.paaApproved && (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      )}
-                    </div>
-                    <p className="font-medium text-foreground text-sm">{kw.primaryKeyword}</p>
-                  </div>
+              <div key={kw.id} style={{ background:"#faf9f5", border:"1px solid #e5e7eb", borderRadius:10, padding:16 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                  <LevelBadge level={kw.nodeLevel} />
+                  <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e" }}>{kw.primaryKeyword}</span>
+                  {kw.paaApproved && <CheckCircle2 style={{ width:14, height:14, color:"#22c55e", marginLeft:"auto" }} />}
                 </div>
-
                 {questions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">No PAA questions found for this keyword.</p>
-                ) : kw.paaApproved ? (
-                  <div className="text-sm text-emerald-400 font-medium">
-                    ✓ {kw.approvedPaaQuestion}
-                  </div>
+                  <p style={{ fontSize:12, color:"#9ca3af", margin:0 }}>No PAA questions available — skip or retry.</p>
                 ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                      Select a question:
-                    </p>
-                    <Select
-                      onValueChange={(q) =>
-                        approvePAA.mutate({
-                          businessId,
-                          keywordId: kw.id,
-                          approvedQuestion: q,
-                        })
-                      }
-                    >
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Choose a PAA question…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {questions.map((q) => (
-                          <SelectItem key={q} value={q}>
-                            {q}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Select
+                    value={kw.approvedPaaQuestion ?? ""}
+                    onValueChange={q => approvePAA.mutate({ businessId, keywordId: kw.id, approvedQuestion: q })}
+                  >
+                    <SelectTrigger style={{ fontSize:13 }}>
+                      <SelectValue placeholder="Choose a PAA question…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {questions.map(q => <SelectItem key={q} value={q}>{q}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
             );
           })}
-        </CardContent>
-      </Card>
-
+        </div>
+      </div>
       {allPaaApproved && (
-        <div className="flex justify-end">
-          <Button onClick={() => navigate("/dashboard")}>
-            Proceed to Article Generation
-            <ArrowRight className="ml-1.5 h-4 w-4" />
-          </Button>
+        <div style={{ display:"flex", justifyContent:"flex-end" }}>
+          <button className="btn-primary" onClick={() => setLocation("/generate")}>
+            Proceed to Article Generation <ArrowRight style={{ width:14, height:14 }} />
+          </button>
         </div>
       )}
     </div>
   );
 
-  // ---------------------------------------------------------------------------
-  // Sub-stage: Complete
-  // ---------------------------------------------------------------------------
+  /* ── Complete sub-stage ── */
   const renderComplete = () => (
-    <Card>
-      <CardContent className="py-12 text-center space-y-4">
-        <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-        <h2 className="text-xl font-bold text-foreground">Stage 3 Complete</h2>
-        <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-          All keywords and PAA questions are approved. Your articles are ready for generation.
-        </p>
-        <Button onClick={() => navigate("/dashboard")}>
-          Go to Dashboard
-          <ArrowRight className="ml-1.5 h-4 w-4" />
-        </Button>
-      </CardContent>
-    </Card>
+    <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:48, textAlign:"center" }}>
+      <CheckCircle2 style={{ width:48, height:48, color:"#22c55e", margin:"0 auto 16px" }} />
+      <h2 style={{ fontSize:20, fontWeight:700, color:"#1a1a2e", marginBottom:8 }}>Stage 3 Complete</h2>
+      <p style={{ fontSize:13, color:"#6b7280", maxWidth:360, margin:"0 auto 24px" }}>
+        All keywords and PAA questions are approved. Your articles are ready for generation.
+      </p>
+      <button className="btn-primary" onClick={() => setLocation("/generate")}>
+        Go to Article Generation <ArrowRight style={{ width:14, height:14 }} />
+      </button>
+    </div>
   );
 
-  // ---------------------------------------------------------------------------
-  // Progress steps
-  // ---------------------------------------------------------------------------
-  const STEPS = [
-    { id: "assign", label: "Assign" },
-    { id: "keyword-review", label: "Keyword Review" },
-    { id: "paa-review", label: "PAA Review" },
-    { id: "complete", label: "Approved" },
-  ];
-
-  const stepIndex = STEPS.findIndex((s) => s.id === subStage);
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top nav */}
-      <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between">
-        <span className="text-xl font-bold text-foreground tracking-tight">
-          Blog <span className="text-primary">Batcher</span>
-        </span>
-        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-          <ArrowLeft className="h-4 w-4 mr-1.5" />
-          Dashboard
-        </Button>
-      </header>
+    <DashboardLayout>
+      <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
+        {/* Stage stepper */}
+        <StageStepper currentStage={currentStage} />
 
-      <main className="max-w-5xl mx-auto px-6 py-10">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground">Stage 3: Keyword Research</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {business.name} · {(kwData?.length ?? 0)} article slots
-          </p>
-        </div>
-
-        {/* Progress steps */}
-        <div className="flex items-center gap-0 mb-8">
-          {STEPS.map((step, i) => {
-            const isComplete = i < stepIndex;
-            const isCurrent = i === stepIndex;
-            return (
-              <div key={step.id} className="flex items-center">
-                <div
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    isCurrent
-                      ? "bg-primary text-white"
-                      : isComplete
-                      ? "bg-emerald-500/15 text-emerald-400"
-                      : "bg-secondary text-muted-foreground"
-                  }`}
-                >
-                  {isComplete ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-                  {step.label}
-                </div>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={`h-px w-6 mx-1 ${
-                      i < stepIndex ? "bg-emerald-300" : "bg-secondary"
-                    }`}
-                  />
-                )}
+        {/* Scrollable content */}
+        <div style={{ flex:1, overflowY:"auto", padding:"24px 32px", background:"#faf9f5" }}>
+          {/* Page header */}
+          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24 }}>
+            <div>
+              <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#9ca3af", marginBottom:6 }}>
+                Stage 3 · Keyword Research
               </div>
-            );
-          })}
-        </div>
+              <h1 style={{ fontSize:32, fontWeight:800, color:"#1a1a2e", lineHeight:1.15, margin:0 }}>
+                Lock the keywords <em style={{ fontFamily:"Lora, Georgia, serif", fontStyle:"italic", fontWeight:600 }}>worth</em> ranking for.
+              </h1>
+              <p style={{ fontSize:14, color:"#6b7280", marginTop:8 }}>
+                {approvedCount} of {totalCount} approved. Swap any that don't fit — then generate the batch.
+              </p>
+            </div>
+            {subStage === "keyword-review" && allKwApproved && (
+              <button className="btn-primary" style={{ flexShrink:0, marginTop:4 }}
+                onClick={() => { setSubStage("paa-review"); if (!allPaaFetched) fetchPAA.mutate({ businessId }); }}>
+                Generate {totalCount} articles
+              </button>
+            )}
+            {subStage === "keyword-review" && !allKwApproved && (
+              <div style={{ display:"flex", gap:8, flexShrink:0, marginTop:4 }}>
+                <button className="btn-ghost">Filter</button>
+                <button className="btn-primary"
+                  onClick={() => approveAll.mutate({ businessId })}
+                  disabled={approveAll.isPending || cannibalizationConflicts.length > 0}>
+                  {approveAll.isPending ? "Approving…" : `Generate ${totalCount} articles`}
+                </button>
+              </div>
+            )}
+          </div>
 
-        {/* Sub-stage content */}
-        {subStage === "assign" && renderAssign()}
-        {subStage === "keyword-review" && renderKeywordReview()}
-        {subStage === "paa-review" && renderPAAReview()}
-        {subStage === "complete" && renderComplete()}
-      </main>
+          {/* Sub-stage content */}
+          {subStage === "assign" && renderAssign()}
+          {subStage === "keyword-review" && renderKeywordReview()}
+          {subStage === "paa-review" && renderPAAReview()}
+          {subStage === "complete" && renderComplete()}
+        </div>
+      </div>
 
       {/* Swap modal */}
       <SwapModal
@@ -840,10 +511,8 @@ export default function Keywords() {
         onClose={() => setSwapTarget(null)}
         businessId={businessId}
         kwRow={swapTarget}
-        onSwapped={async () => {
-          await refetchKw();
-        }}
+        onSwapped={async () => { await refetchKw(); }}
       />
-    </div>
+    </DashboardLayout>
   );
 }

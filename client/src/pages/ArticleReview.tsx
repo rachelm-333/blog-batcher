@@ -16,6 +16,8 @@
  *  approved        → ✓ Approved (green)
  */
 
+import DashboardLayout from "@/components/DashboardLayout";
+import StageStepper from "@/components/StageStepper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -431,9 +433,13 @@ export default function ArticleReview() {
 
   const metaTitleLen = seoEdits.metaTitle.length;
   const metaDescLen = seoEdits.metaDescription.length;
+  const currentStage = business?.currentStage ?? 1;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <DashboardLayout>
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", background:"#faf9f5" }}>
+      <StageStepper currentStage={currentStage} />
+      <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       {/* ── Left sidebar: article list ─────────────────────────────────── */}
       <div className="w-72 min-w-[280px] border-r border-border flex flex-col bg-card overflow-y-auto">
         {/* Header */}
@@ -808,5 +814,7 @@ export default function ArticleReview() {
         )}
       </div>
     </div>
+    </div>
+    </DashboardLayout>
   );
 }

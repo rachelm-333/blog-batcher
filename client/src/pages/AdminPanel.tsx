@@ -15,6 +15,7 @@
  *   Admin Log    — admin_log entries
  */
 
+import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -990,7 +991,7 @@ export default function AdminPanel() {
   if (!isAdmin) return null;
 
   return (
-    <>
+    <DashboardLayout>
       {impersonationQuery.data?.isImpersonating && impersonationQuery.data?.adminUserId != null && (
         <ImpersonationBanner adminUserId={impersonationQuery.data.adminUserId} />
       )}
@@ -1044,6 +1045,6 @@ export default function AdminPanel() {
           </Tabs>
         </div>
       </div>
-    </>
+    </DashboardLayout>
   );
 }
