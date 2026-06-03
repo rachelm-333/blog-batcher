@@ -958,3 +958,25 @@ export const apiCostLogRelations = relations(apiCostLog, ({ one }) => ({
 
 export type ApiCostLog = typeof apiCostLog.$inferSelect;
 export type InsertApiCostLog = typeof apiCostLog.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// KEYWORD SEEDS
+// Up to 10 seed keyword phrases per business, gathered during the business
+// profile wizard. These seeds are used to drive DataForSEO keyword research
+// so that primary keyword assignment is based on real search data rather than
+// AI guesses.
+// ---------------------------------------------------------------------------
+export const keywordSeeds = mysqlTable("keyword_seeds", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  /** The seed keyword phrase, e.g. "pitch deck design". */
+  keyword: varchar("keyword", { length: 255 }).notNull(),
+  /** Display order (0-based). */
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export const keywordSeedsRelations = relations(keywordSeeds, ({ one }) => ({
+  business: one(businesses, { fields: [keywordSeeds.businessId], references: [businesses.id] }),
+}));
+export type KeywordSeed = typeof keywordSeeds.$inferSelect;
+export type InsertKeywordSeed = typeof keywordSeeds.$inferInsert;

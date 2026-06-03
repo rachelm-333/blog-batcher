@@ -416,6 +416,12 @@ describe("keywords.assignAll", () => {
           from: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockResolvedValue([{ name: "Pitch Deck Design" }, { name: "Investor Presentations" }]),
+        })
+        // 6th call: keyword seeds — .from().where().orderBy() resolves directly (empty = no pool)
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockResolvedValue([]),
         }),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue({

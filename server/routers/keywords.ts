@@ -20,6 +20,7 @@ import {
   businessServices,
   brandVoice,
   keywords,
+  keywordSeeds,
 } from "../../drizzle/schema";
 import { invokeLLMWithCost } from "../apiCostLogger";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -73,7 +74,8 @@ async function generateKeywordsViaClaude(
   exclusions: string[],
   services: string[],
   description: string,
-  userId?: number | null
+  userId?: number | null,
+  keywordPool?: Array<{ keyword: string; msv: number | null; competition: string | null }>
 ): Promise<Map<number, string>> {
   // Group nodes by level so Claude understands the hierarchy
   const cornerstones = nodes.filter((n) => n.level === "cornerstone");
@@ -88,6 +90,15 @@ async function generateKeywordsViaClaude(
   const servicesText = services.length > 0 ? services.join(", ") : "(not specified)";
   const descText = description ? description.slice(0, 500) : "(not specified)";
   const locationText = location || "Australia";
+
+  // If we have a real keyword pool from DataForSEO, instruct Claude to SELECT from it.
+  // Otherwise Claude generates keywords from scratch.
+  const poolSection = keywordPool && keywordPool.length > 0
+    ? `\nKEYWORD POOL (real data from Google Ads — SELECT from this list, do not invent new ones):\n${keywordPool
+        .slice(0, 80) // cap at 80 to keep prompt manageable
+        .map((k) => `- "${k.keyword}" (MSV: ${k.msv ?? "unknown"}, competition: ${k.competition ?? "unknown"})`)
+        .join("\n")}\n\nIMPORTANT: You MUST assign keywords exclusively from the pool above. Do not invent keywords not in the list.`
+    : "\nIMPORTANT: Do NOT use generic placeholders. Generate real, specific keywords that someone would actually search for when looking for the business's services.";
 
   const prompt = `You are an expert SEO keyword strategist. Your job is to assign one specific, real-world primary keyword to each article slot for the following business.
 
@@ -117,11 +128,10 @@ KEYWORD ASSIGNMENT RULES:
 6. SERVICE RELEVANCE: Keywords must be directly relevant to the actual services/products of ${businessName}: ${servicesText}
 7. LOCAL SEO: Where appropriate for local service businesses, include "${locationText}" as a location modifier.
 8. INTENT MATCHING: Match keyword intent to article type (e.g., "how to" keywords for How-To articles, "best X" for Top 10 lists, "X vs Y" for Comparisons).
-
-IMPORTANT: Do NOT use generic placeholders. Generate real, specific keywords that someone would actually search for when looking for ${businessName}'s services.
+${poolSection}
 
 Return a JSON object mapping node ID (as a string key) to the keyword string.
-Example for a startup pitch deck consultant in Sydney: {"1": "pitch deck consultant Sydney", "2": "investor pitch deck design", "3": "how to write a pitch deck for investors"}`;
+Example: {"1": "pitch deck consultant Sydney", "2": "investor pitch deck design", "3": "how to write a pitch deck for investors"}`;
 
       const response = await invokeLLMWithCost(
     {
@@ -200,7 +210,6 @@ export const keywordsRouter = router({
       // Delete any existing keyword rows for this business (re-assign)
       await db.delete(keywords).where(eq(keywords.businessId, input.businessId));
 
-      // Generate keyword suggestions using Claude (DataForSEO enrichment happens after)
       const exclusions = biz.keywordExclusions
         ? biz.keywordExclusions.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
@@ -214,11 +223,52 @@ export const keywordsRouter = router({
 
       const services = serviceRows.map((s) => s.name);
 
-      // Build description from available fields (businesses table has uniqueValueProposition, not description)
+      // Build description from available fields
       const description = [biz.uniqueValueProposition, biz.serviceArea]
         .filter(Boolean)
         .join(" | ");
 
+      // ── Step A: Build keyword pool from saved seeds via DataForSEO ──────────
+      // If the user completed the Keyword Seeds step, use real Google Ads data.
+      // Otherwise fall back to Claude-only generation.
+      const seedRows = await db
+        .select({ keyword: keywordSeeds.keyword })
+        .from(keywordSeeds)
+        .where(eq(keywordSeeds.businessId, input.businessId))
+        .orderBy(keywordSeeds.sortOrder);
+
+      let keywordPool: Array<{ keyword: string; msv: number | null; competition: string | null }> = [];
+      let dfsData: Map<string, { msv: number | null; comp: "high" | "medium" | "low" | null }> = new Map();
+
+      if (seedRows.length > 0 && process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
+        for (const seed of seedRows) {
+          try {
+            const suggestions = await getKeywordSuggestions(seed.keyword, 2036, "en", 20);
+            keywordPool.push({ keyword: seed.keyword, msv: null, competition: null });
+            for (const s of suggestions) {
+              keywordPool.push({ keyword: s.keyword, msv: s.monthlySearchVolume, competition: s.competitionLevel });
+              dfsData.set(s.keyword, { msv: s.monthlySearchVolume, comp: s.competitionLevel });
+            }
+          } catch (err) {
+            console.warn(`[Keywords] Pool build failed for seed "${seed.keyword}":`, err);
+            keywordPool.push({ keyword: seed.keyword, msv: null, competition: null });
+          }
+        }
+        // Deduplicate
+        const seen = new Set<string>();
+        keywordPool = keywordPool.filter((r) => {
+          const k = r.keyword.toLowerCase().trim();
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        // Sort by MSV descending
+        keywordPool.sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
+        console.log(`[Keywords] Built pool of ${keywordPool.length} keywords from ${seedRows.length} seeds`);
+      }
+
+      // ── Step B: Claude assigns one keyword per article slot ───────────────────
+      // If pool exists, Claude selects from it. Otherwise Claude generates.
       const kwMap = await generateKeywordsViaClaude(
         nodes.map((n) => ({ id: n.id, level: n.level, articleType: n.articleType, sortOrder: n.sortOrder })),
         biz.name,
@@ -228,16 +278,15 @@ export const keywordsRouter = router({
         exclusions,
         services,
         description,
-        ctx.user.id
+        ctx.user.id,
+        keywordPool.length > 0 ? keywordPool : undefined
       );
 
-      // Enrich with DataForSEO data if credentials are available
-      const kwList = Array.from(kwMap.values());
-      let dfsData: Map<string, { msv: number | null; comp: "high" | "medium" | "low" | null }> = new Map();
-
-      if (process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
+      // ── Step C: Enrich any Claude-generated keywords not already in dfsData ──
+      const newKwList = Array.from(kwMap.values()).filter((kw) => !dfsData.has(kw));
+      if (newKwList.length > 0 && process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
         try {
-          const dfsResults = await getKeywordData(kwList);
+          const dfsResults = await getKeywordData(newKwList);
           for (const r of dfsResults) {
             dfsData.set(r.keyword, { msv: r.monthlySearchVolume, comp: r.competitionLevel });
           }

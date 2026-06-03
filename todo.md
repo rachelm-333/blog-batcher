@@ -792,3 +792,36 @@
 - [x] Improved fallback keyword when Claude misses a node (uses first service name instead of "level sortOrder")
 - [x] Updated keywords.test.ts mock to include 5th select() call for businessServices query
 - [x] TypeScript: 0 errors. All 318 tests pass.
+
+## Keyword Seeds — New Step in Business Profile Wizard
+
+### Schema
+- [x] Add keyword_seeds table: id, businessId, keyword (text), sortOrder (int), createdAt
+- [x] Run Drizzle migration and apply to DB
+
+### Backend (server/routers/keywordSeeds.ts)
+- [x] keywordSeeds.suggest — AI scrapes business profile (services, industry, location, UVP) and suggests up to 10 seed keyword ideas
+- [x] keywordSeeds.getAll — return all seeds for a business
+- [x] keywordSeeds.save — upsert full list of seeds (replace all, max 10)
+- [x] keywordSeeds.searchDataForSEO — for each saved seed, call DataForSEO keywords_for_keywords/live and return a pool of real keywords with MSV + competition
+- [x] Register keywordSeeds router in main routers.ts
+
+### Backend: update assignAll
+- [x] keywords.assignAll — before calling Claude, load the keyword pool from DataForSEO seed search results; pass pool to Claude so it selects from real keywords instead of guessing
+- [x] If no seeds exist, fall back to current Claude-guess behaviour
+
+### Frontend: Onboarding Step 9 — Keyword Seeds
+- [x] New step inserted after Step 8 (Social Proof / E-E-A-T) in the onboarding wizard (now Step 8, Review becomes Step 9)
+- [x] "AI Suggest" button: calls keywordSeeds.suggest, populates list with up to 10 seeds
+- [x] Editable seed list: each seed is a text input with a remove (×) button
+- [x] "Add keyword" button: adds a blank input row (max 10 total)
+- [x] "Search DataForSEO" button: calls keywordSeeds.searchDataForSEO, shows results table (keyword, MSV, competition) per seed
+- [x] Results table: user can approve/remove individual keywords from the pool
+- [x] "Regenerate Search" button: re-runs DataForSEO search with current seeds
+- [x] Counter: shows "X of Y keywords found — need N for your blog pack"
+- [x] Save & Continue button: saves seeds, advances to next step
+- [x] Step visible in progress stepper
+
+### Frontend: Stage 3 Keywords page
+- [x] Updated assign description to reference seed step
+- [x] assignAll now uses real keyword pool — loading copy updated

@@ -11,6 +11,7 @@ import Step4BrandVoice from "./onboarding/Step4BrandVoice";
 import Step5Competitors from "./onboarding/Step5Competitors";
 import Step6PublishingPlatform from "./onboarding/Step6PublishingPlatform";
 import Step7SocialProof from "./onboarding/Step7SocialProof";
+import Step8KeywordSeeds from "./onboarding/Step8KeywordSeeds";
 import Step8Review from "./onboarding/Step8Review";
 
 const STEPS = [
@@ -22,6 +23,7 @@ const STEPS = [
   "Competitors",
   "Publishing",
   "Social Proof",
+  "Keyword Seeds",
   "Review",
 ];
 
@@ -252,6 +254,13 @@ export default function Onboarding() {
           />
         )}
         {step === 8 && businessId && (
+          <Step8KeywordSeeds
+            businessId={businessId}
+            onNext={next}
+            onBack={back}
+          />
+        )}
+        {step === 9 && businessId && (
           <Step8Review
             businessId={businessId}
             summary={{

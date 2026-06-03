@@ -13,6 +13,7 @@ import { supportRouter } from "./routers/support";
 import { adminRouter } from "./routers/admin";
 import { paymentsRouter } from "./routers/payments";
 import { trialRouter } from "./routers/trial";
+import { keywordSeedsRouter } from "./routers/keywordSeeds";
 
 export const appRouter = router({
   // Framework system procedures (heartbeat, notifications, etc.)
@@ -82,6 +83,11 @@ export const appRouter = router({
   // Trial status, start free trial, upgrade options.
   // All procedures live in server/routers/trial.ts
   trial: trialRouter,
+
+  // ─── Layer 15: Keyword Seeds ──────────────────────────────────────────────
+  // AI-suggested seed keywords + DataForSEO pool search (Stage 1 Step 9).
+  // All procedures live in server/routers/keywordSeeds.ts
+  keywordSeeds: keywordSeedsRouter,
 });
 
 export type AppRouter = typeof appRouter;

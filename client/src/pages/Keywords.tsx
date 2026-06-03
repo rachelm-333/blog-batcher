@@ -264,7 +264,7 @@ export default function Keywords() {
           <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Auto-Assign Keywords</h2>
         </div>
         <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:20 }}>
-          Blog Batcher will assign one primary keyword to every article slot in your architecture using DataForSEO data and your brand voice brief. You can swap any keyword in the next step.
+          Blog Batcher will assign one primary keyword to every article slot using real DataForSEO data from your keyword seeds (Stage 1 → Step 8). If you haven’t set keyword seeds yet, go back and complete that step first for best results. You can swap any keyword after assignment.
         </p>
         <div style={{ background:"#faf9f5", border:"1px solid #e5e7eb", borderRadius:8, padding:"14px 16px", marginBottom:20, fontSize:13, color:"#6b7280", display:"flex", flexDirection:"column", gap:4 }}>
           <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Business:</span> {business.name}</div>
