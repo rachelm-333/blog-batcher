@@ -199,6 +199,11 @@ export interface ArticleContext {
   parentPillarUrl?: string;
   siblingUrls?: string[];
   allBatchSlugs: string[];
+  bookingsPageUrl?: string;
+  contactPageUrl?: string;
+  testimonialsPageUrl?: string;
+  shopUrl?: string;
+  otherInternalLinks?: Array<{ label: string; url: string }>;
 }
 
 /**
@@ -287,6 +292,13 @@ export async function buildArticleContext(
     parentPillarUrl,
     siblingUrls,
     allBatchSlugs: allOrderedNodes.map(n => `/${n.urlSlug}`),
+    bookingsPageUrl: biz.bookingsPageUrl ?? undefined,
+    contactPageUrl: biz.contactPageUrl ?? undefined,
+    testimonialsPageUrl: biz.testimonialsPageUrl ?? undefined,
+    shopUrl: biz.shopUrl ?? undefined,
+    otherInternalLinks: biz.otherInternalLinks
+      ? (biz.otherInternalLinks as Array<{ label: string; url: string }>)
+      : undefined,
   };
 }
 
@@ -324,6 +336,19 @@ export function buildGenerationPrompt(ctx: ArticleContext): string {
     .filter(Boolean)
     .join("\n");
 
+  // Build optional internal page links section — only include pages that have URLs
+  const optionalPageLinks: string[] = [];
+  if (ctx.contactPageUrl) optionalPageLinks.push(`Contact Page: ${ctx.contactPageUrl}`);
+  if (ctx.bookingsPageUrl) optionalPageLinks.push(`Bookings/Appointments Page: ${ctx.bookingsPageUrl}`);
+  if (ctx.testimonialsPageUrl) optionalPageLinks.push(`Testimonials/Reviews Page: ${ctx.testimonialsPageUrl}`);
+  if (ctx.shopUrl) optionalPageLinks.push(`Shop/E-commerce Page: ${ctx.shopUrl}`);
+  if (ctx.otherInternalLinks?.length) {
+    ctx.otherInternalLinks.forEach(l => optionalPageLinks.push(`${l.label}: ${l.url}`));
+  }
+  const optionalLinksText = optionalPageLinks.length
+    ? optionalPageLinks.join("\n")
+    : null;
+
   return `You are an expert SEO content writer producing a high-authority blog article for an Australian business.
 
 === BUSINESS CONTEXT ===
@@ -338,6 +363,8 @@ Services/Products (use these for internal CTA links):
 ${servicesText || "No services listed"}
 
 Primary CTA: ${ctx.ctaText} → ${ctx.ctaUrl}
+${optionalLinksText ? `\nAdditional internal pages you may link to naturally:\n${optionalLinksText}` : ""}
+${!ctx.bookingsPageUrl ? "IMPORTANT: Do NOT mention bookings, appointments, or scheduling — this business has not provided a bookings URL." : ""}
 
 Competitors (for Comparison articles only):
 ${competitorText}

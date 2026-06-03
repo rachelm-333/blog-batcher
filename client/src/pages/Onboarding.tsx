@@ -193,6 +193,7 @@ export default function Onboarding() {
               testimonialsPageUrl:
                 business?.testimonialsPageUrl ?? scrapeData?.testimonialsPageUrl,
               shopUrl: business?.shopUrl ?? scrapeData?.shopUrl,
+              otherInternalLinks: (business?.otherInternalLinks as any) ?? undefined,
             }}
             onNext={next}
             onBack={back}
