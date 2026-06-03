@@ -372,7 +372,24 @@ export default function Keywords() {
 
       {/* Bottom actions */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <button className="btn-ghost" onClick={() => setLocation("/architecture")}>← Back to architecture</button>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <button className="btn-ghost" onClick={() => setLocation("/architecture")}>← Back to architecture</button>
+          <button
+            className="btn-ghost"
+            style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"#6b7280" }}
+            onClick={() => {
+              if (window.confirm("Re-assign all keywords? This will replace the current keywords with a fresh AI-generated set based on your business services.")) {
+                assignMutation.mutate({ businessId });
+              }
+            }}
+            disabled={assignMutation.isPending}
+            title="Re-run keyword assignment with updated business context"
+          >
+            {assignMutation.isPending
+              ? <><Loader2 style={{ width:12, height:12 }} className="animate-spin" /> Re-assigning…</>
+              : <><RefreshCw style={{ width:12, height:12 }} /> Re-assign keywords</>}
+          </button>
+        </div>
         {allKwApproved && (
           <button className="btn-primary" onClick={() => {
             setSubStage("paa-review");
