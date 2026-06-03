@@ -7,6 +7,11 @@
  *
  * All calls use Basic Auth with the credentials stored in ENV.
  * Docs: https://docs.dataforseo.com/v3/
+ *
+ * NOTE: The search_volume/live endpoint returns data at the TOP LEVEL of each
+ * result item (not nested under keyword_info). competition is a string enum:
+ * "HIGH" | "MEDIUM" | "LOW". This is different from the sandbox/task-based
+ * endpoints which nest data under keyword_info.
  */
 
 import { ENV } from "./_core/env";
@@ -51,6 +56,45 @@ export interface PAAResult {
   questions: string[];
 }
 
+// The actual shape returned by /keywords_data/google_ads/search_volume/live
+// Data is at the TOP LEVEL of each result item (not nested under keyword_info)
+interface DFSSearchVolumeItem {
+  keyword: string;
+  search_volume?: number | null;
+  competition?: string | null;       // "HIGH" | "MEDIUM" | "LOW" | null
+  competition_index?: number | null; // 0-100
+  cpc?: number | null;
+  monthly_searches?: Array<{ year: number; month: number; search_volume: number }>;
+}
+
+// The shape returned by /keywords_data/google_ads/keywords_for_keywords/live
+// This endpoint DOES nest data under keyword_info
+interface DFSKeywordForKeywordsItem {
+  keyword: string;
+  keyword_info?: {
+    search_volume?: number | null;
+    competition?: number | null; // 0-1 float
+    cpc?: number | null;
+  };
+}
+
+function parseCompetitionString(comp: string | null | undefined): "high" | "medium" | "low" | null {
+  if (!comp) return null;
+  switch (comp.toUpperCase()) {
+    case "HIGH": return "high";
+    case "MEDIUM": return "medium";
+    case "LOW": return "low";
+    default: return null;
+  }
+}
+
+function parseCompetitionFloat(comp: number | null | undefined): "high" | "medium" | "low" | null {
+  if (comp === null || comp === undefined) return null;
+  if (comp >= 0.67) return "high";
+  if (comp >= 0.34) return "medium";
+  return "low";
+}
+
 // ---------------------------------------------------------------------------
 // Keyword data — Google Ads Keywords Data API
 // Returns MSV, competition, CPC for a list of keywords.
@@ -62,7 +106,7 @@ export async function getKeywordData(
 ): Promise<KeywordDataResult[]> {
   if (keywords.length === 0) return [];
 
-  // DataForSEO allows max 1000 keywords per task; we chunk just in case
+  // DataForSEO allows max 1000 keywords per task; we chunk to be safe
   const chunks: string[][] = [];
   for (let i = 0; i < keywords.length; i += 100) {
     chunks.push(keywords.slice(i, i + 100));
@@ -71,38 +115,41 @@ export async function getKeywordData(
   const results: KeywordDataResult[] = [];
 
   for (const chunk of chunks) {
-    const body = chunk.map((kw) => ({
-      keywords: [kw],
-      location_code: locationCode,
-      language_code: languageCode,
-      date_from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10),
-    }));
+    // Send all keywords in a single task (not one task per keyword)
+    const body = [
+      {
+        keywords: chunk,
+        location_code: locationCode,
+        language_code: languageCode,
+      },
+    ];
 
     type DFSResponse = {
       status_code: number;
+      status_message?: string;
       tasks?: Array<{
         status_code: number;
-        result?: Array<{
-          keyword: string;
-          keyword_info?: {
-            search_volume?: number;
-            competition?: number;
-            cpc?: number;
-          };
-        }>;
+        status_message?: string;
+        result?: DFSSearchVolumeItem[];
       }>;
     };
 
-    const data = await dfsPost<DFSResponse>(
-      "/keywords_data/google_ads/search_volume/live",
-      body
-    );
+    let data: DFSResponse;
+    try {
+      data = await dfsPost<DFSResponse>(
+        "/keywords_data/google_ads/search_volume/live",
+        body
+      );
+    } catch (err) {
+      console.warn("[DataForSEO] Request failed:", err);
+      for (const kw of chunk) {
+        results.push({ keyword: kw, monthlySearchVolume: null, competitionLevel: null, cpc: null });
+      }
+      continue;
+    }
 
     if (data.status_code !== 20000) {
-      console.warn("[DataForSEO] Non-200 status:", data.status_code);
-      // Return nulls for this chunk rather than throwing
+      console.warn("[DataForSEO] Non-200 status:", data.status_code, data.status_message);
       for (const kw of chunk) {
         results.push({ keyword: kw, monthlySearchVolume: null, competitionLevel: null, cpc: null });
       }
@@ -110,20 +157,17 @@ export async function getKeywordData(
     }
 
     for (const task of data.tasks ?? []) {
+      if (task.status_code !== 20000) {
+        console.warn("[DataForSEO] Task error:", task.status_code, task.status_message);
+        continue;
+      }
       for (const item of task.result ?? []) {
-        const info = item.keyword_info;
-        const comp = info?.competition ?? null;
-        let competitionLevel: "high" | "medium" | "low" | null = null;
-        if (comp !== null) {
-          if (comp >= 0.67) competitionLevel = "high";
-          else if (comp >= 0.34) competitionLevel = "medium";
-          else competitionLevel = "low";
-        }
+        // Data is at the TOP LEVEL — not nested under keyword_info
         results.push({
           keyword: item.keyword,
-          monthlySearchVolume: info?.search_volume ?? null,
-          competitionLevel,
-          cpc: info?.cpc ?? null,
+          monthlySearchVolume: item.search_volume ?? null,
+          competitionLevel: parseCompetitionString(item.competition),
+          cpc: item.cpc ?? null,
         });
       }
     }
@@ -135,6 +179,7 @@ export async function getKeywordData(
 // ---------------------------------------------------------------------------
 // Keyword suggestions — for the "swap" feature
 // Returns up to 10 related keyword suggestions for a given seed keyword.
+// This endpoint DOES nest data under keyword_info.
 // ---------------------------------------------------------------------------
 export async function getKeywordSuggestions(
   seedKeyword: string,
@@ -146,14 +191,7 @@ export async function getKeywordSuggestions(
     status_code: number;
     tasks?: Array<{
       status_code: number;
-      result?: Array<{
-        keyword: string;
-        keyword_info?: {
-          search_volume?: number;
-          competition?: number;
-          cpc?: number;
-        };
-      }>;
+      result?: DFSKeywordForKeywordsItem[];
     }>;
   };
 
@@ -163,15 +201,20 @@ export async function getKeywordSuggestions(
       location_code: locationCode,
       language_code: languageCode,
       limit,
-      filters: [["keyword_info.search_volume", ">", 0]],
       order_by: ["keyword_info.search_volume,desc"],
     },
   ];
 
-  const data = await dfsPost<DFSResponse>(
-    "/keywords_data/google_ads/keywords_for_keywords/live",
-    body
-  );
+  let data: DFSResponse;
+  try {
+    data = await dfsPost<DFSResponse>(
+      "/keywords_data/google_ads/keywords_for_keywords/live",
+      body
+    );
+  } catch (err) {
+    console.warn("[DataForSEO] Suggestions request failed:", err);
+    return [];
+  }
 
   if (data.status_code !== 20000) {
     console.warn("[DataForSEO] Suggestions non-200:", data.status_code);
@@ -181,18 +224,12 @@ export async function getKeywordSuggestions(
   const results: KeywordDataResult[] = [];
   for (const task of data.tasks ?? []) {
     for (const item of task.result ?? []) {
+      // This endpoint nests data under keyword_info
       const info = item.keyword_info;
-      const comp = info?.competition ?? null;
-      let competitionLevel: "high" | "medium" | "low" | null = null;
-      if (comp !== null) {
-        if (comp >= 0.67) competitionLevel = "high";
-        else if (comp >= 0.34) competitionLevel = "medium";
-        else competitionLevel = "low";
-      }
       results.push({
         keyword: item.keyword,
         monthlySearchVolume: info?.search_volume ?? null,
-        competitionLevel,
+        competitionLevel: parseCompetitionFloat(info?.competition),
         cpc: info?.cpc ?? null,
       });
     }
@@ -234,10 +271,16 @@ export async function getPAAQuestions(
     }>;
   };
 
-  const data = await dfsPost<DFSResponse>(
-    "/serp/google/organic/live/advanced",
-    body
-  );
+  let data: DFSResponse;
+  try {
+    data = await dfsPost<DFSResponse>(
+      "/serp/google/organic/live/advanced",
+      body
+    );
+  } catch (err) {
+    console.warn("[DataForSEO] PAA request failed:", err);
+    return keywords.map((kw) => ({ keyword: kw, questions: [] }));
+  }
 
   if (data.status_code !== 20000) {
     console.warn("[DataForSEO] PAA non-200:", data.status_code);
@@ -253,7 +296,6 @@ export async function getPAAQuestions(
     for (const resultSet of task.result ?? []) {
       for (const item of resultSet.items ?? []) {
         if (item.type === "people_also_ask") {
-          // PAA block contains nested items
           for (const paaItem of item.items ?? []) {
             if (paaItem.title) questions.push(paaItem.title);
           }
