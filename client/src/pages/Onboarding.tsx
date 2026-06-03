@@ -31,8 +31,11 @@ export default function Onboarding() {
   const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const search = useSearch();
+  const searchParams = new URLSearchParams(search);
   // ?new=1 means the user is adding a second (or third, etc.) business
-  const isNewBusiness = new URLSearchParams(search).get("new") === "1";
+  const isNewBusiness = searchParams.get("new") === "1";
+  // ?edit=1 means the user is returning to edit their profile after stages are complete
+  const isEditMode = searchParams.get("edit") === "1";
   const [step, setStep] = useState(0);
   const [businessId, setBusinessId] = useState<number | null>(null);
   const [scrapeData, setScrapeData] = useState<any>(null);
@@ -49,11 +52,14 @@ export default function Onboarding() {
     if (!isNewBusiness && business) {
       setBusinessId(business.id);
       // If Stage 1 is already complete (currentStage > 1), redirect to dashboard
-      if (business.currentStage > 1) {
+      // UNLESS we're in edit mode (?edit=1) — then stay and jump straight to step 1
+      if (business.currentStage > 1 && !isEditMode) {
         navigate("/dashboard");
+      } else if (business.currentStage > 1 && isEditMode && step === 0) {
+        setStep(1);
       }
     }
-  }, [business, navigate, isNewBusiness]);
+  }, [business, navigate, isNewBusiness, isEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auth guard
   useEffect(() => {

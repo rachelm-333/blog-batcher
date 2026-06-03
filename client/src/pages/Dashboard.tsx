@@ -15,7 +15,7 @@ import {
 
 /* ── Stage definitions ── */
 const STAGES = [
-  { id: 1, label: "Business profile",   desc: "Website scan, brand voice, services", path: "/onboarding" },
+  { id: 1, label: "Business profile",   desc: "Website scan, brand voice, services", path: "/onboarding?edit=1" },
   { id: 2, label: "Blog architecture",  desc: "Pack size, content hierarchy",         path: "/architecture" },
   { id: 3, label: "Keyword research",   desc: "Primary keywords, PAA questions",      path: "/keywords" },
   { id: 4, label: "Article generation", desc: "AI-written, SEO-optimised articles",   path: "/generate" },
