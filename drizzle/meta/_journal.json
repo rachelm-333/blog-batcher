@@ -43,6 +43,13 @@
       "when": 1780454336270,
       "tag": "0005_complex_garia",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1780455376941,
+      "tag": "0006_free_archangel",
+      "breakpoints": true
     }
   ]
 }

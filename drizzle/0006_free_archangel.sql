@@ -1,0 +1,1 @@
+ALTER TABLE `article_nodes` MODIFY COLUMN `articleType` enum('cornerstone_guide','top_10_list','how_to','the_why','comparison','myth_busting','specialist_post') NOT NULL;

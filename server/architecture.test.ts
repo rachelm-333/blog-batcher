@@ -153,10 +153,10 @@ describe("architectureRules.generateNodes", () => {
     cornerstones.forEach((n) => expect(n.defaultArticleType).toBe("cornerstone_guide"));
   });
 
-  it("assigns case_study to all cluster nodes", () => {
+  it("assigns specialist_post to all cluster nodes", () => {
     const nodes = generateNodes(2, 2);
     const clusters = nodes.filter((n) => n.level === "cluster");
-    clusters.forEach((n) => expect(n.defaultArticleType).toBe("case_study"));
+    clusters.forEach((n) => expect(n.defaultArticleType).toBe("specialist_post"));
   });
 
   it("generates correct labels", () => {

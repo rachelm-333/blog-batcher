@@ -25,7 +25,7 @@ export const ARTICLE_TYPES = [
   "the_why",
   "comparison",
   "myth_busting",
-  "case_study",
+  "specialist_post",
 ] as const;
 export type ArticleType = (typeof ARTICLE_TYPES)[number];
 
@@ -36,14 +36,14 @@ export const ARTICLE_TYPE_LABELS: Record<ArticleType, string> = {
   the_why: "The Why Article",
   comparison: "Comparison Article",
   myth_busting: "Myth-Busting Article",
-  case_study: "Case Study",
+  specialist_post: "Specialist Post",
 };
 
 /** Which article types are valid for each node level */
 export const VALID_TYPES_BY_LEVEL: Record<"cornerstone" | "pillar" | "cluster", ArticleType[]> = {
   cornerstone: ["cornerstone_guide"],
   pillar: ["top_10_list", "how_to", "the_why", "comparison", "myth_busting"],
-  cluster: ["how_to", "myth_busting", "case_study"],
+  cluster: ["how_to", "myth_busting", "specialist_post"],
 };
 
 /** Word count targets from the scope */
@@ -222,7 +222,7 @@ export function generateNodes(
           cornerstoneIndex: c,
           pillarIndex: p,
           clusterIndex: cl,
-          defaultArticleType: "case_study",
+          defaultArticleType: "specialist_post",
           label: `Cluster ${c}.${p}.${cl}`,
         });
       }

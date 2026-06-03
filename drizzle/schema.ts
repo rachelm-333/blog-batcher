@@ -359,7 +359,7 @@ export const articleNodes = mysqlTable("article_nodes", {
     "the_why",
     "comparison",
     "myth_busting",
-    "case_study",
+    "specialist_post",
   ]).notNull(),
   /** Parent cornerstone node ID. Null for cornerstone nodes. */
   parentCornerstoneId: int("parentCornerstoneId"),

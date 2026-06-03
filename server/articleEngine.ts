@@ -314,7 +314,7 @@ export function buildGenerationPrompt(ctx: ArticleContext): string {
     the_why: "The Why Article",
     comparison: "Comparison Article",
     myth_busting: "Myth-Busting Article",
-    case_study: "Case Study",
+    specialist_post: "Specialist Post",
   };
 
   const typeLabel = articleTypeLabel[ctx.articleType] ?? ctx.articleType;

@@ -408,7 +408,7 @@ describe("keywords.assignAll", () => {
           where: vi.fn().mockResolvedValue([
             { id: 1, level: "cornerstone", articleType: "cornerstone_guide", sortOrder: 0 },
             { id: 2, level: "pillar", articleType: "how_to", sortOrder: 1 },
-            { id: 3, level: "cluster", articleType: "case_study", sortOrder: 2 },
+            { id: 3, level: "cluster", articleType: "specialist_post", sortOrder: 2 },
           ]),
         }),
       insert: vi.fn().mockReturnValue({
