@@ -3,9 +3,9 @@
  *
  * The user builds a list of up to 10 seed keyword phrases. The AI suggests
  * seeds from the business profile; the user can edit/add/remove them. Then
- * DataForSEO expands each seed into a pool of real keywords with MSV and
- * competition data. The pool is saved and used in Stage 3 to assign one
- * primary keyword per article slot.
+ * DataForSEO expands each seed into up to 10 real keywords with MSV and
+ * competition data. The user checks the ones they want to focus on — the
+ * selected pool is used in Stage 3 to assign one primary keyword per article.
  */
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,20 +23,27 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronUp,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 
 interface Props {
   businessId: number;
   onNext: () => void;
   onBack: () => void;
+  articlesNeeded?: number; // how many articles in the pack (from architecture)
 }
 
-interface PoolKeyword {
-  seed: string;
+interface SeedKeyword {
   keyword: string;
   msv: number | null;
   competition: string | null;
   cpc: number | null;
+}
+
+interface SeedGroup {
+  seed: string;
+  keywords: SeedKeyword[];
 }
 
 const COMPETITION_COLOUR: Record<string, string> = {
@@ -45,11 +52,13 @@ const COMPETITION_COLOUR: Record<string, string> = {
   low: "#22c55e",
 };
 
-export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props) {
+export default function Step8KeywordSeeds({ businessId, onNext, onBack, articlesNeeded = 18 }: Props) {
   const [seeds, setSeeds] = useState<string[]>([]);
-  const [pool, setPool] = useState<PoolKeyword[]>([]);
+  const [groups, setGroups] = useState<SeedGroup[]>([]);
   const [poolMessage, setPoolMessage] = useState<string>("");
   const [expandedSeeds, setExpandedSeeds] = useState<Set<string>>(new Set());
+  // selected = Set of "seed|||keyword" composite keys
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Load existing seeds on mount
   const { data: existingSeeds, isLoading: seedsLoading } = trpc.keywordSeeds.getAll.useQuery(
@@ -77,12 +86,20 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props)
 
   const searchMutation = trpc.keywordSeeds.searchDataForSEO.useMutation({
     onSuccess: (data) => {
-      setPool(data.results as PoolKeyword[]);
-      setPoolMessage(data.message);
-      // Auto-expand all seeds
-      const seedNames = new Set(data.results.map((r: PoolKeyword) => r.seed));
-      setExpandedSeeds(seedNames);
-      toast.success(data.message);
+      const g = (data as { groups: SeedGroup[]; totalFound: number; message: string }).groups ?? [];
+      setGroups(g);
+      setPoolMessage((data as { message: string }).message);
+      // Auto-expand all seed groups
+      setExpandedSeeds(new Set(g.map((gr) => gr.seed)));
+      // Auto-select all keywords by default
+      const allKeys = new Set<string>();
+      for (const gr of g) {
+        for (const kw of gr.keywords) {
+          allKeys.add(`${gr.seed}|||${kw.keyword}`);
+        }
+      }
+      setSelected(allKeys);
+      toast.success((data as { message: string }).message);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -115,9 +132,8 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props)
       toast.error("Add at least one seed keyword before searching.");
       return;
     }
-    // Save seeds first
+    // Save seeds first, then search
     await saveMutation.mutateAsync({ businessId, seeds: validSeeds });
-    // Then search DataForSEO
     searchMutation.mutate({ businessId });
   };
 
@@ -126,13 +142,6 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props)
     await saveMutation.mutateAsync({ businessId, seeds: validSeeds });
     onNext();
   };
-
-  // Group pool by seed
-  const poolBySeed = pool.reduce<Record<string, PoolKeyword[]>>((acc, item) => {
-    if (!acc[item.seed]) acc[item.seed] = [];
-    acc[item.seed].push(item);
-    return acc;
-  }, {});
 
   const toggleSeedGroup = (seed: string) => {
     setExpandedSeeds((prev) => {
@@ -143,7 +152,36 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props)
     });
   };
 
+  const compositeKey = (seed: string, keyword: string) => `${seed}|||${keyword}`;
+
+  const toggleKeyword = (seed: string, keyword: string) => {
+    const key = compositeKey(seed, keyword);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAllInGroup = (group: SeedGroup) => {
+    const keys = group.keywords.map((kw) => compositeKey(group.seed, kw.keyword));
+    const allSelected = keys.every((k) => selected.has(k));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        keys.forEach((k) => next.delete(k));
+      } else {
+        keys.forEach((k) => next.add(k));
+      }
+      return next;
+    });
+  };
+
   const validSeeds = seeds.filter((s) => s.trim());
+  const totalKeywords = groups.reduce((sum, g) => sum + g.keywords.length, 0);
+  const selectedCount = selected.size;
+  const needMore = Math.max(0, articlesNeeded - selectedCount);
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
@@ -156,8 +194,9 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props)
         <h1 className="text-2xl font-bold">Build your keyword foundation.</h1>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
           These seed phrases tell DataForSEO what topics to research. The AI will suggest seeds based
-          on your business profile — edit them, then hit <strong>Search DataForSEO</strong> to get real
-          search volume data. Your Stage 3 keyword assignment will use this real data instead of AI guesses.
+          on your business profile — edit them, then hit <strong>Search DataForSEO</strong> to get up
+          to 10 real keyword suggestions per seed. Tick the ones you want to focus on — Stage 3 will
+          use your selections to assign one primary keyword per article.
         </p>
       </div>
 
@@ -230,7 +269,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props)
           <div>
             <p className="text-sm font-medium">DataForSEO Keyword Research</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Expands each seed into real keywords with monthly search volume and competition data.
+              Returns up to 10 real keywords per seed with monthly search volume and competition data.
             </p>
           </div>
           <Button
@@ -241,7 +280,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props)
           >
             {searchMutation.isPending || saveMutation.isPending ? (
               <><Loader2 size={13} className="animate-spin" /> Searching…</>
-            ) : pool.length > 0 ? (
+            ) : groups.length > 0 ? (
               <><RefreshCw size={13} /> Regenerate Search</>
             ) : (
               <><Search size={13} /> Search DataForSEO</>
@@ -249,62 +288,133 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack }: Props)
           </Button>
         </div>
 
-        {poolMessage && (
+        {/* Selection counter */}
+        {totalKeywords > 0 && (
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium ${
+            selectedCount >= articlesNeeded
+              ? "bg-green-50 text-green-700 border border-green-200"
+              : "bg-amber-50 text-amber-700 border border-amber-200"
+          }`}>
+            <CheckSquare size={14} />
+            <span>
+              {selectedCount} of {articlesNeeded} keywords selected
+              {needMore > 0
+                ? ` — select ${needMore} more to fill your ${articlesNeeded}-article pack`
+                : " — you have enough to fill your pack ✓"}
+            </span>
+          </div>
+        )}
+
+        {poolMessage && groups.length === 0 && (
           <p className="text-xs text-muted-foreground">{poolMessage}</p>
         )}
 
-        {/* Results grouped by seed */}
-        {pool.length > 0 && (
+        {/* Results grouped by seed — each row has a checkbox */}
+        {groups.length > 0 && (
           <div className="space-y-2 mt-2">
-            {Object.entries(poolBySeed).map(([seed, items]) => (
-              <div key={seed} className="border rounded-md bg-background overflow-hidden">
-                <button
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-muted/30 transition-colors"
-                  onClick={() => toggleSeedGroup(seed)}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="text-primary">{seed}</span>
-                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                      {items.length} keywords
-                    </Badge>
-                  </span>
-                  {expandedSeeds.has(seed) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-                {expandedSeeds.has(seed) && (
-                  <div className="border-t">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b bg-muted/30">
-                          <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Keyword</th>
-                          <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-20">MSV/mo</th>
-                          <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-24">Competition</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((item, i) => (
-                          <tr key={i} className="border-b last:border-0 hover:bg-muted/10">
-                            <td className="px-3 py-1.5">{item.keyword}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums">
-                              {item.msv != null ? item.msv.toLocaleString() : "—"}
-                            </td>
-                            <td className="px-3 py-1.5 text-right">
-                              {item.competition ? (
-                                <span
-                                  className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold text-white"
-                                  style={{ backgroundColor: COMPETITION_COLOUR[item.competition] ?? "#6b7280" }}
-                                >
-                                  {item.competition}
-                                </span>
-                              ) : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            {groups.map((group) => {
+              const groupKeys = group.keywords.map((kw) => compositeKey(group.seed, kw.keyword));
+              const allGroupSelected = groupKeys.length > 0 && groupKeys.every((k) => selected.has(k));
+              const someGroupSelected = groupKeys.some((k) => selected.has(k));
+              const groupSelectedCount = groupKeys.filter((k) => selected.has(k)).length;
+
+              return (
+                <div key={group.seed} className="border rounded-md bg-background overflow-hidden">
+                  {/* Seed group header */}
+                  <div className="flex items-center px-3 py-2 gap-2 hover:bg-muted/20 transition-colors">
+                    {/* Select-all toggle for this group */}
+                    <button
+                      onClick={() => toggleAllInGroup(group)}
+                      className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                      title={allGroupSelected ? "Deselect all in group" : "Select all in group"}
+                    >
+                      {allGroupSelected ? (
+                        <CheckSquare size={15} className="text-primary" />
+                      ) : someGroupSelected ? (
+                        <CheckSquare size={15} className="text-primary/50" />
+                      ) : (
+                        <Square size={15} />
+                      )}
+                    </button>
+                    <button
+                      className="flex-1 flex items-center justify-between text-sm font-medium text-left"
+                      onClick={() => toggleSeedGroup(group.seed)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="text-primary">{group.seed}</span>
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                          {groupSelectedCount}/{group.keywords.length} selected
+                        </Badge>
+                      </span>
+                      {expandedSeeds.has(group.seed) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Keyword rows */}
+                  {expandedSeeds.has(group.seed) && (
+                    <div className="border-t">
+                      {group.keywords.length === 0 ? (
+                        <p className="text-xs text-muted-foreground px-3 py-2">No results returned for this seed.</p>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b bg-muted/30">
+                              <th className="w-8 px-3 py-1.5" />
+                              <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Keyword</th>
+                              <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-20">MSV/mo</th>
+                              <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-24">Competition</th>
+                              <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-16">CPC</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.keywords.map((kw, i) => {
+                              const key = compositeKey(group.seed, kw.keyword);
+                              const isChecked = selected.has(key);
+                              return (
+                                <tr
+                                  key={i}
+                                  className={`border-b last:border-0 cursor-pointer transition-colors ${
+                                    isChecked ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/10"
+                                  }`}
+                                  onClick={() => toggleKeyword(group.seed, kw.keyword)}
+                                >
+                                  <td className="px-3 py-1.5 text-center">
+                                    {isChecked ? (
+                                      <CheckSquare size={13} className="text-primary mx-auto" />
+                                    ) : (
+                                      <Square size={13} className="text-muted-foreground mx-auto" />
+                                    )}
+                                  </td>
+                                  <td className={`px-3 py-1.5 ${isChecked ? "font-medium" : ""}`}>
+                                    {kw.keyword}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums">
+                                    {kw.msv != null ? kw.msv.toLocaleString() : "—"}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right">
+                                    {kw.competition ? (
+                                      <span
+                                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold text-white"
+                                        style={{ backgroundColor: COMPETITION_COLOUR[kw.competition] ?? "#6b7280" }}
+                                      >
+                                        {kw.competition}
+                                      </span>
+                                    ) : "—"}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                                    {kw.cpc != null ? `$${kw.cpc.toFixed(2)}` : "—"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

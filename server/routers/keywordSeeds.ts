@@ -188,63 +188,47 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
         return { results: mockResults, message: "DataForSEO credentials not configured — showing seed keywords only." };
       }
 
-      // Call DataForSEO for each seed
-      const allResults: Array<{
+      // Call DataForSEO for each seed — max 10 results per seed, grouped
+      type SeedGroup = {
         seed: string;
-        keyword: string;
-        msv: number | null;
-        competition: string | null;
-        cpc: number | null;
-      }> = [];
+        keywords: Array<{
+          keyword: string;
+          msv: number | null;
+          competition: string | null;
+          cpc: number | null;
+        }>;
+      };
+      const groups: SeedGroup[] = [];
+      let totalFound = 0;
 
       for (const seed of seeds) {
         try {
-          const suggestions = await getKeywordSuggestions(seed.keyword, input.locationCode, "en", 15);
-          // Include the seed itself first
-          const seedData = suggestions.find((s) => s.keyword.toLowerCase() === seed.keyword.toLowerCase());
-          allResults.push({
+          // Request 11 so we can always show 10 even if the seed itself is in the list
+          const suggestions = await getKeywordSuggestions(seed.keyword, input.locationCode, "en", 11);
+          // Sort by MSV descending, cap at 10
+          const sorted = suggestions
+            .sort((a, b) => (b.monthlySearchVolume ?? 0) - (a.monthlySearchVolume ?? 0))
+            .slice(0, 10);
+          groups.push({
             seed: seed.keyword,
-            keyword: seed.keyword,
-            msv: seedData?.monthlySearchVolume ?? null,
-            competition: seedData?.competitionLevel ?? null,
-            cpc: seedData?.cpc ?? null,
+            keywords: sorted.map((s) => ({
+              keyword: s.keyword,
+              msv: s.monthlySearchVolume,
+              competition: s.competitionLevel,
+              cpc: s.cpc,
+            })),
           });
-          // Add all suggestions (excluding the seed itself)
-          for (const s of suggestions) {
-            if (s.keyword.toLowerCase() !== seed.keyword.toLowerCase()) {
-              allResults.push({
-                seed: seed.keyword,
-                keyword: s.keyword,
-                msv: s.monthlySearchVolume,
-                competition: s.competitionLevel,
-                cpc: s.cpc,
-              });
-            }
-          }
+          totalFound += sorted.length;
         } catch (err) {
           console.warn(`[KeywordSeeds] DataForSEO failed for seed "${seed.keyword}":`, err);
-          allResults.push({ seed: seed.keyword, keyword: seed.keyword, msv: null, competition: null, cpc: null });
+          groups.push({ seed: seed.keyword, keywords: [] });
         }
       }
 
-      // Deduplicate by keyword (keep first occurrence)
-      const seen = new Set<string>();
-      const deduped = allResults.filter((r) => {
-        const key = r.keyword.toLowerCase().trim();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-
-      // Sort: seed keywords first, then by MSV descending
-      deduped.sort((a, b) => {
-        const aIsSeed = a.keyword === a.seed;
-        const bIsSeed = b.keyword === b.seed;
-        if (aIsSeed && !bIsSeed) return -1;
-        if (!aIsSeed && bIsSeed) return 1;
-        return (b.msv ?? 0) - (a.msv ?? 0);
-      });
-
-      return { results: deduped, message: `Found ${deduped.length} keywords from ${seeds.length} seeds.` };
+      return {
+        groups,
+        totalFound,
+        message: `Found ${totalFound} keywords across ${seeds.length} seeds (up to 10 per seed).`,
+      };
     }),
 });
