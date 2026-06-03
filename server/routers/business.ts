@@ -208,8 +208,8 @@ export const businessRouter = router({
         currentStage: 1,
       });
 
-      const insertId = (result as unknown as { insertId: number }).insertId;
-      return { id: insertId };
+      const insertId = (result as any)[0]?.insertId ?? (result as any).insertId;
+      return { id: Number(insertId) };
     }),
 
   // -------------------------------------------------------------------------

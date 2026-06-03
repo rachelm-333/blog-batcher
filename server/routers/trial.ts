@@ -165,7 +165,7 @@ export const trialRouter = router({
         currentStage: 4, // Skip straight to Stage 4 (generation ready)
         isTestBusiness: false,
       });
-      const businessId = (bizResult as any).insertId as number;
+      const businessId = Number((bizResult as any)[0]?.insertId ?? (bizResult as any).insertId);
 
       // Create a minimal trial architecture (packSize=0, 1 cluster)
       const [archResult] = await db.insert(blogArchitectures).values({
@@ -177,7 +177,7 @@ export const trialRouter = router({
         totalArticleCount: 1,
         confirmed: true, // auto-confirmed
       });
-      const architectureId = (archResult as any).insertId as number;
+      const architectureId = Number((archResult as any)[0]?.insertId ?? (archResult as any).insertId);
 
       // Create the single cluster article node
       const [nodeResult] = await db.insert(articleNodes).values({
@@ -187,7 +187,7 @@ export const trialRouter = router({
         articleType: "how_to",
         sortOrder: 0,
       });
-      const nodeId = (nodeResult as any).insertId as number;
+      const nodeId = Number((nodeResult as any)[0]?.insertId ?? (nodeResult as any).insertId);
 
       // Create a placeholder keyword for the cluster node
       await db.insert(keywords).values({
