@@ -68,14 +68,14 @@ interface DFSSearchVolumeItem {
 }
 
 // The shape returned by /keywords_data/google_ads/keywords_for_keywords/live
-// This endpoint DOES nest data under keyword_info
+// Data is at the TOP LEVEL (same as search_volume endpoint) — NOT nested under keyword_info
 interface DFSKeywordForKeywordsItem {
   keyword: string;
-  keyword_info?: {
-    search_volume?: number | null;
-    competition?: number | null; // 0-1 float
-    cpc?: number | null;
-  };
+  search_volume?: number | null;
+  competition?: string | null;       // "HIGH" | "MEDIUM" | "LOW"
+  competition_index?: number | null;
+  cpc?: number | null;
+  monthly_searches?: Array<{ year: number; month: number; search_volume: number }>;
 }
 
 function parseCompetitionString(comp: string | null | undefined): "high" | "medium" | "low" | null {
@@ -177,9 +177,10 @@ export async function getKeywordData(
 }
 
 // ---------------------------------------------------------------------------
-// Keyword suggestions — for the "swap" feature
-// Returns up to 10 related keyword suggestions for a given seed keyword.
-// This endpoint DOES nest data under keyword_info.
+// Keyword suggestions — for the "swap" feature and keyword seed expansion
+// Returns related keyword suggestions for a given seed keyword.
+// The keywords_for_keywords endpoint returns data at the TOP LEVEL (same as
+// search_volume endpoint) — NOT nested under keyword_info.
 // ---------------------------------------------------------------------------
 export async function getKeywordSuggestions(
   seedKeyword: string,
@@ -189,19 +190,22 @@ export async function getKeywordSuggestions(
 ): Promise<KeywordDataResult[]> {
   type DFSResponse = {
     status_code: number;
+    status_message?: string;
     tasks?: Array<{
       status_code: number;
+      status_message?: string;
       result?: DFSKeywordForKeywordsItem[];
     }>;
   };
 
+  // IMPORTANT: field is "keywords" (array), NOT "keyword" (string)
   const body = [
     {
-      keyword: seedKeyword,
+      keywords: [seedKeyword],
       location_code: locationCode,
       language_code: languageCode,
       limit,
-      order_by: ["keyword_info.search_volume,desc"],
+      order_by: ["search_volume,desc"],
     },
   ];
 
@@ -217,20 +221,23 @@ export async function getKeywordSuggestions(
   }
 
   if (data.status_code !== 20000) {
-    console.warn("[DataForSEO] Suggestions non-200:", data.status_code);
+    console.warn("[DataForSEO] Suggestions non-200:", data.status_code, data.status_message);
     return [];
   }
 
   const results: KeywordDataResult[] = [];
   for (const task of data.tasks ?? []) {
+    if (task.status_code !== 20000) {
+      console.warn("[DataForSEO] Suggestions task error:", task.status_code, task.status_message);
+      continue;
+    }
     for (const item of task.result ?? []) {
-      // This endpoint nests data under keyword_info
-      const info = item.keyword_info;
+      // Data is at the TOP LEVEL — not nested under keyword_info
       results.push({
         keyword: item.keyword,
-        monthlySearchVolume: info?.search_volume ?? null,
-        competitionLevel: parseCompetitionFloat(info?.competition),
-        cpc: info?.cpc ?? null,
+        monthlySearchVolume: item.search_volume ?? null,
+        competitionLevel: parseCompetitionString(item.competition),
+        cpc: item.cpc ?? null,
       });
     }
   }
