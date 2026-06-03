@@ -111,13 +111,17 @@ export default function Onboarding() {
             {STEPS.map((label, i) => (
               <div key={i} className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={() => i < step && setStep(i)}
+                  onClick={() => (isEditMode ? setStep(i) : i < step && setStep(i))}
+                  disabled={!isEditMode && i > step}
+                  title={isEditMode ? `Go to ${STEPS[i]}` : i < step ? `Go back to ${STEPS[i]}` : undefined}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     i === step
                       ? "bg-primary text-primary-foreground"
                       : i < step
                       ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30"
-                      : "text-muted-foreground"
+                      : isEditMode
+                      ? "bg-muted text-foreground cursor-pointer hover:bg-primary/20 hover:text-primary"
+                      : "text-muted-foreground cursor-default"
                   }`}
                 >
                   <span
