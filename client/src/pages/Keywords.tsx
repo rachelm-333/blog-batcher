@@ -188,6 +188,7 @@ export default function Keywords() {
   const businessId = business?.id ?? 0;
   const currentStage = business?.currentStage ?? 1;
 
+  const utils = trpc.useUtils();
   const { data: kwData, isLoading: kwLoading, refetch: refetchKw } = trpc.keywords.getAll.useQuery(
     { businessId },
     { enabled: !!businessId }
@@ -206,7 +207,7 @@ export default function Keywords() {
   const assignMutation = trpc.keywords.assignAll.useMutation({
     onSuccess: async (data) => {
       toast.success(`${data.assigned} keywords assigned`);
-      await refetchKw();
+      await utils.keywords.getAll.invalidate({ businessId });
       setSubStage("keyword-review");
     },
     onError: (err) => toast.error(err.message, { description: "Check your DataForSEO credentials in Settings.", duration: 8000 }),
