@@ -29,6 +29,8 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  ClipboardCopy,
+  Code2,
   ExternalLink,
   FileText,
   ImageIcon,
@@ -211,6 +213,45 @@ function ScoreBadgePanel({ badge }: { badge: StatusBadge }) {
     );
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// CopyRow helper
+// ---------------------------------------------------------------------------
+
+function CopyRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    if (!value) return;
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="w-full flex items-start justify-between gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors text-left group"
+      title={`Click to copy ${label}`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">{label}</div>
+        {value ? (
+          <div className={`text-xs text-foreground truncate ${mono ? "font-mono" : ""}`}>
+            {value.length > 120 ? value.slice(0, 120) + "…" : value}
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground italic">Not set</div>
+        )}
+      </div>
+      <div className={`shrink-0 mt-1 text-xs font-medium transition-colors ${
+        copied ? "text-emerald-500" : "text-muted-foreground group-hover:text-primary"
+      }`}>
+        {copied ? "Copied!" : <ClipboardCopy className="h-3.5 w-3.5" />}
+      </div>
+    </button>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -807,6 +848,37 @@ export default function ArticleReview() {
               {selectedItem.internalScore != null && (
                 <div className="text-xs text-muted-foreground text-center">
                   Internal score: {selectedItem.internalScore}/100
+                </div>
+              )}
+
+              {/* ── Copy to Clipboard Export Panel ─────────────────── */}
+              {fullArticle && (
+                <div className="mt-2 rounded-xl border border-border bg-card overflow-hidden">
+                  <div className="px-4 py-3 bg-muted/40 border-b border-border flex items-center gap-2">
+                    <ClipboardCopy className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-foreground">Copy for Manual Publishing</span>
+                    <span className="ml-auto text-[10px] text-muted-foreground">Click any field to copy</span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {([
+                      { label: "URL Slug", value: (fullArticle as any).urlSlug ?? "" },
+                      { label: "Meta Title", value: (fullArticle as any).metaTitle ?? "" },
+                      { label: "Meta Description", value: (fullArticle as any).metaDescription ?? "" },
+                      { label: "Focus Keyword", value: (fullArticle as any).focusKeyword ?? "" },
+                      { label: "Image Alt Text", value: (fullArticle as any).imageAltText ?? "" },
+                    ]).map(({ label, value }) => (
+                      <CopyRow key={label} label={label} value={value} />
+                    ))}
+                    {(fullArticle as any).schemaMarkup && (
+                      <CopyRow label="Schema JSON-LD" value={(fullArticle as any).schemaMarkup} mono />
+                    )}
+                    {(fullArticle as any).bodyMarkdown && (
+                      <CopyRow label="Article Body (Markdown)" value={(fullArticle as any).bodyMarkdown} mono />
+                    )}
+                    {(fullArticle as any).bodyHtml && (
+                      <CopyRow label="Article Body (HTML)" value={(fullArticle as any).bodyHtml} mono />
+                    )}
+                  </div>
                 </div>
               )}
             </div>

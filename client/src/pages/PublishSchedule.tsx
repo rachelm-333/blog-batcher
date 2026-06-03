@@ -352,7 +352,7 @@ export default function PublishSchedule() {
             Choose how your articles will be delivered to your website.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {PUBLISH_METHODS.map((method) => (
+            {PUBLISH_METHODS.filter(m => m.id !== "zapier" && m.id !== "export_zip").map((method) => (
               <button
                 key={method.id}
                 onClick={() => {
@@ -378,6 +378,54 @@ export default function PublishSchedule() {
                 <div className="text-xs text-muted-foreground mt-0.5">{method.description}</div>
               </button>
             ))}
+          </div>
+
+          {/* Website Not Listed? */}
+          <div className="mt-5 rounded-xl border border-dashed border-border bg-muted/20 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm font-semibold text-foreground">Website not listed?</span>
+              <span className="text-xs text-muted-foreground">Use one of these options to publish manually or connect via automation.</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Zapier */}
+              <button
+                type="button"
+                onClick={() => setSelectedMethod("zapier")}
+                className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all ${
+                  selectedMethod === "zapier"
+                    ? "bg-orange-500/10 border-orange-400 shadow-sm"
+                    : "bg-card border-border hover:bg-muted/50"
+                }`}
+              >
+                <Zap className="h-5 w-5 text-orange-500 mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Zapier Webhook</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Send articles to any platform — Shopify, Webflow, Squarespace, Ghost, or any CMS via Zapier automation.
+                  </div>
+                  <div className="mt-2 text-xs text-orange-500 font-medium">Set up webhook URL in Integrations →</div>
+                </div>
+              </button>
+              {/* Download ZIP */}
+              <button
+                type="button"
+                onClick={() => setSelectedMethod("export_zip")}
+                className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all ${
+                  selectedMethod === "export_zip"
+                    ? "bg-primary/10 border-primary shadow-sm"
+                    : "bg-card border-border hover:bg-muted/50"
+                }`}
+              >
+                <Download className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Download ZIP</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Download all articles as HTML + Markdown files with meta data, schema JSON-LD, image alt text, and a schedule CSV. Copy and paste into any CMS manually.
+                  </div>
+                  <div className="mt-2 text-xs text-primary font-medium">Includes all SEO fields for easy copy-paste</div>
+                </div>
+              </button>
+            </div>
           </div>
         </section>
 

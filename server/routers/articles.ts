@@ -428,8 +428,37 @@ export const articlesRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const [row] = await db
-        .select()
+        .select({
+          id: articles.id,
+          articleNodeId: articles.articleNodeId,
+          businessId: articles.businessId,
+          title: articles.title,
+          bodyHtml: articles.bodyHtml,
+          bodyMarkdown: articles.bodyMarkdown,
+          metaTitle: articles.metaTitle,
+          metaDescription: articles.metaDescription,
+          focusKeyword: articles.focusKeyword,
+          urlSlug: articles.urlSlug,
+          schemaMarkup: articles.schemaMarkup,
+          faqItems: articles.faqItems,
+          wordCount: articles.wordCount,
+          internalScore: articles.internalScore,
+          statusBadge: articles.statusBadge,
+          status: articles.status,
+          generationAttempts: articles.generationAttempts,
+          errorMessage: articles.errorMessage,
+          approvedAt: articles.approvedAt,
+          scheduledPublishAt: articles.scheduledPublishAt,
+          publishedAt: articles.publishedAt,
+          cmsPostId: articles.cmsPostId,
+          cmsPostUrl: articles.cmsPostUrl,
+          createdAt: articles.createdAt,
+          updatedAt: articles.updatedAt,
+          imageUrl: articleImages.imageUrl,
+          imageAltText: articleImages.altText,
+        })
         .from(articles)
+        .leftJoin(articleImages, eq(articleImages.articleId, articles.id))
         .where(eq(articles.id, input.articleId))
         .limit(1);
 
@@ -767,9 +796,11 @@ export const articlesRouter = router({
           scheduledPublishAt: articles.scheduledPublishAt,
           nodeLevel: articleNodes.level,
           nodeUrlSlug: articleNodes.urlSlug,
+          imageAltText: articleImages.altText,
         })
         .from(articles)
         .innerJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
+        .leftJoin(articleImages, eq(articleImages.articleId, articles.id))
         .where(
           and(
             eq(articles.businessId, input.businessId),
@@ -819,6 +850,7 @@ ${row.bodyHtml ?? ""}
             `Meta Description: ${row.metaDescription ?? ""}`,
             `Focus Keyword: ${row.focusKeyword ?? ""}`,
             `URL Slug: ${row.urlSlug ?? ""}`,
+            `Image Alt Text: ${(row as any).imageAltText ?? ""}`,
             `Word Count: ${row.wordCount ?? ""}`,
             `Status: ${row.statusBadge ?? ""}`,
             `Level: ${row.nodeLevel ?? ""}`,
