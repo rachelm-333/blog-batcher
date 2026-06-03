@@ -17,6 +17,7 @@ import { z } from "zod";
 import {
   articleNodes,
   businesses,
+  businessServices,
   brandVoice,
   keywords,
 } from "../../drizzle/schema";
@@ -48,6 +49,17 @@ async function assertBusinessOwnership(userId: number, businessId: number) {
   if (!rows.length) throw new TRPCError({ code: "FORBIDDEN", message: "Business not found" });
 }
 
+// Human-readable labels for article types
+const ARTICLE_TYPE_LABEL: Record<string, string> = {
+  cornerstone_guide: "Ultimate Guide",
+  top_10_list: "Top 10 List",
+  how_to: "How-To Guide",
+  the_why: "The Why",
+  comparison: "Comparison",
+  myth_busting: "Myth-Busting",
+  specialist_post: "Specialist Post",
+};
+
 // ---------------------------------------------------------------------------
 // Claude fallback: generate keyword suggestions when DataForSEO is unavailable
 // ---------------------------------------------------------------------------
@@ -59,37 +71,62 @@ async function generateKeywordsViaClaude(
   location: string,
   voiceBrief: string,
   exclusions: string[],
+  services: string[],
+  description: string,
   userId?: number | null
 ): Promise<Map<number, string>> {
+  // Group nodes by level so Claude understands the hierarchy
+  const cornerstones = nodes.filter((n) => n.level === "cornerstone");
+  const pillars = nodes.filter((n) => n.level === "pillar");
+  const clusters = nodes.filter((n) => n.level === "cluster");
+
   const nodeDescriptions = nodes.map(
-    (n) => `Node ${n.id}: level=${n.level}, type=${n.articleType}, order=${n.sortOrder}`
+    (n) =>
+      `Node ${n.id}: [${n.level.toUpperCase()}] ${ARTICLE_TYPE_LABEL[n.articleType] ?? n.articleType} (order ${n.sortOrder})`
   );
 
-  const prompt = `You are an SEO keyword strategist. Assign one primary keyword to each article slot for the following business.
+  const servicesText = services.length > 0 ? services.join(", ") : "(not specified)";
+  const descText = description ? description.slice(0, 500) : "(not specified)";
+  const locationText = location || "Australia";
 
-Business: ${businessName}
-Industry: ${industry}
-Location: ${location}
-Voice brief excerpt: ${voiceBrief.slice(0, 200)}
-Excluded topics: ${exclusions.join(", ") || "none"}
+  const prompt = `You are an expert SEO keyword strategist. Your job is to assign one specific, real-world primary keyword to each article slot for the following business.
 
-Article slots:
+BUSINESS PROFILE:
+- Name: ${businessName}
+- Industry: ${industry}
+- Location: ${locationText}
+- Services/Products offered: ${servicesText}
+- Business description: ${descText}
+- Brand voice excerpt: ${voiceBrief.slice(0, 300)}
+- Excluded topics: ${exclusions.join(", ") || "none"}
+
+ARTICLE ARCHITECTURE OVERVIEW:
+- ${cornerstones.length} Cornerstone article(s) — broad, authoritative hub pages covering the main service/topic areas
+- ${pillars.length} Pillar article(s) — supporting articles that go deeper into specific aspects
+- ${clusters.length} Cluster article(s) — highly specific long-tail articles targeting narrow questions
+
+ARTICLE SLOTS TO ASSIGN KEYWORDS TO:
 ${nodeDescriptions.join("\n")}
 
-Rules:
-- Cornerstones: broad, high-volume keywords (head terms)
-- Pillars: mid-tail keywords within the cornerstone topic
-- Clusters: specific long-tail keywords (3-5 words)
-- Every keyword must be unique — zero cannibalization
-- Australian English, Australian market focus
-- Keywords must match the article type intent
+KEYWORD ASSIGNMENT RULES:
+1. CORNERSTONES: Assign broad, high-intent head-term keywords (1-3 words) that directly represent the main service areas of ${businessName}. These should be the most searched terms in the industry.
+2. PILLARS: Assign mid-tail keywords (2-4 words) that support a cornerstone topic. Each pillar keyword should clearly relate to one of the cornerstone topics.
+3. CLUSTERS: Assign specific long-tail keywords (3-6 words) targeting a narrow question, comparison, or subtopic. These should be highly specific and have clear search intent.
+4. UNIQUENESS: Every single keyword must be completely unique — absolutely zero duplication or semantic overlap between any two slots.
+5. REAL KEYWORDS: All keywords must be real search terms that people actually type into Google. No made-up phrases.
+6. SERVICE RELEVANCE: Keywords must be directly relevant to the actual services/products of ${businessName}: ${servicesText}
+7. LOCAL SEO: Where appropriate for local service businesses, include "${locationText}" as a location modifier.
+8. INTENT MATCHING: Match keyword intent to article type (e.g., "how to" keywords for How-To articles, "best X" for Top 10 lists, "X vs Y" for Comparisons).
 
-Return a JSON object mapping node ID to keyword string only. Example: {"1": "plumber Gold Coast", "2": "emergency plumber Gold Coast"}`;
+IMPORTANT: Do NOT use generic placeholders. Generate real, specific keywords that someone would actually search for when looking for ${businessName}'s services.
 
-  const response = await invokeLLMWithCost(
+Return a JSON object mapping node ID (as a string key) to the keyword string.
+Example for a startup pitch deck consultant in Sydney: {"1": "pitch deck consultant Sydney", "2": "investor pitch deck design", "3": "how to write a pitch deck for investors"}`;
+
+      const response = await invokeLLMWithCost(
     {
       messages: [
-        { role: "system", content: "You are an SEO keyword strategist. Return only valid JSON." },
+        { role: "system", content: "You are an expert SEO keyword strategist. Return only valid JSON with real, specific keywords. Never use placeholder text." },
         { role: "user", content: prompt },
       ],
       response_format: {
@@ -168,13 +205,29 @@ export const keywordsRouter = router({
         ? biz.keywordExclusions.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
 
+      // Fetch all services for this business (used to give Claude real context)
+      const serviceRows = await db
+        .select({ name: businessServices.name })
+        .from(businessServices)
+        .where(eq(businessServices.businessId, input.businessId))
+        .orderBy(businessServices.sortOrder);
+
+      const services = serviceRows.map((s) => s.name);
+
+      // Build description from available fields (businesses table has uniqueValueProposition, not description)
+      const description = [biz.uniqueValueProposition, biz.serviceArea]
+        .filter(Boolean)
+        .join(" | ");
+
       const kwMap = await generateKeywordsViaClaude(
         nodes.map((n) => ({ id: n.id, level: n.level, articleType: n.articleType, sortOrder: n.sortOrder })),
         biz.name,
         biz.industry ?? "",
-        biz.location ?? "",
+        biz.location ?? biz.serviceArea ?? "",
         voice?.finalVoiceBrief ?? "",
         exclusions,
+        services,
+        description,
         ctx.user.id
       );
 
@@ -194,8 +247,12 @@ export const keywordsRouter = router({
       }
 
       // Insert keyword rows
+      // Fallback: if Claude missed a node, generate a reasonable placeholder based on business name + service
+      const fallbackService = services[0] ?? biz.industry ?? "services";
       const insertRows = nodes.map((node) => {
-        const kw = kwMap.get(node.id) ?? `${biz.name} ${node.level} ${node.sortOrder}`;
+        const kw =
+          kwMap.get(node.id) ??
+          `${biz.name} ${fallbackService} ${node.level}`.toLowerCase().replace(/\s+/g, " ").trim();
         const enriched = dfsData.get(kw);
         return {
           articleNodeId: node.id,

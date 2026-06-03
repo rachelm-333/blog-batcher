@@ -785,3 +785,10 @@
 - [x] Granted Rachie admin role + agency tier + 99999 credits + onboarding bypassed
 - [x] Added admin bypass to articles credit gate (admin can generate without credits)
 - [x] Fixed V2c test timeout (increased to 15000ms)
+
+## Keyword Generation Fix (Session: Jun 2026)
+- [x] Fix generateKeywordsViaClaude: now fetches businessServices and passes services list + description/UVP to Claude
+- [x] Rewrote Claude prompt with rich business context: services, description, location, article type labels, hierarchy counts
+- [x] Improved fallback keyword when Claude misses a node (uses first service name instead of "level sortOrder")
+- [x] Updated keywords.test.ts mock to include 5th select() call for businessServices query
+- [x] TypeScript: 0 errors. All 318 tests pass.

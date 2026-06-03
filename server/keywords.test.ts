@@ -399,7 +399,7 @@ describe("keywords.assignAll", () => {
         // 1st call: ownership check (assertBusinessOwnership) — returns [{ id: 1 }]
         .mockReturnValueOnce(makeChainable([{ id: 1 }]))
         // 2nd call: businesses fetch — returns full biz row
-        .mockReturnValueOnce(makeChainable([{ id: 1, keywordExclusions: null }]))
+        .mockReturnValueOnce(makeChainable([{ id: 1, name: "Test Biz", keywordExclusions: null, uniqueValueProposition: null, serviceArea: null, location: null, industry: "Technology" }]))
         // 3rd call: brand voice fetch — returns null (optional)
         .mockReturnValueOnce(makeChainable([]))
         // 4th call: article nodes — .where() resolves directly (no .limit)
@@ -410,6 +410,12 @@ describe("keywords.assignAll", () => {
             { id: 2, level: "pillar", articleType: "how_to", sortOrder: 1 },
             { id: 3, level: "cluster", articleType: "specialist_post", sortOrder: 2 },
           ]),
+        })
+        // 5th call: business services — .from().where().orderBy() resolves directly
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockResolvedValue([{ name: "Pitch Deck Design" }, { name: "Investor Presentations" }]),
         }),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue({
