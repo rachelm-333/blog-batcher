@@ -131,7 +131,8 @@ KEYWORD ASSIGNMENT RULES:
 ${poolSection}
 
 Return a JSON object mapping node ID (as a string key) to the keyword string.
-Example: {"1": "pitch deck consultant Sydney", "2": "investor pitch deck design", "3": "how to write a pitch deck for investors"}`;
+IMPORTANT: Use the EXACT node IDs shown above (e.g. "${nodes[0]?.id ?? 1}", "${nodes[1]?.id ?? 2}", etc.) as the JSON keys — NOT sequential numbers like "1", "2", "3".
+Example using your actual node IDs: {"${nodes[0]?.id ?? 1}": "pitch deck consultant", "${nodes[1]?.id ?? 2}": "investor pitch deck design", "${nodes[2]?.id ?? 3}": "how to write a pitch deck for investors"}`;
 
       const response = await invokeLLMWithCost(
     {
