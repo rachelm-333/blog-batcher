@@ -111,6 +111,8 @@ export const businesses = mysqlTable("businesses", {
     "webflow",
     "squarespace",
     "ghost",
+    "zapier",
+    "download",
   ]),
   /** WordPress SEO plugin selection. Only relevant when cmsPlatform = 'wordpress'. */
   wordpressSeoPlugin: mysqlEnum("wordpressSeoPlugin", [

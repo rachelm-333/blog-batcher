@@ -240,7 +240,7 @@ export const businessRouter = router({
         shopUrl: z.string().optional(),
         otherInternalLinks: z.array(z.object({ label: z.string(), url: z.string() })).optional(),
         cmsPlatform: z
-          .enum(["wordpress", "wix", "shopify", "webflow", "squarespace", "ghost"])
+          .enum(["wordpress", "wix", "shopify", "webflow", "squarespace", "ghost", "zapier", "download"])
           .optional(),
         wordpressSeoPlugin: z.enum(["yoast", "rankmath", "aioseo", "none"]).optional(),
       })
