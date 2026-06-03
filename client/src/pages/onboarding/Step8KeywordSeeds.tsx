@@ -6,6 +6,12 @@
  * DataForSEO expands each seed into up to 10 real keywords with MSV and
  * competition data. The user checks the ones they want to focus on — the
  * selected pool is used in Stage 3 to assign one primary keyword per article.
+ *
+ * Key behaviours:
+ * - Results are sorted by MSV descending (highest volume first)
+ * - Selections PERSIST across searches — adding a new seed and regenerating
+ *   keeps previously selected keywords ticked
+ * - A flat "Selected keywords" panel shows all ticked keywords at a glance
  */
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,13 +31,14 @@ import {
   ChevronUp,
   CheckSquare,
   Square,
+  ArrowUpDown,
 } from "lucide-react";
 
 interface Props {
   businessId: number;
   onNext: () => void;
   onBack: () => void;
-  articlesNeeded?: number; // how many articles in the pack (from architecture)
+  articlesNeeded?: number;
 }
 
 interface SeedKeyword {
@@ -55,12 +62,12 @@ const COMPETITION_COLOUR: Record<string, string> = {
 export default function Step8KeywordSeeds({ businessId, onNext, onBack, articlesNeeded = 18 }: Props) {
   const [seeds, setSeeds] = useState<string[]>([]);
   const [groups, setGroups] = useState<SeedGroup[]>([]);
-  const [poolMessage, setPoolMessage] = useState<string>("");
   const [expandedSeeds, setExpandedSeeds] = useState<Set<string>>(new Set());
-  // selected = Set of "seed|||keyword" composite keys
+  // selected = Set of keyword strings (not composite keys — so selections survive seed changes)
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // All keywords ever seen across all searches, keyed by keyword string
+  const [kwMeta, setKwMeta] = useState<Map<string, SeedKeyword>>(new Map());
 
-  // Load existing seeds on mount
   const { data: existingSeeds, isLoading: seedsLoading } = trpc.keywordSeeds.getAll.useQuery(
     { businessId },
     { enabled: !!businessId }
@@ -87,26 +94,51 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
   const searchMutation = trpc.keywordSeeds.searchDataForSEO.useMutation({
     onSuccess: (data) => {
       const g = (data as { groups: SeedGroup[]; totalFound: number; message: string }).groups ?? [];
-      setGroups(g);
-      setPoolMessage((data as { message: string }).message);
-      // Auto-expand all seed groups
-      setExpandedSeeds(new Set(g.map((gr) => gr.seed)));
-      // Auto-select all keywords by default
-      const allKeys = new Set<string>();
-      for (const gr of g) {
-        for (const kw of gr.keywords) {
-          allKeys.add(`${gr.seed}|||${kw.keyword}`);
+
+      // Sort each group's keywords by MSV descending
+      const sortedGroups = g.map((gr) => ({
+        ...gr,
+        keywords: [...gr.keywords].sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0)),
+      }));
+
+      setGroups(sortedGroups);
+
+      // Merge new keyword metadata — preserve existing entries, add new ones
+      setKwMeta((prev) => {
+        const next = new Map(prev);
+        for (const gr of sortedGroups) {
+          for (const kw of gr.keywords) {
+            if (!next.has(kw.keyword)) {
+              next.set(kw.keyword, kw);
+            }
+          }
         }
-      }
-      setSelected(allKeys);
+        return next;
+      });
+
+      // Auto-expand all seed groups
+      setExpandedSeeds(new Set(sortedGroups.map((gr) => gr.seed)));
+
+      // Auto-select NEW keywords (don't touch existing selections)
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const gr of sortedGroups) {
+          for (const kw of gr.keywords) {
+            // Only auto-select if this keyword wasn't seen before
+            if (!prev.has(kw.keyword) && !kwMeta.has(kw.keyword)) {
+              next.add(kw.keyword);
+            }
+          }
+        }
+        return next;
+      });
+
       toast.success((data as { message: string }).message);
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const handleSuggest = () => {
-    suggestMutation.mutate({ businessId });
-  };
+  const handleSuggest = () => suggestMutation.mutate({ businessId });
 
   const handleAddSeed = () => {
     if (seeds.length >= 10) {
@@ -116,9 +148,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
     setSeeds([...seeds, ""]);
   };
 
-  const handleRemoveSeed = (idx: number) => {
-    setSeeds(seeds.filter((_, i) => i !== idx));
-  };
+  const handleRemoveSeed = (idx: number) => setSeeds(seeds.filter((_, i) => i !== idx));
 
   const handleSeedChange = (idx: number, value: string) => {
     const updated = [...seeds];
@@ -132,7 +162,6 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
       toast.error("Add at least one seed keyword before searching.");
       return;
     }
-    // Save seeds first, then search
     await saveMutation.mutateAsync({ businessId, seeds: validSeeds });
     searchMutation.mutate({ businessId });
   };
@@ -152,20 +181,17 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
     });
   };
 
-  const compositeKey = (seed: string, keyword: string) => `${seed}|||${keyword}`;
-
-  const toggleKeyword = (seed: string, keyword: string) => {
-    const key = compositeKey(seed, keyword);
+  const toggleKeyword = (keyword: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(keyword)) next.delete(keyword);
+      else next.add(keyword);
       return next;
     });
   };
 
   const toggleAllInGroup = (group: SeedGroup) => {
-    const keys = group.keywords.map((kw) => compositeKey(group.seed, kw.keyword));
+    const keys = group.keywords.map((kw) => kw.keyword);
     const allSelected = keys.every((k) => selected.has(k));
     setSelected((prev) => {
       const next = new Set(prev);
@@ -183,6 +209,11 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
   const selectedCount = selected.size;
   const needMore = Math.max(0, articlesNeeded - selectedCount);
 
+  // Build a flat sorted list of selected keywords for the summary panel
+  const selectedKeywords = Array.from(selected)
+    .map((kw) => kwMeta.get(kw) ?? { keyword: kw, msv: null, competition: null, cpc: null })
+    .sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
       {/* Header */}
@@ -193,10 +224,10 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
         </div>
         <h1 className="text-2xl font-bold">Build your keyword foundation.</h1>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          These seed phrases tell DataForSEO what topics to research. The AI will suggest seeds based
-          on your business profile — edit them, then hit <strong>Search DataForSEO</strong> to get up
-          to 10 real keyword suggestions per seed. Tick the ones you want to focus on — Stage 3 will
-          use your selections to assign one primary keyword per article.
+          Enter seed phrases (your core service terms) and hit <strong>Search DataForSEO</strong> to get
+          real keyword ideas with monthly search volume. Tick the ones you want — your selections are
+          saved even when you add new seeds and search again. Stage 3 will use your selected pool to
+          assign one primary keyword per article.
         </p>
       </div>
 
@@ -236,6 +267,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
                   placeholder="e.g. pitch deck design"
                   className="flex-1 h-9 text-sm"
                   maxLength={255}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 />
                 <button
                   onClick={() => handleRemoveSeed(idx)}
@@ -269,7 +301,8 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
           <div>
             <p className="text-sm font-medium">DataForSEO Keyword Research</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Returns up to 10 real keywords per seed with monthly search volume and competition data.
+              Returns up to 10 real keywords per seed, sorted by highest search volume. Your existing
+              selections are preserved when you add seeds and search again.
             </p>
           </div>
           <Button
@@ -289,7 +322,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
         </div>
 
         {/* Selection counter */}
-        {totalKeywords > 0 && (
+        {(totalKeywords > 0 || selectedCount > 0) && (
           <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium ${
             selectedCount >= articlesNeeded
               ? "bg-green-50 text-green-700 border border-green-200"
@@ -305,15 +338,15 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
           </div>
         )}
 
-        {poolMessage && groups.length === 0 && (
-          <p className="text-xs text-muted-foreground">{poolMessage}</p>
-        )}
-
-        {/* Results grouped by seed — each row has a checkbox */}
+        {/* Results grouped by seed */}
         {groups.length > 0 && (
           <div className="space-y-2 mt-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground pb-1">
+              <ArrowUpDown size={11} />
+              Results sorted by highest monthly search volume first
+            </div>
             {groups.map((group) => {
-              const groupKeys = group.keywords.map((kw) => compositeKey(group.seed, kw.keyword));
+              const groupKeys = group.keywords.map((kw) => kw.keyword);
               const allGroupSelected = groupKeys.length > 0 && groupKeys.every((k) => selected.has(k));
               const someGroupSelected = groupKeys.some((k) => selected.has(k));
               const groupSelectedCount = groupKeys.filter((k) => selected.has(k)).length;
@@ -322,7 +355,6 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
                 <div key={group.seed} className="border rounded-md bg-background overflow-hidden">
                   {/* Seed group header */}
                   <div className="flex items-center px-3 py-2 gap-2 hover:bg-muted/20 transition-colors">
-                    {/* Select-all toggle for this group */}
                     <button
                       onClick={() => toggleAllInGroup(group)}
                       className="text-muted-foreground hover:text-primary transition-colors shrink-0"
@@ -361,22 +393,25 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
                             <tr className="border-b bg-muted/30">
                               <th className="w-8 px-3 py-1.5" />
                               <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Keyword</th>
-                              <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-20">MSV/mo</th>
+                              <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-24">
+                                <span className="flex items-center justify-end gap-1">
+                                  <ArrowUpDown size={10} /> MSV/mo
+                                </span>
+                              </th>
                               <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-24">Competition</th>
                               <th className="text-right px-3 py-1.5 font-medium text-muted-foreground w-16">CPC</th>
                             </tr>
                           </thead>
                           <tbody>
                             {group.keywords.map((kw, i) => {
-                              const key = compositeKey(group.seed, kw.keyword);
-                              const isChecked = selected.has(key);
+                              const isChecked = selected.has(kw.keyword);
                               return (
                                 <tr
                                   key={i}
+                                  onClick={() => toggleKeyword(kw.keyword)}
                                   className={`border-b last:border-0 cursor-pointer transition-colors ${
                                     isChecked ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/10"
                                   }`}
-                                  onClick={() => toggleKeyword(group.seed, kw.keyword)}
                                 >
                                   <td className="px-3 py-1.5 text-center">
                                     {isChecked ? (
@@ -388,7 +423,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
                                   <td className={`px-3 py-1.5 ${isChecked ? "font-medium" : ""}`}>
                                     {kw.keyword}
                                   </td>
-                                  <td className="px-3 py-1.5 text-right tabular-nums">
+                                  <td className="px-3 py-1.5 text-right tabular-nums font-medium">
                                     {kw.msv != null ? kw.msv.toLocaleString() : "—"}
                                   </td>
                                   <td className="px-3 py-1.5 text-right">
@@ -418,6 +453,46 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
           </div>
         )}
       </div>
+
+      {/* Selected keywords summary panel */}
+      {selectedCount > 0 && (
+        <div className="border rounded-lg p-4 bg-background space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">
+              Selected keywords ({selectedCount})
+            </p>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+            >
+              Clear all
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedKeywords.map((kw) => (
+              <span
+                key={kw.keyword}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium"
+              >
+                {kw.keyword}
+                {kw.msv != null && (
+                  <span className="text-primary/60 text-[10px]">{kw.msv.toLocaleString()}/mo</span>
+                )}
+                <button
+                  onClick={() => toggleKeyword(kw.keyword)}
+                  className="text-primary/60 hover:text-destructive transition-colors ml-0.5"
+                  title="Remove"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            These keywords will be used as the pool for Stage 3 keyword assignment. You can add more seeds and search again — your selections above are preserved.
+          </p>
+        </div>
+      )}
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-2">
