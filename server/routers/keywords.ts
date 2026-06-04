@@ -12,7 +12,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
   articleNodes,
@@ -613,17 +613,48 @@ export const keywordsRouter = router({
     }),
 
   // -------------------------------------------------------------------------
-  // keywords.getSuggestions
-  // Get keyword swap suggestions for a specific keyword (used by swap modal).
+    // keywords.getSuggestions
+  // Get keyword swap suggestions for the swap modal.
+  // Uses the business's saved seed keywords (not the current bad keyword) to query DataForSEO.
+  // Returns up to 20 real keyword alternatives sorted by MSV descending.
   // -------------------------------------------------------------------------
   getSuggestions: protectedProcedure
     .input(z.object({ businessId: z.number(), keyword: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       await assertBusinessOwnership(ctx.user.id, input.businessId);
-
+      const db = await getDb();
+      if (!db) return [];
+      // Load saved seed keywords for this business
+      const seeds = await db
+        .select({ keyword: keywordSeeds.keyword })
+        .from(keywordSeeds)
+        .where(eq(keywordSeeds.businessId, input.businessId))
+        .orderBy(asc(keywordSeeds.sortOrder));
+      // If seeds exist, use them to build a real pool from DataForSEO
+      if (seeds.length > 0) {
+        const allResults: Array<{ keyword: string; msv: number | null; competition: string | null }> = [];
+        for (const seed of seeds.slice(0, 5)) {
+          try {
+            const results = await getKeywordSuggestions(seed.keyword, 2036, "en", 10);
+            for (const r of results) {
+              allResults.push({ keyword: r.keyword, msv: r.monthlySearchVolume, competition: r.competitionLevel });
+            }
+          } catch {
+            // skip failed seeds
+          }
+        }
+        // Deduplicate and sort by MSV descending
+        const seen = new Set<string>();
+        const deduped = allResults
+          .filter(r => { if (seen.has(r.keyword)) return false; seen.add(r.keyword); return true; })
+          .sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0))
+          .slice(0, 20);
+        if (deduped.length > 0) return deduped;
+      }
+      // Fallback: use the current keyword as the seed (original behaviour)
       try {
         const results = await getKeywordSuggestions(input.keyword, 2036, "en", 10);
-        return results.slice(0, 5).map((r) => ({
+        return results.slice(0, 10).map((r) => ({
           keyword: r.keyword,
           msv: r.monthlySearchVolume,
           competition: r.competitionLevel,
