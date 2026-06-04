@@ -9,8 +9,15 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
-import { Loader2, Zap, CheckCircle2, Clock, AlertTriangle, BarChart2 } from "lucide-react";
+import { Loader2, Zap, CheckCircle2, Clock, AlertTriangle, BarChart2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+
+// Word count minimums per level (must match server)
+const WORD_COUNT_MIN: Record<string, number> = {
+  cornerstone: 2400,
+  pillar: 1500,
+  cluster: 800,
+};
 
 /* ─── Level badge ────────────────────────────────────────── */
 function LevelBadge({ level }: { level: string }) {
@@ -69,6 +76,7 @@ export default function ArticleGeneration() {
   const { user, loading: userLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [generating, setGenerating] = useState(false);
+  const [regenAllRunning, setRegenAllRunning] = useState(false);
 
   const { data: businesses, isLoading: bizLoading } = trpc.business.listAll.useQuery(undefined, { retry: false });
   const business = businesses?.[0];
@@ -79,6 +87,19 @@ export default function ArticleGeneration() {
     { businessId },
     { enabled: !!businessId, refetchInterval: generating ? 3000 : false }
   );
+
+  const regenUnderTargetMutation = trpc.articles.regenerateUnderTarget.useMutation({
+    onSuccess: (data) => {
+      if (data.queued === 0) {
+        toast.success("All articles are already at or above their word count target.");
+      } else {
+        toast.success(`Regenerating ${data.queued} article${data.queued === 1 ? "" : "s"} below target…`);
+        setRegenAllRunning(true);
+        setGenerating(true);
+      }
+    },
+    onError: (err) => { toast.error(err.message); },
+  });
 
   const generateMutation = trpc.articles.startGeneration.useMutation({
     onSuccess: (data) => {
@@ -105,6 +126,21 @@ export default function ArticleGeneration() {
   const allWritten = totalCount > 0 && writtenCount === totalCount;
   const hasArticles = totalCount > 0;
   const canGenerate = currentStage >= 4 && !generating;
+
+  // Count articles under their word count target
+  const underTargetCount = articles?.filter(a => {
+    if (a.status === "generating" || a.status === "approved") return false;
+    const min = WORD_COUNT_MIN[a.level ?? "cluster"] ?? 800;
+    return (a.wordCount ?? 0) < min && a.wordCount !== null && a.wordCount !== undefined;
+  }).length ?? 0;
+
+  // Stop regenAll polling once all are done
+  useEffect(() => {
+    if (!regenAllRunning) return;
+    if (!articles?.length) return;
+    const anyGenerating = articles.some(a => a.status === "generating" || a.status === "pending_generation");
+    if (!anyGenerating) setRegenAllRunning(false);
+  }, [articles, regenAllRunning]);
 
   if (userLoading || bizLoading) {
     return (
@@ -138,21 +174,34 @@ export default function ArticleGeneration() {
                 Each approved keyword becomes a full, SEO-scored draft. One click starts the batch.
               </p>
             </div>
-            {canGenerate && (
-              <button
-                className="btn-primary"
-                style={{ flexShrink:0, marginTop:4 }}
-                onClick={() => generateMutation.mutate({ businessId })}
-                disabled={generateMutation.isPending}
-              >
-                {generateMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Starting…</> : <><Zap style={{ width:14, height:14 }} /> Generate {totalCount || "6"} articles</>}
-              </button>
-            )}
-            {allWritten && (
-              <button className="btn-primary" style={{ flexShrink:0, marginTop:4 }} onClick={() => setLocation("/review")}>
-                Review articles →
-              </button>
-            )}
+            <div style={{ display:"flex", gap:10, flexShrink:0, marginTop:4 }}>
+              {canGenerate && (
+                <button
+                  className="btn-primary"
+                  onClick={() => generateMutation.mutate({ businessId })}
+                  disabled={generateMutation.isPending}
+                >
+                  {generateMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Starting…</> : <><Zap style={{ width:14, height:14 }} /> Generate {totalCount || "6"} articles</>}
+                </button>
+              )}
+              {hasArticles && underTargetCount > 0 && !generating && (
+                <button
+                  className="btn-ghost"
+                  style={{ border:"1.5px solid #6e5afe", color:"#6e5afe", padding:"8px 16px", borderRadius:8, fontSize:13, fontWeight:600, display:"flex", alignItems:"center", gap:6, cursor:"pointer", background:"#fff" }}
+                  onClick={() => regenUnderTargetMutation.mutate({ businessId })}
+                  disabled={regenUnderTargetMutation.isPending}
+                >
+                  {regenUnderTargetMutation.isPending
+                    ? <><Loader2 style={{ width:13, height:13 }} className="animate-spin" /> Queuing…</>
+                    : <><RefreshCw style={{ width:13, height:13 }} /> Regenerate {underTargetCount} under target</>}
+                </button>
+              )}
+              {allWritten && (
+                <button className="btn-primary" onClick={() => setLocation("/review")}>
+                  Review articles →
+                </button>
+              )}
+            </div>
           </div>
 
           {/* KPI cards */}
@@ -198,7 +247,7 @@ export default function ArticleGeneration() {
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
                 <thead>
                   <tr style={{ background:"#faf9f5" }}>
-                    {["Level", "Article title", "Keyword", "SEO score", "Status", ""].map(h => (
+                    {["Level", "Article title", "Keyword", "Words", "SEO score", "Status", ""].map(h => (
                       <th key={h} style={{ textAlign:"left", padding:"10px 16px", fontSize:11, fontWeight:600, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -222,6 +271,19 @@ export default function ArticleGeneration() {
                         <span style={{ fontSize:12, fontFamily:"monospace", color:"#6b7280", background:"#f3f4f6", padding:"2px 6px", borderRadius:4 }}>
                           {article.focusKeyword ?? "—"}
                         </span>
+                      </td>
+                      <td style={{ padding:"12px 16px" }}>
+                        {article.wordCount != null ? (
+                          <span style={{
+                            fontSize:12, fontWeight:600,
+                            color: (() => {
+                              const min = WORD_COUNT_MIN[article.level ?? "cluster"] ?? 800;
+                              return (article.wordCount ?? 0) < min ? "#b45309" : "#166534";
+                            })(),
+                          }}>
+                            {article.wordCount.toLocaleString()}
+                          </span>
+                        ) : <span style={{ color:"#9ca3af", fontSize:12 }}>—</span>}
                       </td>
                       <td style={{ padding:"12px 16px" }}><ScoreRing score={article.internalScore ?? null} /></td>
                       <td style={{ padding:"12px 16px" }}><StatusBadge status={article.status} /></td>

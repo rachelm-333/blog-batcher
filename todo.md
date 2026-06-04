@@ -842,3 +842,8 @@
 - [x] Fix word count max enforcement: articles over max (e.g. 3200 for cornerstone) must be condensed by AI, not just flagged
 - [x] Add tRPC procedure articles.aiEditInstruction — takes articleId + instruction string, rewrites article body following the instruction, returns updated bodyHtml + wordCount
 - [x] Add AI instruction panel to ArticleReview: textarea for natural language instruction + "Apply AI Edit" button, spinner while processing, updates article body on success, shows before/after word count
+
+## Regenerate All Under Target Feature
+- [x] Add regenerateUnderTarget tRPC procedure — finds all articles below their word count min and regenerates them sequentially
+- [x] Add "Regenerate All Under Target" button to ArticleGeneration page with live progress counter
+- [x] Show which article is currently regenerating and how many remain

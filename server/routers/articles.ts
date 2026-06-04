@@ -506,6 +506,65 @@ export const articlesRouter = router({
     }),
 
   /**
+   * Regenerate all articles that are below their word count minimum for their type.
+   * Runs sequentially in the background. Returns the count of articles queued.
+   */
+  regenerateUnderTarget: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      // Word count minimums per article type
+      const WORD_COUNT_MIN: Record<string, number> = {
+        cornerstone: 2400,
+        pillar: 1500,
+        cluster: 800,
+      };
+
+      // Find all articles that are below their word count minimum and not currently generating
+      const allArticles = await db
+        .select({
+          id: articles.id,
+          articleNodeId: articles.articleNodeId,
+          wordCount: articles.wordCount,
+          status: articles.status,
+          level: articleNodes.level,
+        })
+        .from(articles)
+        .innerJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
+        .where(eq(articles.businessId, input.businessId));
+
+      const underTarget = allArticles.filter((a) => {
+        if (a.status === "generating" || a.status === "approved") return false;
+        const min = WORD_COUNT_MIN[a.level ?? "cluster"] ?? 800;
+        return (a.wordCount ?? 0) < min;
+      });
+
+      if (underTarget.length === 0) return { queued: 0 };
+
+      const orderedNodes = await getOrderedNodes(input.businessId);
+
+      // Run sequentially in background so we don't overwhelm the LLM
+      setImmediate(async () => {
+        for (const art of underTarget) {
+          try {
+            console.log(`[Articles] regenerateUnderTarget: starting node ${art.articleNodeId} (${art.level}, ${art.wordCount ?? 0} words)`);
+            await generateAndSave(input.businessId, art.articleNodeId, orderedNodes, false);
+            console.log(`[Articles] regenerateUnderTarget: completed node ${art.articleNodeId}`);
+          } catch (err) {
+            console.error(`[Articles] regenerateUnderTarget: failed for node ${art.articleNodeId}:`, err);
+          }
+        }
+        console.log(`[Articles] regenerateUnderTarget: all ${underTarget.length} articles processed`);
+      });
+
+      return { queued: underTarget.length };
+    }),
+
+  /**
    * Advance article status.
    * Valid transitions: generated → pending_approval, pending_approval → approved
    */
