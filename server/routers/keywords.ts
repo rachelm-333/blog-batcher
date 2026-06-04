@@ -98,7 +98,7 @@ async function generateKeywordsViaClaude(
         .slice(0, 80) // cap at 80 to keep prompt manageable
         .map((k) => `- "${k.keyword}" (MSV: ${k.msv ?? "unknown"}, competition: ${k.competition ?? "unknown"})`)
         .join("\n")}\n\nIMPORTANT: You MUST assign keywords exclusively from the pool above. Do not invent keywords not in the list.`
-    : "\nIMPORTANT: Do NOT use generic placeholders. Generate real, specific keywords that someone would actually search for when looking for the business's services.";
+    : `\nIMPORTANT: No DataForSEO pool is available. Generate real, specific keywords that people actually search for when looking for ${businessName}'s services (${servicesText}). Do NOT use article type names, placeholder text, or the business name as the keyword. Each keyword must be a genuine search phrase.`;
 
   const prompt = `You are an expert SEO keyword strategist. Your job is to assign one specific, real-world primary keyword to each article slot for the following business.
 
@@ -140,26 +140,32 @@ Example using your actual node IDs: {"${nodes[0]?.id ?? 1}": "pitch deck consult
         { role: "system", content: "You are an expert SEO keyword strategist. Return only valid JSON with real, specific keywords. Never use placeholder text." },
         { role: "user", content: prompt },
       ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "keyword_assignments",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: { type: "string" },
-          },
-        },
-      },
+
     },
     { userId, feature: "keyword_research" }
   );
 
-  const content = response?.choices?.[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content)) as Record<string, string>;
+  let content = response?.choices?.[0]?.message?.content ?? "{}";
+  if (typeof content !== "string") content = JSON.stringify(content);
+  // Strip markdown code fences if Claude wraps the JSON
+  const fenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) content = fenceMatch[1].trim();
+  // Extract first {...} block in case there's surrounding text
+  const braceMatch = content.match(/\{[\s\S]*\}/);
+  if (braceMatch) content = braceMatch[0];
+  let parsed: Record<string, string> = {};
+  try {
+    parsed = JSON.parse(content) as Record<string, string>;
+  } catch (e) {
+    console.warn("[Keywords] Claude returned unparseable JSON:", content.slice(0, 200));
+  }
+  console.log(`[Keywords] Claude returned ${Object.keys(parsed).length} keyword assignments`);
   const map = new Map<number, string>();
   for (const [k, v] of Object.entries(parsed)) {
-    map.set(parseInt(k, 10), v);
+    const nodeId = parseInt(k, 10);
+    if (!isNaN(nodeId) && typeof v === "string" && v.trim()) {
+      map.set(nodeId, v.trim());
+    }
   }
   return map;
 }
