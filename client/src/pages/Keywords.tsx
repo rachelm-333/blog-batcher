@@ -3,7 +3,7 @@
  * Matches the BlogBatcher mockup: light cream theme, horizontal stage stepper,
  * serif italic heading, table with Level/Title/Keyword/MSV/Competition/Status/Actions
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -131,12 +131,23 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped }: {
   };
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Swap Keyword</DialogTitle>
-          <DialogDescription>Replace <strong>{kwRow?.primaryKeyword}</strong> with a different keyword.</DialogDescription>
-        </DialogHeader>
-        <div style={{ display:"flex", flexDirection:"column", gap:16, marginTop:8 }}>
+      <DialogContent className="max-w-lg" style={{ display:"flex", flexDirection:"column", maxHeight:"90vh", padding:0, overflow:"hidden" }}>
+        {/* Header */}
+        <div style={{ padding:"20px 24px 16px", borderBottom:"1px solid #e5e7eb", flexShrink:0 }}>
+          <DialogHeader>
+            <DialogTitle>Swap Keyword</DialogTitle>
+            <DialogDescription>Replace <strong>{kwRow?.primaryKeyword}</strong> with a different keyword.</DialogDescription>
+          </DialogHeader>
+          {kwRow?.cannibalizationWarning && (
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, padding:"8px 12px", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:8, fontSize:12, color:"#92400e" }}>
+              <AlertTriangle style={{ width:13, height:13, color:"#d97706", flexShrink:0 }} />
+              <span><strong>Cannibalization conflict</strong> — this keyword overlaps with another article. Swap it to resolve.</span>
+            </div>
+          )}
+        </div>
+
+        {/* Scrollable body */}
+        <div style={{ flex:1, overflowY:"auto", padding:"16px 24px", display:"flex", flexDirection:"column", gap:16 }}>
           {suggestions.isLoading && (
             <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:"#9ca3af" }}>
               <Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Fetching suggestions…
@@ -159,17 +170,27 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped }: {
               </div>
             </div>
           )}
+          {!suggestions.isLoading && (suggestions.data?.length ?? 0) === 0 && (
+            <p style={{ fontSize:12, color:"#9ca3af", margin:0 }}>No suggestions found — enter a keyword manually below.</p>
+          )}
           <div>
             <p style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>Or enter manually</p>
             <Input placeholder="Type a custom keyword…" value={manualKw}
               onChange={e => { setManualKw(e.target.value); setSelected(null); }} />
           </div>
-          <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
-            <button className="btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="btn-primary" onClick={handleSwap} disabled={swapMutation.isPending}>
-              {swapMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Swapping…</> : "Confirm Swap"}
-            </button>
-          </div>
+        </div>
+
+        {/* Sticky footer with action buttons */}
+        <div style={{ padding:"14px 24px", borderTop:"1px solid #e5e7eb", flexShrink:0, display:"flex", gap:8, justifyContent:"flex-end", background:"#fff" }}>
+          {selected && (
+            <span style={{ fontSize:12, color:"#6b7280", alignSelf:"center", marginRight:"auto" }}>
+              Selected: <strong style={{ color:"#1a1a2e" }}>{selected}</strong>
+            </span>
+          )}
+          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" onClick={handleSwap} disabled={swapMutation.isPending}>
+            {swapMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Swapping…</> : "Confirm Swap"}
+          </button>
         </div>
       </DialogContent>
     </Dialog>
@@ -255,7 +276,28 @@ export default function Keywords() {
     onError: (err) => toast.error(err.message),
   });
 
-  const cannibalizationConflicts = useMemo(() => kwData?.filter(k => k.cannibalizationWarning) ?? [], [kwData]);
+  // ── Client-side cannibalization detection ──────────────────────────────────
+  // Re-derive conflicts live from the current kwData so highlighting is always
+  // accurate without waiting for a server approveAll round-trip.
+  const computeConflicts = useCallback((rows: KwRow[] | undefined) => {
+    if (!rows || rows.length === 0) return new Set<number>();
+    const normalise = (kw: string) => kw.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+    const STOP = new Set(["a","an","the","and","or","but","in","on","at","to","for","of","with","by","from","is","are","was","were","be","been","being","have","has","had","do","does","did","will","would","could","should","may","might","shall","can","how","what","when","where","why","who","which","that","this","these","those"]);
+    const tokenSet = (kw: string) => normalise(kw).split(" ").filter(t => t.length > 1 && !STOP.has(t)).sort().join("|");
+    const conflictIds = new Set<number>();
+    for (let i = 0; i < rows.length; i++) {
+      for (let j = i + 1; j < rows.length; j++) {
+        const a = rows[i]!; const b = rows[j]!;
+        const nA = normalise(a.primaryKeyword); const nB = normalise(b.primaryKeyword);
+        if (nA === nB) { conflictIds.add(a.articleNodeId); conflictIds.add(b.articleNodeId); continue; }
+        const tA = tokenSet(a.primaryKeyword); const tB = tokenSet(b.primaryKeyword);
+        if (tA.length > 0 && tA === tB) { conflictIds.add(a.articleNodeId); conflictIds.add(b.articleNodeId); }
+      }
+    }
+    return conflictIds;
+  }, []);
+  const liveConflictNodeIds = useMemo(() => computeConflicts(kwData), [kwData, computeConflicts]);
+  const cannibalizationConflicts = useMemo(() => kwData?.filter(k => liveConflictNodeIds.has(k.articleNodeId)) ?? [], [kwData, liveConflictNodeIds]);
   const allKwApproved = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => k.keywordApproved), [kwData]);
   const allPaaFetched = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => { const q = k.paaQuestions as string[]|null; return q && q.length > 0; }), [kwData]);
   const allPaaApproved = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => k.paaApproved), [kwData]);
@@ -346,12 +388,14 @@ export default function Keywords() {
                 <tr><td colSpan={7} style={{ textAlign:"center", padding:32 }}>
                   <Loader2 style={{ width:20, height:20, color:"#6e5afe" }} className="animate-spin" />
                 </td></tr>
-              ) : kwData?.map(kw => (
-                <tr key={kw.id} style={{ borderBottom:"1px solid #f3f4f6", background: kw.cannibalizationWarning ? "#fffbeb" : "transparent" }}>
+              ) : kwData?.map(kw => {
+                const isConflict = liveConflictNodeIds.has(kw.articleNodeId);
+                return (
+                <tr key={kw.id} style={{ borderBottom:"1px solid #f3f4f6", background: isConflict ? "#fffbeb" : "transparent" }}>
                   <td style={{ padding:"12px 16px" }}><LevelBadge level={kw.nodeLevel} /></td>
                   <td style={{ padding:"12px 16px" }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      {kw.cannibalizationWarning && <AlertTriangle style={{ width:13, height:13, color:"#d97706", flexShrink:0 }} />}
+                      {isConflict && <AlertTriangle style={{ width:13, height:13, color:"#d97706", flexShrink:0 }} />}
                       <span style={{ fontSize:13, fontWeight:500, color:"#1a1a2e" }}>
                         {kwData ? deriveNodeLabel(kwData, kw) : "—"}
                       </span>
@@ -384,7 +428,8 @@ export default function Keywords() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );})
+            }
             </tbody>
           </table>
         </div>
