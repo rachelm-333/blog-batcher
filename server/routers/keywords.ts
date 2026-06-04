@@ -655,12 +655,55 @@ export const keywordsRouter = router({
       await assertBusinessOwnership(ctx.user.id, input.businessId);
       const db = await getDb();
       if (!db) return [];
+
+      // Load all existing keywords for this business so we can filter out conflicts.
+      // We exclude the keyword being swapped (input.keyword) from the conflict set
+      // so the row being replaced doesn't block its own suggestions.
+      const existingKws = await db
+        .select({ primaryKeyword: keywords.primaryKeyword })
+        .from(keywords)
+        .where(eq(keywords.businessId, input.businessId));
+
+      // Build a normalised set of existing keywords (minus the one being swapped)
+      const normalise = (kw: string) =>
+        kw.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+      const STOP = new Set([
+        "a","an","the","and","or","but","in","on","at","to","for","of","with","by",
+        "from","is","are","was","were","be","been","being","have","has","had","do",
+        "does","did","will","would","could","should","may","might","shall","can",
+        "how","what","when","where","why","who","which","that","this","these","those",
+      ]);
+      const tokenSet = (kw: string) =>
+        normalise(kw).split(" ").filter(t => t.length > 1 && !STOP.has(t)).sort().join("|");
+
+      const normCurrentKw = normalise(input.keyword);
+      const existingNorms = new Set<string>();
+      const existingTokenSets = new Set<string>();
+      for (const row of existingKws) {
+        const norm = normalise(row.primaryKeyword);
+        const tset = tokenSet(row.primaryKeyword);
+        // Exclude the row being swapped from the conflict set
+        if (norm === normCurrentKw) continue;
+        existingNorms.add(norm);
+        if (tset.length > 0) existingTokenSets.add(tset);
+      }
+
+      /** Returns true if a candidate keyword would conflict with any existing keyword. */
+      function wouldConflict(candidate: string): boolean {
+        const norm = normalise(candidate);
+        if (existingNorms.has(norm)) return true; // exact duplicate
+        const tset = tokenSet(candidate);
+        if (tset.length > 0 && existingTokenSets.has(tset)) return true; // semantic overlap
+        return false;
+      }
+
       // Load saved seed keywords for this business
       const seeds = await db
         .select({ keyword: keywordSeeds.keyword })
         .from(keywordSeeds)
         .where(eq(keywordSeeds.businessId, input.businessId))
         .orderBy(asc(keywordSeeds.sortOrder));
+
       // If seeds exist, use them to build a real pool from DataForSEO
       if (seeds.length > 0) {
         const allResults: Array<{ keyword: string; msv: number | null; competition: string | null }> = [];
@@ -674,22 +717,31 @@ export const keywordsRouter = router({
             // skip failed seeds
           }
         }
-        // Deduplicate and sort by MSV descending
+        // Deduplicate, filter out conflicts, and sort by MSV descending
         const seen = new Set<string>();
         const deduped = allResults
-          .filter(r => { if (seen.has(r.keyword)) return false; seen.add(r.keyword); return true; })
+          .filter(r => {
+            if (seen.has(r.keyword)) return false;
+            seen.add(r.keyword);
+            if (wouldConflict(r.keyword)) return false; // skip cannibalizing suggestions
+            return true;
+          })
           .sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0))
           .slice(0, 20);
         if (deduped.length > 0) return deduped;
       }
+
       // Fallback: use the current keyword as the seed (original behaviour)
       try {
         const results = await getKeywordSuggestions(input.keyword, 2036, "en", 10);
-        return results.slice(0, 10).map((r) => ({
-          keyword: r.keyword,
-          msv: r.monthlySearchVolume,
-          competition: r.competitionLevel,
-        }));
+        return results
+          .filter(r => !wouldConflict(r.keyword))
+          .slice(0, 10)
+          .map((r) => ({
+            keyword: r.keyword,
+            msv: r.monthlySearchVolume,
+            competition: r.competitionLevel,
+          }));
       } catch {
         return [];
       }

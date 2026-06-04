@@ -110,8 +110,8 @@ function StatusBadge({ approved }: { approved: boolean }) {
 }
 
 /* ─── Swap Modal ─────────────────────────────────────────── */
-function SwapModal({ open, onClose, businessId, kwRow, onSwapped }: {
-  open: boolean; onClose: () => void; businessId: number; kwRow: KwRow | null; onSwapped: () => void;
+function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict }: {
+  open: boolean; onClose: () => void; businessId: number; kwRow: KwRow | null; onSwapped: () => void; isConflict?: boolean;
 }) {
   const [manualKw, setManualKw] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -138,7 +138,7 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped }: {
             <DialogTitle>Swap Keyword</DialogTitle>
             <DialogDescription>Replace <strong>{kwRow?.primaryKeyword}</strong> with a different keyword.</DialogDescription>
           </DialogHeader>
-          {kwRow?.cannibalizationWarning && (
+          {isConflict && (
             <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, padding:"8px 12px", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:8, fontSize:12, color:"#92400e" }}>
               <AlertTriangle style={{ width:13, height:13, color:"#d97706", flexShrink:0 }} />
               <span><strong>Cannibalization conflict</strong> — this keyword overlaps with another article. Swap it to resolve.</span>
@@ -613,6 +613,7 @@ export default function Keywords() {
         onClose={() => setSwapTarget(null)}
         businessId={businessId}
         kwRow={swapTarget}
+        isConflict={swapTarget ? liveConflictNodeIds.has(swapTarget.articleNodeId) : false}
         onSwapped={async () => { await refetchKw(); }}
       />
     </DashboardLayout>
