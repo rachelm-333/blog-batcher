@@ -108,10 +108,11 @@ async function generateAndSave(
   try {
     const result = await generateSingleArticle(businessId, nodeId, allOrderedNodes);
 
-    // Auto-regenerate once if score is below threshold (only on first attempt)
+    // If score is below threshold on first attempt, save the article as-is (word count is already enforced)
+    // Do NOT regenerate from scratch — that would lose the word count that was already achieved.
+    // The article will be flagged as needs_review for manual improvement via the AI Edit Instruction panel.
     if (!isRetry && result.internalScore < MIN_DELIVERY_SCORE) {
-      console.log(`[Articles] Node ${nodeId} scored ${result.internalScore} — auto-regenerating (attempt 2)`);
-      return generateAndSave(businessId, nodeId, allOrderedNodes, true);
+      console.log(`[Articles] Node ${nodeId} scored ${result.internalScore} — saving as needs_review (word count preserved: ${result.wordCount} words)`);
     }
 
     // Save result

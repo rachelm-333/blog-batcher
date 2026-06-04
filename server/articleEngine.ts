@@ -854,12 +854,17 @@ Return ONLY the condensed article body as clean HTML, wrapped in these exact del
       const condensedHtml = condensationMatch ? condensationMatch[1].trim() : rawCondensation.trim();
       if (condensedHtml && condensedHtml.length > 100) {
         const condensedWordCount = condensedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+        // Accept if: shorter than original AND above minimum (even if still over max — progress is progress)
         if (condensedWordCount < overMaxWordCount && condensedWordCount >= ctx.wordCountMin) {
           bodyHtml = condensedHtml;
           wordCount = condensedWordCount;
-          console.log(`[ArticleEngine] Condensation pass successful for node ${nodeId}: ${overMaxWordCount} → ${condensedWordCount} words`);
+          if (condensedWordCount <= ctx.wordCountMax) {
+            console.log(`[ArticleEngine] Condensation pass successful for node ${nodeId}: ${overMaxWordCount} → ${condensedWordCount} words`);
+          } else {
+            console.log(`[ArticleEngine] Condensation pass partial for node ${nodeId}: ${overMaxWordCount} → ${condensedWordCount} words (still over max, but shorter)`);
+          }
         } else {
-          console.warn(`[ArticleEngine] Condensation pass result out of range for node ${nodeId}: ${condensedWordCount} words — using original`);
+          console.warn(`[ArticleEngine] Condensation pass result unusable for node ${nodeId}: ${condensedWordCount} words (original: ${overMaxWordCount}) — using original`);
           wordCount = overMaxWordCount;
         }
       }
