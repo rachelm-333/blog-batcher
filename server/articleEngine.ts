@@ -40,9 +40,9 @@ import { getDb } from "./db";
 // Word count rules (from scope Table 4)
 // ---------------------------------------------------------------------------
 export const WORD_COUNT_RULES = {
-  cornerstone: { min: 2500, max: 3200 },
+  cornerstone: { min: 2400, max: 3000 },
   pillar: { min: 1500, max: 1800 },
-  cluster: { min: 1000, max: 1200 },
+  cluster: { min: 800, max: 1200 },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -447,7 +447,7 @@ Return a single JSON object with these exact fields:
 export function buildScrubPrompt(bodyHtml: string, bodyMarkdown: string): string {
   return `You are an AI content editor specialising in removing AI fingerprints from blog content.
 
-Review the following article and rewrite it to remove all AI tells. The result must be indistinguishable from content written by a specific human expert with a strong point of view.
+Review the article below and rewrite it to remove all AI tells. The result must be indistinguishable from content written by a specific human expert with a strong point of view.
 
 SPECIFIC THINGS TO FIX:
 1. Remove em dash (—) overuse — replace with commas, full stops, or restructure the sentence
@@ -456,15 +456,15 @@ SPECIFIC THINGS TO FIX:
 4. Remove repetitive sentence structures — vary the rhythm
 5. Vary sentence length — mix short punchy sentences (5–10 words) with longer explanatory ones (20–30 words)
 6. Ensure the article sounds like it was written by a specific human with a point of view, not a generic assistant
-7. Preserve all HTML tags, links, headings, and schema markup exactly — only change the prose text
+7. Preserve ALL HTML tags, links, headings, and schema markup exactly — only change the prose text
+8. Do NOT remove any content, sections, or paragraphs — the output MUST be at least as long as the input
 
 IMPORTANT: Do NOT change the meaning, facts, keyword placement, or structure. Only improve the human authenticity of the writing.
 
-Return a JSON object with:
-{
-  "bodyHtml": "scrubbed HTML body",
-  "bodyMarkdown": "scrubbed Markdown body"
-}
+Return ONLY the scrubbed HTML body wrapped in these exact delimiters (no other text before or after):
+<SCRUBBED_HTML>
+...full scrubbed HTML here...
+</SCRUBBED_HTML>
 
 ARTICLE TO SCRUB:
 ${bodyHtml}`;
@@ -940,30 +940,80 @@ Return ONLY the expanded article body as clean HTML, wrapped in these exact deli
     const scrubResult = await invokeLLMWithCost(
       {
         messages: [{ role: "user", content: scrubPrompt }],
-        response_format: { type: "json_object" },
+        // No json_object mode — we use plain HTML delimiters to avoid JSON encoding issues
         max_tokens: 65536,
       },
       { userId, feature: "article_generation" }
     );
-    const scrubContent = scrubResult.choices[0]?.message?.content;
-    const scrubParsed = JSON.parse(typeof scrubContent === "string" ? scrubContent : JSON.stringify(scrubContent));
-    if (scrubParsed.bodyHtml) {
-      const scrubWordCount = scrubParsed.bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    const scrubContent = scrubResult.choices[0]?.message?.content ?? "";
+    const rawScrub = typeof scrubContent === "string" ? scrubContent : JSON.stringify(scrubContent);
+    // Extract HTML from delimiters
+    const scrubMatch = rawScrub.match(/<SCRUBBED_HTML>([\s\S]*?)<\/SCRUBBED_HTML>/i);
+    const scrubbedHtml = scrubMatch ? scrubMatch[1].trim() : "";
+    if (scrubbedHtml && scrubbedHtml.length > 100) {
+      const scrubWordCount = scrubbedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
       const originalWordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
       // Safety guard: reject scrubbed body if it lost more than 20% of the original content
       if (scrubWordCount >= originalWordCount * 0.8) {
-        bodyHtml = scrubParsed.bodyHtml;
-        if (scrubParsed.bodyMarkdown) bodyMarkdown = scrubParsed.bodyMarkdown;
+        bodyHtml = scrubbedHtml;
         console.log(`[ArticleEngine] Scrub pass accepted: ${scrubWordCount} words (original: ${originalWordCount}) for node ${nodeId}`);
       } else {
         console.warn(`[ArticleEngine] Scrub pass REJECTED for node ${nodeId}: scrubbed body too short (${scrubWordCount} vs ${originalWordCount} original words) — using original`);
       }
+    } else {
+      console.warn(`[ArticleEngine] Scrub pass returned no delimited content for node ${nodeId} — using original content`);
     }
     // Recount words after scrub
     wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-  } catch {
+  } catch (err) {
     // Scrub failure is non-fatal — continue with original content
-    console.warn(`[ArticleEngine] Scrub pass failed for node ${nodeId} — using original content`);
+    console.warn(`[ArticleEngine] Scrub pass failed for node ${nodeId}:`, err);
+  }
+
+  // --- Pass B2: Post-scrub word count safety check ---
+  // If the scrub pass somehow reduced the article below the minimum, run one more expansion.
+  {
+    const postScrubWc = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    if (postScrubWc < ctx.wordCountMin) {
+      const wordsNeeded = ctx.wordCountMin - postScrubWc;
+      console.warn(`[ArticleEngine] Post-scrub word count below minimum for node ${nodeId}: ${postScrubWc} words (min: ${ctx.wordCountMin}) — running recovery expansion`);
+      try {
+        const recoverySystemPrompt = `You are an expert SEO content writer. You will receive an article that needs to be expanded.
+Current word count: ${postScrubWc} words
+Required minimum: ${ctx.wordCountMin} words (you are ${wordsNeeded} words SHORT)
+Required maximum: ${ctx.wordCountMax} words
+Primary keyword: ${ctx.primaryKeyword}
+Add ${Math.ceil(wordsNeeded / 200)} new H2 sections covering related subtopics. Each section 150-250 words. Maintain tone, HTML structure, and all existing links.
+Return ONLY the expanded HTML wrapped in:
+<EXPANDED_HTML>
+...full expanded HTML here...
+</EXPANDED_HTML>`;
+        const recoveryResult = await invokeLLMWithCost(
+          {
+            messages: [
+              { role: "system", content: recoverySystemPrompt },
+              { role: "user", content: bodyHtml },
+            ],
+            max_tokens: 65536,
+          },
+          { userId, feature: "article_generation" }
+        );
+        const recoveryContent = recoveryResult.choices[0]?.message?.content ?? "";
+        const rawRecovery = typeof recoveryContent === "string" ? recoveryContent : JSON.stringify(recoveryContent);
+        const recoveryMatch = rawRecovery.match(/<EXPANDED_HTML>([\s\S]*?)<\/EXPANDED_HTML>/i);
+        const recoveredHtml = recoveryMatch ? recoveryMatch[1].trim() : "";
+        if (recoveredHtml && recoveredHtml.length > 100) {
+          const recoveredWc = recoveredHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+          if (recoveredWc > postScrubWc) {
+            bodyHtml = recoveredHtml;
+            wordCount = recoveredWc;
+            console.log(`[ArticleEngine] Post-scrub recovery expansion: ${postScrubWc} → ${recoveredWc} words for node ${nodeId}`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[ArticleEngine] Post-scrub recovery expansion failed for node ${nodeId}:`, err);
+      }
+    }
   }
 
   // --- Pass C: Post-scrub keyword density + first-100-words enforcement ---
