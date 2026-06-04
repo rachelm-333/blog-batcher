@@ -391,6 +391,26 @@ export default function ArticleReview() {
     onError: (err) => toast.error(err.message),
   });
 
+  // Article body editing state
+  const [bodyEditMode, setBodyEditMode] = useState(false);
+  const [bodyEditHtml, setBodyEditHtml] = useState("");
+
+  // Sync body edit state when article changes
+  useEffect(() => {
+    setBodyEditMode(false);
+    setBodyEditHtml((fullArticle as any)?.bodyHtml ?? "");
+  }, [(fullArticle as any)?.id]);
+
+  const updateBody = trpc.articles.updateBody.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Article body saved. (${data.wordCount.toLocaleString()} words)`);
+      setBodyEditMode(false);
+      refetchArticles();
+      refetchFull();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   // Derived state
   const approvedCount = articleList.filter(
     a => a.status === "approved" || a.status === "scheduled" || a.status === "published"
@@ -630,16 +650,75 @@ export default function ArticleReview() {
                 </div>
               ) : fullArticle ? (
                 <div>
-                  {/* Position Zero Answer Block callout */}
-                  {fullArticle.bodyHtml && /class="position-zero-answer"|<blockquote|<strong>[^<]*\?/i.test(fullArticle.bodyHtml) && (
-                    <div className="mb-4 px-3 py-1.5 rounded-md bg-primary/5 border border-primary/20 text-xs text-primary font-medium">
-                      📌 Position Zero Answer Block
+                  {/* Edit / Preview toggle bar */}
+                  {!isApproved && (
+                    <div className="flex items-center gap-2 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (bodyEditMode) {
+                            // Discard changes
+                            setBodyEditHtml((fullArticle as any).bodyHtml ?? "");
+                            setBodyEditMode(false);
+                          } else {
+                            setBodyEditHtml((fullArticle as any).bodyHtml ?? "");
+                            setBodyEditMode(true);
+                          }
+                        }}
+                        className={`text-xs px-3 py-1.5 rounded-md border font-medium transition-colors ${
+                          bodyEditMode
+                            ? "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+                            : "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+                        }`}
+                      >
+                        {bodyEditMode ? "Cancel Editing" : "✏️ Edit Article Body"}
+                      </button>
+                      {bodyEditMode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!selectedItem?.id) return;
+                            updateBody.mutate({ articleId: selectedItem.id, bodyHtml: bodyEditHtml });
+                          }}
+                          disabled={updateBody.isPending}
+                          className="text-xs px-3 py-1.5 rounded-md border font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                          {updateBody.isPending ? (
+                            <><Loader2 className="inline h-3 w-3 animate-spin mr-1" />Saving...</>
+                          ) : (
+                            <><Save className="inline h-3 w-3 mr-1" />Save Body</>
+                          )}
+                        </button>
+                      )}
+                      {bodyEditMode && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          Editing raw HTML — preserve all tags. Keyword placement affects SEO score.
+                        </span>
+                      )}
                     </div>
                   )}
-                  <div
-                    className="prose prose-sm max-w-none text-foreground"
-                    dangerouslySetInnerHTML={{ __html: fullArticle.bodyHtml ?? "" }}
-                  />
+
+                  {bodyEditMode ? (
+                    <textarea
+                      className="w-full min-h-[600px] text-xs font-mono bg-muted/40 border border-border rounded-lg p-3 resize-y focus:outline-none focus:ring-1 focus:ring-primary"
+                      value={bodyEditHtml}
+                      onChange={e => setBodyEditHtml(e.target.value)}
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <div>
+                      {/* Position Zero Answer Block callout */}
+                      {fullArticle.bodyHtml && /class="position-zero-answer"|<blockquote|<strong>[^<]*\?/i.test(fullArticle.bodyHtml) && (
+                        <div className="mb-4 px-3 py-1.5 rounded-md bg-primary/5 border border-primary/20 text-xs text-primary font-medium">
+                          📌 Position Zero Answer Block
+                        </div>
+                      )}
+                      <div
+                        className="prose prose-sm max-w-none text-foreground"
+                        dangerouslySetInnerHTML={{ __html: fullArticle.bodyHtml ?? "" }}
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">

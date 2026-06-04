@@ -378,7 +378,7 @@ URL Slug: /${ctx.urlSlug}
 Primary Keyword: ${ctx.primaryKeyword}
 Secondary Keywords: ${ctx.secondaryKeywords.join(", ") || "None"}
 PAA Question to Answer: ${ctx.paaQuestion || "Not specified — answer the most likely search intent question"}
-Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (HARD MAXIMUM: ${ctx.wordCountMax} words — do not exceed)
+Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (MINIMUM: ${ctx.wordCountMin} words — you MUST write at least ${ctx.wordCountMin} words; HARD MAXIMUM: ${ctx.wordCountMax} words — do not exceed). A ${ctx.level} article that is shorter than ${ctx.wordCountMin} words is UNACCEPTABLE and will be rejected.
 
 === INTERNAL LINK CONTEXT ===
 ${internalLinkContext || "No parent/sibling articles yet — this is a Cornerstone."}
@@ -404,6 +404,14 @@ ${ctx.allBatchSlugs.slice(0, 20).join(", ")}
 14. E-E-A-T SIGNALS: Weave in Experience, Expertise, Authoritativeness, and Trustworthiness. Include social proof signals: ${ctx.socialProof || "mention industry experience"}.
 15. HUMAN AUTHENTICITY: No AI fingerprint patterns. Content must solve the reader's problem completely. Must be cohesive with the rest of the batch.
 16. ARTICLE TYPE STRUCTURE: Format and structure this as a ${typeLabel}. The title must signal specific territory ownership.
+
+=== CLOSING CTA SECTION (MANDATORY) ===
+Every article MUST end with a dedicated CTA section using this exact structure:
+<h2>Ready to Take the Next Step?</h2>
+<p>[1–2 sentences summarising the value the reader has just gained and why acting now makes sense.]</p>
+<p>${ctx.ctaText}: <a href="${ctx.ctaUrl}">${ctx.ctaText}</a></p>
+
+Customise the H2 heading and body copy to match the article topic and brand voice — do not use the generic placeholder text above verbatim. The CTA link MUST point to ${ctx.ctaUrl}.
 
 === ABSOLUTE RULES ===
 - DO NOT fabricate statistics, quotes, or data. If you reference a statistic, it must come from a real, citable source. Use the external authority link as the citation anchor.
@@ -745,7 +753,7 @@ export async function generateSingleArticle(
         {
           messages: genMessages,
           response_format: { type: "json_object" },
-          max_tokens: 16000,
+          max_tokens: 65536,
         },
         { userId, feature: "article_generation" }
       );
@@ -812,7 +820,7 @@ export async function generateSingleArticle(
       {
         messages: [{ role: "user", content: scrubPrompt }],
         response_format: { type: "json_object" },
-        max_tokens: 16000,
+        max_tokens: 65536,
       },
       { userId, feature: "article_generation" }
     );

@@ -599,6 +599,45 @@ export const articlesRouter = router({
     }),
 
   /**
+   * Update the article body (HTML + Markdown).
+   * Allowed before approval. Blocked for published articles.
+   */
+  updateBody: protectedProcedure
+    .input(z.object({
+      articleId: z.number(),
+      bodyHtml: z.string(),
+      bodyMarkdown: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [article] = await db
+        .select({ businessId: articles.businessId, status: articles.status })
+        .from(articles)
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!article) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, article.businessId);
+
+      if (article.status === "published") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Published articles cannot be edited here. Edit directly in your CMS." });
+      }
+
+      // Recount words from the updated HTML
+      const wordCount = input.bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
+      await db.update(articles).set({
+        bodyHtml: input.bodyHtml,
+        bodyMarkdown: input.bodyMarkdown ?? input.bodyHtml.replace(/<[^>]+>/g, ""),
+        wordCount,
+      }).where(eq(articles.id, input.articleId));
+
+      return { updated: true, wordCount };
+    }),
+
+  /**
    * Approve a single article.
    * Sets status = approved and records approvedAt timestamp.
    * Regeneration is blocked after approval.

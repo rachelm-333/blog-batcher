@@ -831,3 +831,9 @@
 - [x] Add Retry button per row in PAA review section of Keywords.tsx
 - [x] Add Skip button per row in PAA review section so rows with no PAA can be skipped
 - [x] Add AI citation/disclosure to the start of each generated blog post (one-line disclaimer)
+
+## Article Engine & Review Fixes (Session 4)
+- [x] Fix cornerstone word count target: 2800 words (max 3200) — currently generating ~1000 words
+- [x] Fix article truncation: articles cut off mid-sentence (LLM max_tokens too low)
+- [x] Add CTA section at end of every generated article
+- [x] Make article body editable in review panel (inline rich-text or textarea editor)
