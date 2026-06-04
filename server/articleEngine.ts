@@ -813,33 +813,43 @@ export async function generateSingleArticle(
     // Note: we flag this rather than destructively truncating HTML
   }
 
-  // --- Pass A2: Word count expansion (if below minimum) ---
-  // If the model produced fewer words than required, ask it to expand the article.
-  const actualWordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-  if (actualWordCount < ctx.wordCountMin) {
-    console.log(`[ArticleEngine] Word count too low for node ${nodeId}: ${actualWordCount} words (min: ${ctx.wordCountMin}) — running expansion pass`);
+  // --- Pass A2: Word count expansion loop (guaranteed minimum) ---
+  // Keeps expanding until the article meets the minimum word count or 4 attempts are exhausted.
+  // This is deterministic enforcement — not prompt-based hoping.
+  const MAX_EXPANSION_ATTEMPTS = 4;
+  for (let expansionAttempt = 1; expansionAttempt <= MAX_EXPANSION_ATTEMPTS; expansionAttempt++) {
+    const currentWc = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    wordCount = currentWc;
+    if (currentWc >= ctx.wordCountMin) {
+      if (expansionAttempt > 1) console.log(`[ArticleEngine] Word count met after ${expansionAttempt - 1} expansion pass(es): ${currentWc} words for node ${nodeId}`);
+      break;
+    }
+    const wordsNeeded = ctx.wordCountMin - currentWc;
+    console.log(`[ArticleEngine] Expansion attempt ${expansionAttempt}/${MAX_EXPANSION_ATTEMPTS} for node ${nodeId}: ${currentWc} words, need ${wordsNeeded} more (min: ${ctx.wordCountMin})`);
     try {
-      const expansionPrompt = `You are an expert SEO content writer. The following article is too short and needs to be expanded.
+      const expansionPrompt = `You are an expert SEO content writer. The following article is too short and MUST be expanded.
 
-Current word count: ${actualWordCount} words
-Required minimum: ${ctx.wordCountMin} words
+Current word count: ${currentWc} words
+Required minimum: ${ctx.wordCountMin} words (you are ${wordsNeeded} words SHORT)
 Required maximum: ${ctx.wordCountMax} words
 Primary keyword: ${ctx.primaryKeyword}
 
-Expand this article by adding more depth, detail, and value to reach at least ${ctx.wordCountMin} words. Specifically:
-- Add more detail and practical advice to existing sections
-- Add 2–3 new H2 sections covering related subtopics the reader would find valuable
-- Expand thin paragraphs with real-world examples, statistics (from authoritative sources), or step-by-step guidance
+You MUST add at least ${wordsNeeded} words to this article. This is not optional.
+
+How to expand:
+- Add ${Math.ceil(wordsNeeded / 200)} new H2 sections covering related subtopics the reader would find valuable
+- Each new section should be 150–250 words with practical, specific advice
+- Expand existing thin paragraphs with real-world examples and step-by-step guidance
+- Add a FAQ section if one does not already exist (3–5 questions and detailed answers)
 - Maintain the same tone, voice, and HTML structure
 - Keep all existing links, keywords, schema, and the closing CTA section intact
 - Do NOT add the CTA section again — it already exists at the end
 - Use Australian English spelling
 
-Return a JSON object with:
+Return a JSON object with ONLY these fields:
 {
-  "bodyHtml": "expanded full article body as clean HTML",
-  "bodyMarkdown": "expanded full article body as Markdown",
-  "wordCount": <integer — actual word count of the expanded bodyHtml>
+  "bodyHtml": "the complete expanded article body as clean HTML — must be at least ${ctx.wordCountMin} words",
+  "bodyMarkdown": "the complete expanded article body as Markdown"
 }
 
 ARTICLE TO EXPAND:
@@ -857,17 +867,20 @@ ${bodyHtml}`;
       const expansionParsed = JSON.parse(typeof expansionContent === "string" ? expansionContent : JSON.stringify(expansionContent));
       if (expansionParsed.bodyHtml) {
         const expandedWordCount = expansionParsed.bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-        if (expandedWordCount > actualWordCount) {
+        if (expandedWordCount > currentWc) {
           bodyHtml = expansionParsed.bodyHtml;
           if (expansionParsed.bodyMarkdown) bodyMarkdown = expansionParsed.bodyMarkdown;
           wordCount = expandedWordCount;
-          console.log(`[ArticleEngine] Expansion pass successful for node ${nodeId}: ${actualWordCount} → ${expandedWordCount} words`);
+          console.log(`[ArticleEngine] Expansion attempt ${expansionAttempt} for node ${nodeId}: ${currentWc} → ${expandedWordCount} words`);
         } else {
-          console.warn(`[ArticleEngine] Expansion pass did not increase word count for node ${nodeId} (${expandedWordCount} vs ${actualWordCount}) — using original`);
+          console.warn(`[ArticleEngine] Expansion attempt ${expansionAttempt} for node ${nodeId} did not increase word count (${expandedWordCount} vs ${currentWc}) — retrying`);
         }
       }
     } catch (err) {
-      console.warn(`[ArticleEngine] Expansion pass failed for node ${nodeId}:`, err);
+      console.warn(`[ArticleEngine] Expansion attempt ${expansionAttempt} failed for node ${nodeId}:`, err);
+    }
+    if (expansionAttempt === MAX_EXPANSION_ATTEMPTS) {
+      console.warn(`[ArticleEngine] Max expansion attempts reached for node ${nodeId}: final word count ${wordCount} (min: ${ctx.wordCountMin})`);
     }
   }
 
