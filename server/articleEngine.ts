@@ -813,6 +813,64 @@ export async function generateSingleArticle(
     // Note: we flag this rather than destructively truncating HTML
   }
 
+  // --- Pass A2: Word count expansion (if below minimum) ---
+  // If the model produced fewer words than required, ask it to expand the article.
+  const actualWordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  if (actualWordCount < ctx.wordCountMin) {
+    console.log(`[ArticleEngine] Word count too low for node ${nodeId}: ${actualWordCount} words (min: ${ctx.wordCountMin}) — running expansion pass`);
+    try {
+      const expansionPrompt = `You are an expert SEO content writer. The following article is too short and needs to be expanded.
+
+Current word count: ${actualWordCount} words
+Required minimum: ${ctx.wordCountMin} words
+Required maximum: ${ctx.wordCountMax} words
+Primary keyword: ${ctx.primaryKeyword}
+
+Expand this article by adding more depth, detail, and value to reach at least ${ctx.wordCountMin} words. Specifically:
+- Add more detail and practical advice to existing sections
+- Add 2–3 new H2 sections covering related subtopics the reader would find valuable
+- Expand thin paragraphs with real-world examples, statistics (from authoritative sources), or step-by-step guidance
+- Maintain the same tone, voice, and HTML structure
+- Keep all existing links, keywords, schema, and the closing CTA section intact
+- Do NOT add the CTA section again — it already exists at the end
+- Use Australian English spelling
+
+Return a JSON object with:
+{
+  "bodyHtml": "expanded full article body as clean HTML",
+  "bodyMarkdown": "expanded full article body as Markdown",
+  "wordCount": <integer — actual word count of the expanded bodyHtml>
+}
+
+ARTICLE TO EXPAND:
+${bodyHtml}`;
+
+      const expansionResult = await invokeLLMWithCost(
+        {
+          messages: [{ role: "user", content: expansionPrompt }],
+          response_format: { type: "json_object" },
+          max_tokens: 65536,
+        },
+        { userId, feature: "article_generation" }
+      );
+      const expansionContent = expansionResult.choices[0]?.message?.content;
+      const expansionParsed = JSON.parse(typeof expansionContent === "string" ? expansionContent : JSON.stringify(expansionContent));
+      if (expansionParsed.bodyHtml) {
+        const expandedWordCount = expansionParsed.bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+        if (expandedWordCount > actualWordCount) {
+          bodyHtml = expansionParsed.bodyHtml;
+          if (expansionParsed.bodyMarkdown) bodyMarkdown = expansionParsed.bodyMarkdown;
+          wordCount = expandedWordCount;
+          console.log(`[ArticleEngine] Expansion pass successful for node ${nodeId}: ${actualWordCount} → ${expandedWordCount} words`);
+        } else {
+          console.warn(`[ArticleEngine] Expansion pass did not increase word count for node ${nodeId} (${expandedWordCount} vs ${actualWordCount}) — using original`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[ArticleEngine] Expansion pass failed for node ${nodeId}:`, err);
+    }
+  }
+
   // --- Pass B: AI fingerprint scrub ---
   try {
     const scrubPrompt = buildScrubPrompt(bodyHtml, bodyMarkdown);
