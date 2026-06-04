@@ -467,7 +467,7 @@ Return a JSON object with:
 }
 
 ARTICLE TO SCRUB:
-${bodyHtml.slice(0, 8000)}`;
+${bodyHtml}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -826,8 +826,18 @@ export async function generateSingleArticle(
     );
     const scrubContent = scrubResult.choices[0]?.message?.content;
     const scrubParsed = JSON.parse(typeof scrubContent === "string" ? scrubContent : JSON.stringify(scrubContent));
-    if (scrubParsed.bodyHtml) bodyHtml = scrubParsed.bodyHtml;
-    if (scrubParsed.bodyMarkdown) bodyMarkdown = scrubParsed.bodyMarkdown;
+    if (scrubParsed.bodyHtml) {
+      const scrubWordCount = scrubParsed.bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+      const originalWordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+      // Safety guard: reject scrubbed body if it lost more than 20% of the original content
+      if (scrubWordCount >= originalWordCount * 0.8) {
+        bodyHtml = scrubParsed.bodyHtml;
+        if (scrubParsed.bodyMarkdown) bodyMarkdown = scrubParsed.bodyMarkdown;
+        console.log(`[ArticleEngine] Scrub pass accepted: ${scrubWordCount} words (original: ${originalWordCount}) for node ${nodeId}`);
+      } else {
+        console.warn(`[ArticleEngine] Scrub pass REJECTED for node ${nodeId}: scrubbed body too short (${scrubWordCount} vs ${originalWordCount} original words) — using original`);
+      }
+    }
     // Recount words after scrub
     wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
   } catch {
