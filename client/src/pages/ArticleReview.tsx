@@ -411,6 +411,21 @@ export default function ArticleReview() {
     onError: (err) => toast.error(err.message),
   });
 
+  // AI instruction panel state
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiInstruction, setAiInstruction] = useState("");
+
+  const aiEditInstruction = trpc.articles.aiEditInstruction.useMutation({
+    onSuccess: (data) => {
+      toast.success(`AI edit applied. (${data.wordCount.toLocaleString()} words)`);
+      setAiPanelOpen(false);
+      setAiInstruction("");
+      refetchArticles();
+      refetchFull();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   // Derived state
   const approvedCount = articleList.filter(
     a => a.status === "approved" || a.status === "scheduled" || a.status === "published"
@@ -652,7 +667,7 @@ export default function ArticleReview() {
                 <div>
                   {/* Edit / Preview toggle bar */}
                   {!isApproved && (
-                    <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 mb-4 flex-wrap">
                       <button
                         type="button"
                         onClick={() => {
@@ -663,6 +678,7 @@ export default function ArticleReview() {
                           } else {
                             setBodyEditHtml((fullArticle as any).bodyHtml ?? "");
                             setBodyEditMode(true);
+                            setAiPanelOpen(false);
                           }
                         }}
                         className={`text-xs px-3 py-1.5 rounded-md border font-medium transition-colors ${
@@ -673,6 +689,19 @@ export default function ArticleReview() {
                       >
                         {bodyEditMode ? "Cancel Editing" : "✏️ Edit Article Body"}
                       </button>
+                      {!bodyEditMode && (
+                        <button
+                          type="button"
+                          onClick={() => setAiPanelOpen(v => !v)}
+                          className={`text-xs px-3 py-1.5 rounded-md border font-medium transition-colors ${
+                            aiPanelOpen
+                              ? "bg-violet-100 border-violet-300 text-violet-700 hover:bg-violet-200"
+                              : "bg-violet-50 border-violet-200 text-violet-600 hover:bg-violet-100"
+                          }`}
+                        >
+                          ✨ AI Edit Instruction
+                        </button>
+                      )}
                       {bodyEditMode && (
                         <button
                           type="button"
@@ -695,6 +724,76 @@ export default function ArticleReview() {
                           Editing raw HTML — preserve all tags. Keyword placement affects SEO score.
                         </span>
                       )}
+                    </div>
+                  )}
+
+                  {/* AI Instruction Panel */}
+                  {aiPanelOpen && !bodyEditMode && !isApproved && (
+                    <div className="mb-4 p-4 rounded-xl border border-violet-200 bg-violet-50/60">
+                      <div className="flex items-start gap-2 mb-3">
+                        <span className="text-violet-600 text-base mt-0.5">✨</span>
+                        <div>
+                          <p className="text-sm font-semibold text-violet-800">AI Edit Instruction</p>
+                          <p className="text-xs text-violet-600 mt-0.5">
+                            Describe what you want changed in plain English. The AI will apply only your instruction and preserve everything else.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs text-violet-500 font-medium">Examples:</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            "Change '1 year in business' to reflect 30+ years of combined experience",
+                            "Replace 'we' with the business name throughout",
+                            "Make the tone more conversational and less formal",
+                            "Add a paragraph about our free consultation offer",
+                          ].map(example => (
+                            <button
+                              key={example}
+                              type="button"
+                              onClick={() => setAiInstruction(example)}
+                              className="text-xs px-2 py-1 rounded-md bg-violet-100 border border-violet-200 text-violet-700 hover:bg-violet-200 transition-colors text-left"
+                            >
+                              {example}
+                            </button>
+                          ))}
+                        </div>
+                        <textarea
+                          className="w-full min-h-[80px] text-sm bg-white border border-violet-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-violet-300"
+                          placeholder="e.g. Change '1 year in business' to reflect 30+ years of combined business experience across multiple businesses..."
+                          value={aiInstruction}
+                          onChange={e => setAiInstruction(e.target.value)}
+                          disabled={aiEditInstruction.isPending}
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={!aiInstruction.trim() || aiEditInstruction.isPending || !selectedItem?.id}
+                            onClick={() => {
+                              if (!selectedItem?.id || !aiInstruction.trim()) return;
+                              aiEditInstruction.mutate({ articleId: selectedItem.id, instruction: aiInstruction.trim() });
+                            }}
+                            className="text-sm px-4 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {aiEditInstruction.isPending ? (
+                              <><Loader2 className="h-4 w-4 animate-spin" />Applying AI edit…</>
+                            ) : (
+                              <>✨ Apply AI Edit</>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setAiPanelOpen(false); setAiInstruction(""); }}
+                            className="text-sm px-3 py-2 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-100 transition-colors"
+                            disabled={aiEditInstruction.isPending}
+                          >
+                            Cancel
+                          </button>
+                          {aiEditInstruction.isPending && (
+                            <span className="text-xs text-violet-500">This may take 15–30 seconds…</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 

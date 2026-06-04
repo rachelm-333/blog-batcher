@@ -837,3 +837,8 @@
 - [x] Fix article truncation: articles cut off mid-sentence (LLM max_tokens too low)
 - [x] Add CTA section at end of every generated article
 - [x] Make article body editable in review panel (inline rich-text or textarea editor)
+
+## AI Inline Editing & Word Count Max Fix (Session 5)
+- [x] Fix word count max enforcement: articles over max (e.g. 3200 for cornerstone) must be condensed by AI, not just flagged
+- [x] Add tRPC procedure articles.aiEditInstruction — takes articleId + instruction string, rewrites article body following the instruction, returns updated bodyHtml + wordCount
+- [x] Add AI instruction panel to ArticleReview: textarea for natural language instruction + "Apply AI Edit" button, spinner while processing, updates article body on success, shows before/after word count

@@ -805,12 +805,62 @@ export async function generateSingleArticle(
     console.log(`[ArticleEngine] Meta description padded to ${metaDescription.length} chars for node ${nodeId}`);
   }
 
-  // Enforce hard word count maximum for Cornerstones
-  if (ctx.level === "cornerstone" && wordCount > WORD_COUNT_RULES.cornerstone.max) {
-    // Truncate at the max — trim trailing HTML tags cleanly
-    const words = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean);
-    wordCount = WORD_COUNT_RULES.cornerstone.max;
-    // Note: we flag this rather than destructively truncating HTML
+  // --- Pass A1: Word count condensation (if over maximum) ---
+  // If the model produced more words than the maximum, ask it to condense.
+  const overMaxWordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  if (overMaxWordCount > ctx.wordCountMax) {
+    const wordsOver = overMaxWordCount - ctx.wordCountMax;
+    console.log(`[ArticleEngine] Word count over max for node ${nodeId}: ${overMaxWordCount} words (max: ${ctx.wordCountMax}) — running condensation pass`);
+    try {
+      const condensationSystemPrompt = `You are an expert SEO content editor. You will receive an article that is too long and must be condensed.
+
+Current word count: ${overMaxWordCount} words
+Required maximum: ${ctx.wordCountMax} words (you are ${wordsOver} words OVER)
+Required minimum: ${ctx.wordCountMin} words
+
+Condense the article to fit within ${ctx.wordCountMax} words. Rules:
+- Remove the least valuable content first (redundant explanations, repetitive examples)
+- Do NOT remove the introduction, conclusion, or CTA section
+- Do NOT remove any headings (H2/H3)
+- Preserve all internal links, keyword mentions, and schema markup
+- Use Australian English spelling
+
+Return ONLY the condensed article body as clean HTML, wrapped in these exact delimiters:
+<CONDENSED_HTML>
+...full condensed HTML here...
+</CONDENSED_HTML>`;
+
+      const condensationResult = await invokeLLMWithCost(
+        {
+          messages: [
+            { role: "system", content: condensationSystemPrompt },
+            { role: "user", content: bodyHtml },
+          ],
+          max_tokens: 65536,
+        },
+        { userId, feature: "article_generation" }
+      );
+      const condensationContent = condensationResult.choices[0]?.message?.content ?? "";
+      const rawCondensation = typeof condensationContent === "string" ? condensationContent : JSON.stringify(condensationContent);
+      const condensationMatch = rawCondensation.match(/<CONDENSED_HTML>([\s\S]*?)<\/CONDENSED_HTML>/i);
+      const condensedHtml = condensationMatch ? condensationMatch[1].trim() : rawCondensation.trim();
+      if (condensedHtml && condensedHtml.length > 100) {
+        const condensedWordCount = condensedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+        if (condensedWordCount < overMaxWordCount && condensedWordCount >= ctx.wordCountMin) {
+          bodyHtml = condensedHtml;
+          wordCount = condensedWordCount;
+          console.log(`[ArticleEngine] Condensation pass successful for node ${nodeId}: ${overMaxWordCount} → ${condensedWordCount} words`);
+        } else {
+          console.warn(`[ArticleEngine] Condensation pass result out of range for node ${nodeId}: ${condensedWordCount} words — using original`);
+          wordCount = overMaxWordCount;
+        }
+      }
+    } catch (err) {
+      console.warn(`[ArticleEngine] Condensation pass failed for node ${nodeId}:`, err);
+      wordCount = overMaxWordCount;
+    }
+  } else {
+    wordCount = overMaxWordCount;
   }
 
   // --- Pass A2: Word count expansion loop (guaranteed minimum) ---
@@ -827,14 +877,14 @@ export async function generateSingleArticle(
     const wordsNeeded = ctx.wordCountMin - currentWc;
     console.log(`[ArticleEngine] Expansion attempt ${expansionAttempt}/${MAX_EXPANSION_ATTEMPTS} for node ${nodeId}: ${currentWc} words, need ${wordsNeeded} more (min: ${ctx.wordCountMin})`);
     try {
-      const expansionPrompt = `You are an expert SEO content writer. The following article is too short and MUST be expanded.
+      const expansionSystemPrompt = `You are an expert SEO content writer. You will receive an article that is too short and must be expanded.
 
 Current word count: ${currentWc} words
 Required minimum: ${ctx.wordCountMin} words (you are ${wordsNeeded} words SHORT)
 Required maximum: ${ctx.wordCountMax} words
 Primary keyword: ${ctx.primaryKeyword}
 
-You MUST add at least ${wordsNeeded} words to this article. This is not optional.
+You MUST add at least ${wordsNeeded} words. This is not optional.
 
 How to expand:
 - Add ${Math.ceil(wordsNeeded / 200)} new H2 sections covering related subtopics the reader would find valuable
@@ -846,30 +896,30 @@ How to expand:
 - Do NOT add the CTA section again — it already exists at the end
 - Use Australian English spelling
 
-Return a JSON object with ONLY these fields:
-{
-  "bodyHtml": "the complete expanded article body as clean HTML — must be at least ${ctx.wordCountMin} words",
-  "bodyMarkdown": "the complete expanded article body as Markdown"
-}
-
-ARTICLE TO EXPAND:
-${bodyHtml}`;
+Return ONLY the expanded article body as clean HTML, wrapped in these exact delimiters:
+<EXPANDED_HTML>
+...full expanded HTML here...
+</EXPANDED_HTML>`;
 
       const expansionResult = await invokeLLMWithCost(
         {
-          messages: [{ role: "user", content: expansionPrompt }],
-          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: expansionSystemPrompt },
+            { role: "user", content: bodyHtml },
+          ],
           max_tokens: 65536,
         },
         { userId, feature: "article_generation" }
       );
-      const expansionContent = expansionResult.choices[0]?.message?.content;
-      const expansionParsed = JSON.parse(typeof expansionContent === "string" ? expansionContent : JSON.stringify(expansionContent));
-      if (expansionParsed.bodyHtml) {
-        const expandedWordCount = expansionParsed.bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+      const expansionContent = expansionResult.choices[0]?.message?.content ?? "";
+      const rawExpansion = typeof expansionContent === "string" ? expansionContent : JSON.stringify(expansionContent);
+      // Extract HTML from delimiters — robust against any JSON/markdown wrapping
+      const delimMatch = rawExpansion.match(/<EXPANDED_HTML>([\s\S]*?)<\/EXPANDED_HTML>/i);
+      const expandedHtml = delimMatch ? delimMatch[1].trim() : rawExpansion.trim();
+      if (expandedHtml && expandedHtml.length > 100) {
+        const expandedWordCount = expandedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
         if (expandedWordCount > currentWc) {
-          bodyHtml = expansionParsed.bodyHtml;
-          if (expansionParsed.bodyMarkdown) bodyMarkdown = expansionParsed.bodyMarkdown;
+          bodyHtml = expandedHtml;
           wordCount = expandedWordCount;
           console.log(`[ArticleEngine] Expansion attempt ${expansionAttempt} for node ${nodeId}: ${currentWc} → ${expandedWordCount} words`);
         } else {

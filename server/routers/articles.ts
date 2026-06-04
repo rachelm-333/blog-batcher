@@ -638,6 +638,84 @@ export const articlesRouter = router({
     }),
 
   /**
+   * AI-guided article edit.
+   * Takes a natural language instruction and rewrites the article body accordingly.
+   * Preserves keyword placement, HTML structure, and SEO fields.
+   */
+  aiEditInstruction: protectedProcedure
+    .input(z.object({
+      articleId: z.number(),
+      instruction: z.string().min(5).max(2000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [article] = await db
+        .select({
+          businessId: articles.businessId,
+          status: articles.status,
+          bodyHtml: articles.bodyHtml,
+          bodyMarkdown: articles.bodyMarkdown,
+          wordCount: articles.wordCount,
+        })
+        .from(articles)
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!article) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, article.businessId);
+
+      if (article.status === "published") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Published articles cannot be edited here. Edit directly in your CMS." });
+      }
+
+      if (!article.bodyHtml) throw new TRPCError({ code: "BAD_REQUEST", message: "Article has no content to edit." });
+
+      const systemPrompt = `You are an expert SEO content editor. You will receive an article body (HTML) and an editing instruction from the author.
+
+Apply the instruction precisely. Rules:
+- Make ONLY the changes described in the instruction — do not rewrite unrelated sections
+- Preserve all HTML tags, heading structure, internal links, and keyword placement
+- Preserve the closing CTA section exactly as-is
+- Use Australian English spelling
+- Do not add new sections unless the instruction explicitly asks for them
+- Do not change the article title or meta fields
+
+Return ONLY the updated article body as clean HTML, wrapped in these exact delimiters:
+<EDITED_HTML>
+...full updated HTML here...
+</EDITED_HTML>`;
+
+      const result = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `EDITING INSTRUCTION: ${input.instruction}\n\nARTICLE:\n${article.bodyHtml}` },
+        ],
+        max_tokens: 65536,
+      });
+
+      const rawContent = result.choices[0]?.message?.content ?? "";
+      const raw = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
+      const delimMatch = raw.match(/<EDITED_HTML>([\s\S]*?)<\/EDITED_HTML>/i);
+      const editedHtml = delimMatch ? delimMatch[1].trim() : raw.trim();
+
+      if (!editedHtml || editedHtml.length < 100) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI edit returned empty content. Please try again." });
+      }
+
+      const wordCount = editedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
+      await db.update(articles).set({
+        bodyHtml: editedHtml,
+        bodyMarkdown: article.bodyMarkdown ?? editedHtml.replace(/<[^>]+>/g, ""),
+        wordCount,
+      }).where(eq(articles.id, input.articleId));
+
+      return { updated: true, bodyHtml: editedHtml, wordCount };
+    }),
+
+  /**
    * Approve a single article.
    * Sets status = approved and records approvedAt timestamp.
    * Regeneration is blocked after approval.
