@@ -271,7 +271,15 @@ export default function ArticleReview() {
 
   const { data: articlesData, isLoading: articlesLoading, refetch: refetchArticles } = trpc.articles.getAll.useQuery(
     { businessId: business?.id ?? 0 },
-    { enabled: !!business?.id }
+    {
+      enabled: !!business?.id,
+      // Poll every 4 seconds while any article is generating so the UI stays live
+      refetchInterval: (data) => {
+        const list = data?.state?.data as ArticleListItem[] | undefined;
+        const anyGenerating = list?.some(a => a.status === "generating" || a.status === "pending_generation");
+        return anyGenerating ? 4000 : false;
+      },
+    }
   );
 
   // Selected article
@@ -647,14 +655,14 @@ export default function ArticleReview() {
                       selectedItem.id &&
                       regenerate.mutate({ articleId: selectedItem.id })
                     }
-                    disabled={regenerate.isPending}
+                    disabled={regenerate.isPending || selectedItem.status === "generating" || selectedItem.status === "pending_generation"}
                   >
-                    {regenerate.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    {(regenerate.isPending || selectedItem.status === "generating" || selectedItem.status === "pending_generation") ? (
+                      <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
                     ) : (
                       <RefreshCw className="h-3 w-3 mr-1" />
                     )}
-                    Regenerate
+                    {(selectedItem.status === "generating" || selectedItem.status === "pending_generation") ? "Generating…" : "Regenerate"}
                   </Button>
                 )}
               </div>
