@@ -903,6 +903,16 @@ export async function generateSingleArticle(
     }
   }
 
+  // --- AI Citation Disclosure ---
+  // Prepend a one-line AI disclosure to every article before scoring and storage.
+  // This appears at the very top of the published post.
+  const aiDisclosureHtml = `<p class="ai-disclosure" style="font-size:0.85em;color:#6b7280;border-left:3px solid #e5e7eb;padding:4px 10px;margin-bottom:1.5em;"><em>This article was researched and drafted with AI assistance and reviewed for accuracy by ${ctx.businessName}.</em></p>\n`;
+  const aiDisclosureMd = `> *This article was researched and drafted with AI assistance and reviewed for accuracy by ${ctx.businessName}.*\n\n`;
+  bodyHtml = aiDisclosureHtml + bodyHtml;
+  bodyMarkdown = aiDisclosureMd + bodyMarkdown;
+  // Recount words after prepending disclosure (disclosure words are minimal, ~15 words)
+  wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
   // --- Pass 1: Rules-based scorer ---
   const pass1 = runPass1Scorer({
     bodyHtml,

@@ -825,3 +825,9 @@
 ### Frontend: Stage 3 Keywords page
 - [x] Updated assign description to reference seed step
 - [x] assignAll now uses real keyword pool — loading copy updated
+
+## Immediate Fixes (Session 3)
+- [x] Add retryPAA procedure to keywords router — fetches PAA for a single keyword by ID
+- [x] Add Retry button per row in PAA review section of Keywords.tsx
+- [x] Add Skip button per row in PAA review section so rows with no PAA can be skipped
+- [x] Add AI citation/disclosure to the start of each generated blog post (one-line disclaimer)

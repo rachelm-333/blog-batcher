@@ -613,11 +613,42 @@ export const keywordsRouter = router({
     }),
 
   // -------------------------------------------------------------------------
-    // keywords.getSuggestions
-  // Get keyword swap suggestions for the swap modal.
-  // Uses the business's saved seed keywords (not the current bad keyword) to query DataForSEO.
-  // Returns up to 20 real keyword alternatives sorted by MSV descending.
+  // keywords.retryPAA
+  // Fetch (or re-fetch) PAA questions for a single keyword row.
   // -------------------------------------------------------------------------
+  retryPAA: protectedProcedure
+    .input(z.object({ businessId: z.number(), keywordId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      const kwRows = await db
+        .select({ id: keywords.id, primaryKeyword: keywords.primaryKeyword })
+        .from(keywords)
+        .where(and(eq(keywords.id, input.keywordId), eq(keywords.businessId, input.businessId)))
+        .limit(1);
+
+      if (!kwRows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Keyword not found" });
+
+      const kw = kwRows[0];
+      let questions: string[] = [];
+      try {
+        const results = await getPAAQuestions([kw.primaryKeyword]);
+        questions = results.find(r => r.keyword === kw.primaryKeyword)?.questions ?? [];
+      } catch (err) {
+        console.warn("[Keywords] retryPAA failed for", kw.primaryKeyword, err);
+      }
+
+      await db
+        .update(keywords)
+        .set({ paaQuestions: questions })
+        .where(eq(keywords.id, kw.id));
+
+      return { keywordId: kw.id, questionsFound: questions.length };
+    }),
+
   getSuggestions: protectedProcedure
     .input(z.object({ businessId: z.number(), keyword: z.string().min(1) }))
     .query(async ({ ctx, input }) => {

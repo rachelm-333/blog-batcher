@@ -228,6 +228,25 @@ export default function Keywords() {
     onSuccess: async (data) => { toast.success(`PAA fetched for ${data.fetched} keywords`); await refetchKw(); },
     onError: (err) => toast.error(err.message, { description: "Check your DataForSEO integration.", duration: 8000 }),
   });
+  const retryPAA = trpc.keywords.retryPAA.useMutation({
+    onSuccess: async (data) => {
+      if (data.questionsFound > 0) {
+        toast.success(`Found ${data.questionsFound} PAA question${data.questionsFound > 1 ? 's' : ''}`);
+      } else {
+        toast.info("No PAA questions found for this keyword — you can skip it.");
+      }
+      await refetchKw();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const skipPAA = trpc.keywords.approvePAA.useMutation({
+    onSuccess: async (data) => {
+      toast.success("Skipped — article will proceed without a PAA subheading.");
+      await refetchKw();
+      if (data.stageAdvanced) { setSubStage("complete"); }
+    },
+    onError: (err) => toast.error(err.message),
+  });
   const approvePAA = trpc.keywords.approvePAA.useMutation({
     onSuccess: async (data) => {
       await refetchKw();
@@ -433,7 +452,27 @@ export default function Keywords() {
                   {kw.paaApproved && <CheckCircle2 style={{ width:14, height:14, color:"#22c55e", marginLeft:"auto" }} />}
                 </div>
                 {questions.length === 0 ? (
-                  <p style={{ fontSize:12, color:"#9ca3af", margin:0 }}>No PAA questions available — skip or retry.</p>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                    <p style={{ fontSize:12, color:"#9ca3af", margin:0, flex:1 }}>No PAA questions found — retry or skip this article.</p>
+                    <button
+                      onClick={() => retryPAA.mutate({ businessId, keywordId: kw.id })}
+                      disabled={retryPAA.isPending && retryPAA.variables?.keywordId === kw.id}
+                      style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"5px 12px", borderRadius:6, border:"1px solid #c4b5fd", background:"#ede9ff", color:"#6e5afe", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}
+                    >
+                      {retryPAA.isPending && retryPAA.variables?.keywordId === kw.id
+                        ? <><Loader2 style={{ width:11, height:11 }} className="animate-spin" /> Retrying…</>
+                        : <><RefreshCw style={{ width:11, height:11 }} /> Retry</>}
+                    </button>
+                    <button
+                      onClick={() => skipPAA.mutate({ businessId, keywordId: kw.id, approvedQuestion: "__skip__" })}
+                      disabled={skipPAA.isPending && skipPAA.variables?.keywordId === kw.id}
+                      style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"5px 12px", borderRadius:6, border:"1px solid #e5e7eb", background:"#fff", color:"#6b7280", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}
+                    >
+                      {skipPAA.isPending && skipPAA.variables?.keywordId === kw.id
+                        ? <><Loader2 style={{ width:11, height:11 }} className="animate-spin" /> Skipping…</>
+                        : "Skip"}
+                    </button>
+                  </div>
                 ) : (
                   <Select
                     value={kw.approvedPaaQuestion ?? ""}
