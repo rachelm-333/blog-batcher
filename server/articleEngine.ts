@@ -663,21 +663,29 @@ ${bodyHtml.slice(0, 3000)}
 Return JSON: { "score": <0-100 integer>, "feedback": "<one sentence summary>" }`;
 
   try {
-    const result = await invokeLLMWithCost(
-      {
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-      },
-      { userId, feature: "seo_analysis" }
+    // Race the LLM call against a 30-second timeout so it never hangs indefinitely
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Pass 2 scorer timed out after 30s")), 30_000)
     );
+    const result = await Promise.race([
+      invokeLLMWithCost(
+        {
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+        },
+        { userId, feature: "seo_analysis" }
+      ),
+      timeoutPromise,
+    ]);
     const content = result.choices[0]?.message?.content;
     const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
     return {
       score: Math.min(100, Math.max(0, parseInt(parsed.score) || 0)),
       feedback: parsed.feedback || "",
     };
-  } catch {
-    // If AI scorer fails, return a neutral score so generation isn't blocked
+  } catch (err) {
+    // If AI scorer fails or times out, return a neutral score so generation isn't blocked
+    console.warn(`[ArticleEngine] Pass 2 scorer failed/timed out:`, err instanceof Error ? err.message : err);
     return { score: 75, feedback: "AI quality check unavailable" };
   }
 }
@@ -1120,10 +1128,13 @@ Return ONLY the expanded HTML wrapped in:
   });
 
   // --- Pass 2: AI quality scorer ---
+  console.log(`[ArticleEngine] Pass 2 scoring for node ${nodeId} (${wordCount} words)...`);
   const pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
+  console.log(`[ArticleEngine] Pass 2 score: ${pass2.score} for node ${nodeId} — ${pass2.feedback}`);
 
   // --- Derive badge ---
   const { internalScore, statusBadge } = deriveStatusBadge(pass1.score, pass2.score);
+  console.log(`[ArticleEngine] Final score: ${internalScore} (${statusBadge}) for node ${nodeId}`);
 
   return {
     title,
