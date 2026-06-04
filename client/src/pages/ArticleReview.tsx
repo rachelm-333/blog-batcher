@@ -382,6 +382,15 @@ export default function ArticleReview() {
     reader.readAsDataURL(file);
   }
 
+  const retryPublish = trpc.articles.retryPublish.useMutation({
+    onSuccess: () => {
+      toast.success("Publish retry started.");
+      refetchArticles();
+      refetchFull();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   // Derived state
   const approvedCount = articleList.filter(
     a => a.status === "approved" || a.status === "scheduled" || a.status === "published"
@@ -420,15 +429,6 @@ export default function ArticleReview() {
     selectedItem?.status !== "approved" &&
     selectedItem?.status !== "scheduled" &&
     selectedItem?.status !== "published";
-
-  const retryPublish = trpc.articles.retryPublish.useMutation({
-    onSuccess: () => {
-      toast.success("Publish retry started.");
-      refetchArticles();
-      refetchFull();
-    },
-    onError: (err) => toast.error(err.message),
-  });
 
   function handleSaveDraft() {
     if (!selectedItem?.id) return;
