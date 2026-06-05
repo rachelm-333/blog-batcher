@@ -123,7 +123,7 @@ const PLATFORMS: PlatformConfig[] = [
     icon: <Globe className="w-6 h-6 text-purple-500" />,
     available: true,
     helpUrl: "https://dev.wix.com/docs/rest/articles/getting-started/authentication",
-    helpText: "You need a Wix API Key and Site ID from the Wix Developer Centre.",
+    helpText: "You need a Wix API Key, Site ID, and Member ID from the Wix Developer Centre.",
     fields: [
       {
         key: "apiKey",
@@ -140,6 +140,14 @@ const PLATFORMS: PlatformConfig[] = [
         type: "text",
         required: true,
         hint: "Found in your Wix site URL or Developer Centre",
+      },
+      {
+        key: "memberId",
+        label: "Wix Member ID",
+        placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        type: "text",
+        required: true,
+        hint: "Your Wix account Member ID — found in Wix Developer Centre → Members or your site dashboard URL",
       },
     ],
   },
@@ -313,6 +321,7 @@ function PlatformCard({
                   {field.key === "seoPlugin" && <HelpLink slug="seo-plugins" label="Which SEO plugin should I use?" />}
                   {field.key === "applicationPassword" && <HelpLink slug="wordpress-application-password" label="How to create a WordPress Application Password" />}
                   {field.key === "apiKey" && <HelpLink slug="wix-api-key" label="How to get your Wix API Key" />}
+                  {field.key === "memberId" && <HelpLink slug="wix-member-id" label="How to find your Wix Member ID" />}
                 </div>
                 {field.type === "select" ? (
                   <Select

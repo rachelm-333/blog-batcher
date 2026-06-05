@@ -166,6 +166,7 @@ export const integrationsRouter = router({
         if (creds.username) safeFields.username = creds.username;
         if (creds.seoPlugin) safeFields.seoPlugin = creds.seoPlugin;
         if (creds.siteId) safeFields.siteId = creds.siteId;
+        if (creds.memberId) safeFields.memberId = creds.memberId;
         if (creds.webhookUrl) safeFields.webhookUrl = creds.webhookUrl;
         // Mask secrets
         if (creds.applicationPassword) safeFields.applicationPassword = "••••••••";
@@ -229,6 +230,7 @@ export const integrationsRouter = router({
         result = await testWixConnection({
           apiKey: creds.apiKey ?? "",
           siteId: creds.siteId ?? "",
+          memberId: creds.memberId ?? "",
         });
       } else {
         result = await testZapierConnection({
