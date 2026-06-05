@@ -318,9 +318,9 @@ export default function ArticleGeneration() {
                       <td style={{ padding:"12px 16px" }}><ScoreRing score={article.internalScore ?? null} /></td>
                       <td style={{ padding:"12px 16px" }}><StatusBadge status={article.status} /></td>
                       <td style={{ padding:"12px 16px" }}>
-                        {["generated","pending_approval","approved"].includes(article.status) && (
+                        {["generated","pending_approval","approved","published","scheduled"].includes(article.status) && (
                           <button className="btn-ghost" style={{ padding:"5px 12px", fontSize:12 }}
-                            onClick={() => setLocation("/review")}>
+                            onClick={() => setLocation(`/review?articleId=${article.id}`)}>
                             Review
                           </button>
                         )}

@@ -50,7 +50,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
 
 // ---------------------------------------------------------------------------
@@ -529,12 +529,27 @@ export default function ArticleReview() {
 
   const articleList: ArticleListItem[] = useMemo(() => articlesData ?? [], [articlesData]);
 
-  // Auto-select first article
+  // Read ?articleId= from URL to deep-link to a specific article
+  const searchString = useSearch();
+  const urlArticleId = useMemo(() => {
+    const params = new URLSearchParams(searchString);
+    const v = params.get("articleId");
+    return v ? parseInt(v, 10) : null;
+  }, [searchString]);
+
+  // Auto-select: prefer URL articleId, then first article
   useEffect(() => {
-    if (articleList.length > 0 && selectedNodeId === null) {
-      setSelectedNodeId(articleList[0].articleNodeId);
+    if (articleList.length === 0) return;
+    if (selectedNodeId !== null) return; // already selected
+    if (urlArticleId) {
+      const target = articleList.find(a => a.id === urlArticleId);
+      if (target) {
+        setSelectedNodeId(target.articleNodeId);
+        return;
+      }
     }
-  }, [articleList, selectedNodeId]);
+    setSelectedNodeId(articleList[0].articleNodeId);
+  }, [articleList, selectedNodeId, urlArticleId]);
 
   const selectedItem = articleList.find(a => a.articleNodeId === selectedNodeId) ?? null;
 
