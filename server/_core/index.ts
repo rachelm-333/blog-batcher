@@ -188,6 +188,29 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // ── Startup recovery: reset any articles stuck in 'generating' or 'pending_generation' ──
+  // These get stuck when the server restarts mid-generation (e.g. during hot-reload or deploy).
+  setImmediate(async () => {
+    try {
+      const db = await getDb();
+      if (!db) return;
+      const { inArray: inArr } = await import("drizzle-orm");
+      const result = await db
+        .update(articles)
+        .set({
+          status: "failed",
+          errorMessage: "Generation was interrupted by a server restart. Use \"Keep & review\" if the article has content, or Retry to regenerate.",
+        })
+        .where(inArr(articles.status, ["generating", "pending_generation"]));
+      const count = (result as unknown as { rowsAffected?: number })?.rowsAffected ?? 0;
+      if (count > 0) {
+        console.log(`[Startup] Reset ${count} stuck article(s) from generating → failed`);
+      }
+    } catch (err) {
+      console.error("[Startup] Failed to reset stuck articles:", err);
+    }
+  });
 }
 
 startServer().catch(console.error);

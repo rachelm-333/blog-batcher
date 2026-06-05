@@ -865,3 +865,8 @@
 ## Wix Publish Bug Fix (Session 7)
 - [x] Fix "No CMS connected" bug in publish panel — was checking i.connected (undefined) instead of i.status === "connected"
 - [x] Add refetchOnMount + staleTime:0 to integrations.get query in ArticleReview so it always fetches fresh connection status
+
+## Article Formatting & Wix Publish Fixes (Session 7)
+
+- [x] Register @tailwindcss/typography plugin in index.css so prose classes render headings/paragraphs correctly in article preview
+- [x] Fix Wix publish to send full article HTML as proper Ricos node tree (HEADING, PARAGRAPH, BULLETED_LIST, ORDERED_LIST, BLOCKQUOTE) instead of truncated 5000-char plain text
