@@ -31,6 +31,7 @@ import {
   Calendar,
   CheckCircle2,
   ClipboardCopy,
+  Copy,
   Code2,
   Download,
   ExternalLink,
@@ -796,11 +797,17 @@ export default function ArticleReview() {
     );
   }
 
+  // isApproved controls the article body editor lock — NOT the SEO fields.
+  // SEO fields (slug, meta title, meta description, focus keyword, image URL)
+  // are always editable so users can update them before re-publishing.
   const isApproved =
     selectedItem?.status === "approved" ||
     selectedItem?.status === "scheduled" ||
     selectedItem?.status === "published" ||
     selectedItem?.status === "failed";
+
+  // SEO fields are always editable regardless of publish status
+  const seoFieldsLocked = false;
   const canRegenerate = !!selectedItem?.id &&
     selectedItem?.status !== "approved" &&
     selectedItem?.status !== "scheduled" &&
@@ -1202,13 +1209,23 @@ export default function ArticleReview() {
                   {fieldFailing("urlSlug") && <AlertTriangle className="h-3 w-3 text-amber-500" />}
                   <HelpLink slug="url-slug-best-practices" label="How to write a good URL slug" />
                 </div>
-                <Input
-                  value={seoEdits.urlSlug}
-                  onChange={e => setSeoEdits(prev => ({ ...prev, urlSlug: e.target.value }))}
-                  placeholder="url-slug-here"
-                  className={`text-xs font-mono ${fieldFailing("urlSlug") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
-                  disabled={isApproved}
-                />
+                <div className="flex gap-1">
+                  <Input
+                    value={seoEdits.urlSlug}
+                    onChange={e => setSeoEdits(prev => ({ ...prev, urlSlug: e.target.value }))}
+                    placeholder="url-slug-here"
+                    className={`text-xs font-mono flex-1 ${fieldFailing("urlSlug") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
+                    disabled={seoFieldsLocked}
+                  />
+                  <button
+                    type="button"
+                    title="Copy slug"
+                    onClick={() => { navigator.clipboard.writeText(seoEdits.urlSlug); toast.success("Slug copied"); }}
+                    className="px-2 rounded-md border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
                 {fieldFailing("urlSlug") && (
                   <p className="text-[11px] text-amber-600">Include your focus keyword in the slug (e.g. focus-keyword-topic)</p>
                 )}
@@ -1221,13 +1238,23 @@ export default function ArticleReview() {
                   {fieldFailing("metaTitle") && <XCircle className="h-3 w-3 text-red-500" />}
                   <HelpLink slug="meta-title-description" label="Meta title best practices" />
                 </div>
-                <Input
-                  value={seoEdits.metaTitle}
-                  onChange={e => setSeoEdits(prev => ({ ...prev, metaTitle: e.target.value }))}
-                  placeholder="Meta title (max 60 chars)"
-                  className={`text-xs ${fieldFailing("metaTitle") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
-                  disabled={isApproved}
-                />
+                <div className="flex gap-1">
+                  <Input
+                    value={seoEdits.metaTitle}
+                    onChange={e => setSeoEdits(prev => ({ ...prev, metaTitle: e.target.value }))}
+                    placeholder="Meta title (max 60 chars)"
+                    className={`text-xs flex-1 ${fieldFailing("metaTitle") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                    disabled={seoFieldsLocked}
+                  />
+                  <button
+                    type="button"
+                    title="Copy meta title"
+                    onClick={() => { navigator.clipboard.writeText(seoEdits.metaTitle); toast.success("Meta title copied"); }}
+                    className="px-2 rounded-md border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
                 <div className={`text-xs text-right ${
                   metaTitleLen > 60 ? "text-destructive" :
                   fieldFailing("metaTitle") ? "text-amber-600" :
@@ -1244,13 +1271,23 @@ export default function ArticleReview() {
                   {fieldFailing("metaDescription") && <XCircle className="h-3 w-3 text-red-500" />}
                   <HelpLink slug="meta-title-description" label="Meta description best practices" />
                 </div>
-                <Textarea
-                  value={seoEdits.metaDescription}
-                  onChange={e => setSeoEdits(prev => ({ ...prev, metaDescription: e.target.value }))}
-                  placeholder="Meta description (140–160 chars)"
-                  className={`text-xs min-h-[70px] resize-none ${fieldFailing("metaDescription") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
-                  disabled={isApproved}
-                />
+                <div className="relative">
+                  <Textarea
+                    value={seoEdits.metaDescription}
+                    onChange={e => setSeoEdits(prev => ({ ...prev, metaDescription: e.target.value }))}
+                    placeholder="Meta description (140–160 chars)"
+                    className={`text-xs min-h-[70px] resize-none pr-8 ${fieldFailing("metaDescription") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                    disabled={seoFieldsLocked}
+                  />
+                  <button
+                    type="button"
+                    title="Copy meta description"
+                    onClick={() => { navigator.clipboard.writeText(seoEdits.metaDescription); toast.success("Meta description copied"); }}
+                    className="absolute top-2 right-2 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
                 <div className={`text-xs text-right ${
                   (metaDescLen < 140 || metaDescLen > 160) ? "text-amber-600" :
                   fieldFailing("metaDescription") ? "text-amber-600" :
@@ -1267,13 +1304,23 @@ export default function ArticleReview() {
                   {fieldFailing("focusKeyword") && <AlertTriangle className="h-3 w-3 text-amber-500" />}
                   <HelpLink slug="focus-keyword" label="What is a focus keyword?" />
                 </div>
-                <Input
-                  value={seoEdits.focusKeyword}
-                  onChange={e => setSeoEdits(prev => ({ ...prev, focusKeyword: e.target.value }))}
-                  placeholder="focus keyword phrase"
-                  className={`text-xs ${fieldFailing("focusKeyword") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
-                  disabled={isApproved}
-                />
+                <div className="flex gap-1">
+                  <Input
+                    value={seoEdits.focusKeyword}
+                    onChange={e => setSeoEdits(prev => ({ ...prev, focusKeyword: e.target.value }))}
+                    placeholder="focus keyword phrase"
+                    className={`text-xs flex-1 ${fieldFailing("focusKeyword") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
+                    disabled={seoFieldsLocked}
+                  />
+                  <button
+                    type="button"
+                    title="Copy focus keyword"
+                    onClick={() => { navigator.clipboard.writeText(seoEdits.focusKeyword); toast.success("Focus keyword copied"); }}
+                    className="px-2 rounded-md border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
                 {fieldFailing("focusKeyword") && (
                   <p className="text-[11px] text-amber-600">Keyword should appear in H1, H2, first 150 words, meta title, and slug</p>
                 )}
@@ -1287,33 +1334,30 @@ export default function ArticleReview() {
                   onChange={e => setSeoEdits(prev => ({ ...prev, imageUrl: e.target.value }))}
                   placeholder="Paste image URL or upload below"
                   className="text-xs"
-                  disabled={isApproved}
                 />
-                {!isApproved && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageUpload}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs mt-1"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={saveImage.isPending}
-                    >
-                      {saveImage.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                      ) : (
-                        <Upload className="h-3 w-3 mr-1" />
-                      )}
-                      Upload Image
-                    </Button>
-                  </>
-                )}
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs mt-1"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={saveImage.isPending}
+                  >
+                    {saveImage.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Upload className="h-3 w-3 mr-1" />
+                    )}
+                    Upload Image
+                  </Button>
+                </>
               </div>
 
               {/* Action buttons */}
