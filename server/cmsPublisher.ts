@@ -340,7 +340,10 @@ function htmlToRicos(html: string): Record<string, unknown> {
         const hrefMatch = part.match(/href=["']([^"']+)["']/i);
         text = part.replace(/<[^>]+>/g, "");
         if (hrefMatch) {
-          decorations.push({ type: "LINK", linkData: { link: { url: hrefMatch[1], target: "_blank" } } });
+          // Wix Ricos target enum: 0=SELF, 1=BLANK, 2=PARENT, 3=TOP
+          const targetAttr = part.match(/target=["']([^"']+)["']/i)?.[1] ?? "_blank";
+          const targetEnum = targetAttr === "_self" ? 0 : targetAttr === "_parent" ? 2 : targetAttr === "_top" ? 3 : 1;
+          decorations.push({ type: "LINK", linkData: { link: { url: hrefMatch[1], target: targetEnum } } });
         }
       } else if (/<br/i.test(part)) {
         text = "\n";
