@@ -486,7 +486,7 @@ function htmlToRicos(html: string): Record<string, unknown> {
       spacedNodes.push({
         type: "PARAGRAPH",
         id: nextId(),
-        nodes: [{ type: "TEXT", id: nextId(), nodes: [], textData: { text: " ", decorations: [] } }],
+        nodes: [{ type: "TEXT", id: nextId(), nodes: [], textData: { text: "", decorations: [] } }],
         paragraphData: {},
       });
     }
@@ -529,8 +529,9 @@ export async function publishToWix(
     // 1. Remove the first <h1> tag (Wix renders the post title separately — having it in the body creates a duplicate)
     // 2. Remove the AI disclosure paragraph (it's a meta note, not article content)
     let cleanBodyHtml = article.bodyHtml
-      .replace(/<h1[^>]*>.*?<\/h1>/i, "")  // strip first H1 (duplicate of title)
-      .replace(/<p[^>]*>\s*This article was researched and drafted with AI assistance[^<]*<\/p>/i, "") // strip AI disclosure
+      .replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, "")  // strip first H1 (duplicate of title) — multiline
+      .replace(/<p[^>]*class="ai-disclosure"[^>]*>[\s\S]*?<\/p>/i, "") // strip AI disclosure by class
+      .replace(/<p[^>]*>[\s\S]*?This article was researched and drafted with AI assistance[\s\S]*?<\/p>/i, "") // fallback: strip by text content
       .trim();
 
     // Build excerpt from meta description (max 500 chars per Wix limit)
