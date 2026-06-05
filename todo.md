@@ -861,3 +861,7 @@
 - [x] Auto-rescore the 15-point checklist when any SEO field is saved (meta title, meta description, focus keyword, schema) — no manual refresh needed
 - [x] Add manual copy panel on right side: copyable meta title, meta description, focus keyword, schema JSON, and slug (for manual publishing)
 - [x] Add line spacing between headings and paragraphs in generated article HTML (one blank line between each element for clean rendering in CMS)
+
+## Wix Publish Bug Fix (Session 7)
+- [x] Fix "No CMS connected" bug in publish panel — was checking i.connected (undefined) instead of i.status === "connected"
+- [x] Add refetchOnMount + staleTime:0 to integrations.get query in ArticleReview so it always fetches fresh connection status

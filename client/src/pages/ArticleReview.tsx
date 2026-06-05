@@ -673,9 +673,9 @@ export default function ArticleReview() {
   // Integration data (to know which platforms are connected)
   const { data: integrationsData } = trpc.integrations.get.useQuery(
     { businessId: business?.id ?? 0 },
-    { enabled: !!business?.id }
+    { enabled: !!business?.id, refetchOnMount: true, staleTime: 0 }
   );
-  const connectedPlatforms = (integrationsData ?? []).filter((i: any) => i.connected).map((i: any) => i.platform as string);
+  const connectedPlatforms = (integrationsData ?? []).filter((i: any) => i.status === "connected").map((i: any) => i.platform as string);
   const defaultPlatform = connectedPlatforms.includes("wix") ? "wix" : connectedPlatforms.includes("wordpress") ? "wordpress" : connectedPlatforms[0] ?? null;
   const [publishPlatform, setPublishPlatform] = useState<string | null>(null);
 
