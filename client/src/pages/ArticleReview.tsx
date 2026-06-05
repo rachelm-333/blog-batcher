@@ -1390,6 +1390,71 @@ export default function ArticleReview() {
                       View on CMS
                     </a>
                   )}
+                  {/* Re-publish panel — same as approved state */}
+                  {!publishPanelOpen ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs"
+                      onClick={() => {
+                        setPublishPlatform(defaultPlatform);
+                        setPublishMode("live");
+                        setScheduleDate("");
+                        setPublishPanelOpen(true);
+                      }}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1.5" />
+                      Re-publish to CMS
+                    </Button>
+                  ) : (
+                    <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">Publish Options</span>
+                        <button
+                          type="button"
+                          onClick={() => setPublishPanelOpen(false)}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >✕</button>
+                      </div>
+                      {connectedPlatforms.length === 0 ? (
+                        <p className="text-xs text-amber-500">
+                          ⚠ No CMS connected. <a href="/integrations" className="underline">Go to Integrations</a>
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          {connectedPlatforms.map(p => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setPublishPlatform(p)}
+                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
+                                publishPlatform === p
+                                  ? "border-primary bg-primary/10 text-primary font-semibold"
+                                  : "border-border bg-background hover:bg-muted"
+                              }`}
+                            >
+                              <Globe className="h-3.5 w-3.5" />
+                              {p.charAt(0).toUpperCase() + p.slice(1)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {connectedPlatforms.length > 0 && (
+                        <Button
+                          size="sm"
+                          className="w-full text-xs"
+                          onClick={handlePublishSingle}
+                          disabled={publishSingle.isPending || !publishPlatform}
+                        >
+                          {publishSingle.isPending ? (
+                            <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Publishing…</>
+                          ) : (
+                            <><Globe className="h-3 w-3 mr-1" /> Publish live now</>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* ── Per-article publish action panel ─────────────────── */
