@@ -477,7 +477,22 @@ function htmlToRicos(html: string): Record<string, unknown> {
     nodes.push(makeParagraph(plainText || "(no content)"));
   }
 
-  return { nodes, metadata: { version: 1 } };
+  // Insert an empty PARAGRAPH spacer between every pair of nodes so Wix
+  // renders visual spacing between headings, paragraphs, and lists.
+  const spacedNodes: Record<string, unknown>[] = [];
+  for (let i = 0; i < nodes.length; i++) {
+    spacedNodes.push(nodes[i]);
+    if (i < nodes.length - 1) {
+      spacedNodes.push({
+        type: "PARAGRAPH",
+        id: nextId(),
+        nodes: [{ type: "TEXT", id: nextId(), nodes: [], textData: { text: " ", decorations: [] } }],
+        paragraphData: {},
+      });
+    }
+  }
+
+  return { nodes: spacedNodes, metadata: { version: 1 } };
 }
 
 // ---------------------------------------------------------------------------
@@ -509,30 +524,41 @@ export async function publishToWix(
     // NOTE: Wix Blog API v3 auto-generates the slug from the title.
     // The slug field in draftPost is read-only for 3rd-party apps.
     // memberId is required for 3rd-party API key authentication.
+
+    // Pre-process body HTML before converting to Ricos:
+    // 1. Remove the first <h1> tag (Wix renders the post title separately — having it in the body creates a duplicate)
+    // 2. Remove the AI disclosure paragraph (it's a meta note, not article content)
+    let cleanBodyHtml = article.bodyHtml
+      .replace(/<h1[^>]*>.*?<\/h1>/i, "")  // strip first H1 (duplicate of title)
+      .replace(/<p[^>]*>\s*This article was researched and drafted with AI assistance[^<]*<\/p>/i, "") // strip AI disclosure
+      .trim();
+
+    // Build excerpt from meta description (max 500 chars per Wix limit)
+    const excerpt = article.metaDescription
+      ? article.metaDescription.slice(0, 500)
+      : undefined;
+
+    // Build hashtags from focus keyword (Wix uses hashtags for keyword association)
+    const hashtags = article.focusKeyword
+      ? article.focusKeyword.split(/[,\s]+/).filter(Boolean).slice(0, 10)
+      : [];
+
     const draftBody: Record<string, unknown> = {
       draftPost: {
         title: article.title,
-        richContent: htmlToRicos(article.bodyHtml),
+        richContent: htmlToRicos(cleanBodyHtml),
         memberId: credentials.memberId,
+        ...(excerpt ? { excerpt } : {}),
+        ...(hashtags.length > 0 ? { hashtags } : {}),
         seoData: {
           tags: [
             {
               type: "title",
-              children: article.metaTitle,
-              custom: false,
-              isDisabled: false,
+              children: article.metaTitle || article.title,
             },
             {
               type: "meta",
-              props: { name: "description", content: article.metaDescription },
-              custom: false,
-              isDisabled: false,
-            },
-            {
-              type: "meta",
-              props: { name: "keywords", content: article.focusKeyword },
-              custom: false,
-              isDisabled: false,
+              props: { name: "description", content: article.metaDescription || "" },
             },
           ],
         },
