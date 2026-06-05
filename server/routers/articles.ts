@@ -1396,7 +1396,7 @@ ${row.bodyHtml ?? ""}
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
       await assertBusinessOwnership(ctx.user.id, row.businessId);
 
-      if (!(["approved", "scheduled", "generated", "pending_approval"].includes(row.status))) {
+      if (!(["approved", "scheduled", "generated", "pending_approval", "published"].includes(row.status))) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Article must be approved before publishing" });
       }
 
