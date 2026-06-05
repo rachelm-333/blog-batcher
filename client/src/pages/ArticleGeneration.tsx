@@ -88,6 +88,14 @@ export default function ArticleGeneration() {
     { enabled: !!businessId, refetchInterval: generating ? 3000 : false }
   );
 
+  const regenerateSingleMutation = trpc.articles.regenerate.useMutation({
+    onSuccess: () => {
+      toast.success("Regenerating article… this may take a minute.");
+      setGenerating(true);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const regenUnderTargetMutation = trpc.articles.regenerateUnderTarget.useMutation({
     onSuccess: (data) => {
       if (data.queued === 0) {
@@ -117,12 +125,14 @@ export default function ArticleGeneration() {
   }, [articles]);
 
   const totalCount = articles?.length ?? 0;
-  const writtenCount = articles?.filter(a => ["generated","pending_approval","approved","published","scheduled"].includes(a.status)).length ?? 0;
+  const writtenCount = articles?.filter(a => ["generated","pending_approval","approved","published","scheduled","failed"].includes(a.status)).length ?? 0;
+  const failedCount = articles?.filter(a => a.status === "failed").length ?? 0;
   const scoredCount = articles?.filter(a => a.internalScore !== null).length ?? 0;
   const avgScore = scoredCount > 0
     ? Math.round(articles!.filter(a => a.internalScore !== null).reduce((s, a) => s + (a.internalScore ?? 0), 0) / scoredCount)
     : null;
 
+  // allWritten: all articles are in a terminal state (no longer generating/pending)
   const allWritten = totalCount > 0 && writtenCount === totalCount;
   const hasArticles = totalCount > 0;
   const canGenerate = currentStage >= 4 && !generating;
@@ -196,9 +206,14 @@ export default function ArticleGeneration() {
                     : <><RefreshCw style={{ width:13, height:13 }} /> Regenerate {underTargetCount} under target</>}
                 </button>
               )}
-              {allWritten && (
+              {allWritten && failedCount === 0 && (
                 <button className="btn-primary" onClick={() => setLocation("/review")}>
                   Review articles →
+                </button>
+              )}
+              {allWritten && failedCount > 0 && (
+                <button className="btn-primary" onClick={() => setLocation("/review")}>
+                  Review {writtenCount - failedCount} articles →
                 </button>
               )}
             </div>
@@ -228,6 +243,16 @@ export default function ArticleGeneration() {
               <h3 style={{ fontSize:14, fontWeight:700, color:"#1a1a2e", margin:0 }}>The batch</h3>
               <span style={{ fontSize:12, color:"#9ca3af" }}>{writtenCount} / {totalCount} written</span>
             </div>
+
+            {/* Failed articles warning banner */}
+            {!generating && failedCount > 0 && (
+              <div style={{ padding:"12px 20px", borderBottom:"1px solid #fecaca", background:"#fff1f2", display:"flex", alignItems:"center", gap:10 }}>
+                <AlertTriangle style={{ width:15, height:15, color:"#dc2626", flexShrink:0 }} />
+                <span style={{ fontSize:13, color:"#991b1b", fontWeight:500 }}>
+                  {failedCount} article{failedCount > 1 ? "s" : ""} failed to generate. Use the Retry button to regenerate {failedCount > 1 ? "them" : "it"}, or proceed to review the {writtenCount - failedCount} successful articles.
+                </span>
+              </div>
+            )}
 
             {/* Generating progress bar */}
             {generating && (
@@ -292,6 +317,18 @@ export default function ArticleGeneration() {
                           <button className="btn-ghost" style={{ padding:"5px 12px", fontSize:12 }}
                             onClick={() => setLocation("/review")}>
                             Review
+                          </button>
+                        )}
+                        {article.status === "failed" && (
+                          <button
+                            className="btn-ghost"
+                            style={{ padding:"5px 12px", fontSize:12, color:"#dc2626", borderColor:"#fca5a5", display:"flex", alignItems:"center", gap:4 }}
+                            disabled={regenerateSingleMutation.isPending}
+                            onClick={() => regenerateSingleMutation.mutate({ articleId: article.id })}
+                          >
+                            {regenerateSingleMutation.isPending
+                              ? <><Loader2 style={{ width:11, height:11 }} className="animate-spin" /> Retrying…</>
+                              : <><RefreshCw style={{ width:11, height:11 }} /> Retry</>}
                           </button>
                         )}
                       </td>
