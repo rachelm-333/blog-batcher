@@ -280,7 +280,7 @@
 - [ ] WordPress schema: inject JSON-LD as custom field _blog_batcher_schema
 - [ ] WordPress image: upload featured image via /wp-json/wp/v2/media if imageUrl provided
 - [ ] Wix publisher: POST to Wix Blog API v3 (create draft, set SEO fields, publish)
-- [ ] Zapier publisher: POST article payload JSON to user-supplied webhookUrl
+- [x] Zapier publisher: POST article payload JSON to user-supplied webhookUrl
 - [ ] Publish failure: catch all errors, return structured { success, cmsPostId, cmsPostUrl, error } result
 - [ ] Connection test: testConnection(integration) — lightweight HEAD/GET to verify credentials before publish
 
@@ -299,7 +299,7 @@
 - [ ] /integrations route — CMS Integrations settings page (auth-guarded)
 - [ ] WordPress connection form: Site URL, Username, Application Password, SEO Plugin selector (Yoast/RankMath/AIOSEO/None), Test Connection button
 - [ ] Wix connection form: API Key, Site ID, Test Connection button
-- [ ] Zapier connection form: Webhook URL, Test Connection button
+- [x] Zapier connection form: Webhook URL, Test Connection button — expanded to Zapier/Make with full payload field table and template links
 - [ ] Shopify/Webflow/Squarespace/Ghost: Coming Soon cards (greyed out)
 - [ ] Connection status badge per integration (Connected / Not Connected / Failed)
 - [ ] Test Connection result shown inline (success message or error detail)

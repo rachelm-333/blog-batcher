@@ -33,6 +33,8 @@ import {
   Globe,
   Webhook,
   Clock,
+  Info,
+  AlertTriangle,
 } from "lucide-react";
 import { HelpLink } from "@/components/HelpLink";
 
@@ -119,11 +121,11 @@ const PLATFORMS: PlatformConfig[] = [
   {
     id: "wix",
     name: "Wix",
-    description: "Publish blog posts to your Wix site using the Wix Content API.",
+    description: "Publish blog posts directly to Wix via the Blog API. Note: URL slug and focus keyword require Zapier or Make for full control.",
     icon: <Globe className="w-6 h-6 text-purple-500" />,
     available: true,
     helpUrl: "https://dev.wix.com/docs/rest/articles/getting-started/authentication",
-    helpText: "You need a Wix API Key, Site ID, and Member ID from the Wix Developer Centre.",
+    helpText: "You need a Wix API Key, Site ID, and Member ID from the Wix Developer Centre. For full SEO field control (URL slug, focus keyword), use the Zapier or Make webhook instead.",
     fields: [
       {
         key: "apiKey",
@@ -153,20 +155,20 @@ const PLATFORMS: PlatformConfig[] = [
   },
   {
     id: "zapier",
-    name: "Zapier Webhook",
-    description: "Send article payloads to any Zapier webhook. Connect to any CMS, email tool, or automation.",
+    name: "Zapier / Make Webhook",
+    description: "Recommended for Wix users. Sends all SEO fields — including URL slug, focus keyword, image alt text, and schema — to your automation tool, which then pushes to any CMS.",
     icon: <Zap className="w-6 h-6 text-orange-500" />,
     available: true,
     helpUrl: "https://zapier.com/apps/webhook/integrations",
-    helpText: "Create a Zap with a Webhooks by Zapier trigger (Catch Hook) and paste the webhook URL below.",
+    helpText: "Create a Zap (Webhooks by Zapier → Catch Hook) or a Make scenario (Webhooks → Custom webhook) and paste the URL below. Blog Batcher will POST a full JSON payload with every SEO field.",
     fields: [
       {
         key: "webhookUrl",
-        label: "Zapier Webhook URL",
-        placeholder: "https://hooks.zapier.com/hooks/catch/...",
+        label: "Webhook URL (Zapier or Make)",
+        placeholder: "https://hooks.zapier.com/hooks/catch/... or https://hook.eu1.make.com/...",
         type: "url",
         required: true,
-        hint: "From your Zapier Catch Hook trigger",
+        hint: "Zapier: Webhooks by Zapier → Catch Hook. Make: Webhooks → Custom webhook.",
       },
     ],
   },
@@ -474,19 +476,94 @@ export default function IntegrationsPage() {
           </div>
         </div>
 
-        {/* Webhook info */}
-        <Card className="bg-muted/30">
+        {/* Wix limitation callout */}
+        <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="pt-4">
             <div className="flex gap-3">
-              <Webhook className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">Using Zapier?</p>
-                <p className="mt-1">
-                  The Zapier webhook sends a JSON payload with all article fields (title, HTML body, meta title,
-                  meta description, focus keyword, URL slug, schema JSON-LD, and scheduled publish date).
-                  Use Zapier to route to Shopify, Webflow, Squarespace, Ghost, or any other platform.
+              <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-semibold text-foreground">Wix users — URL slug &amp; focus keyword</p>
+                <p className="mt-1 text-muted-foreground">
+                  The Wix Blog API restricts URL slug and focus keyword fields for third-party apps.
+                  To publish with full SEO control, connect via <strong>Zapier</strong> or <strong>Make</strong> instead —
+                  Blog Batcher sends all fields to your webhook, and your automation maps them into Wix with no restrictions.
+                </p>
+                <p className="mt-2 text-muted-foreground">
+                  The direct Wix connection still publishes title, body, meta title, meta description, and excerpt correctly.
                 </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Webhook info */}
+        <Card className="bg-muted/30">
+          <CardContent className="pt-4 space-y-3">
+            <div className="flex gap-3">
+              <Webhook className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-semibold text-foreground">Zapier / Make webhook — full payload</p>
+                <p className="mt-1 text-muted-foreground">
+                  Blog Batcher POSTs a JSON payload to your webhook URL with every article field.
+                  Your Zap or Make scenario maps these to any CMS — Wix, Shopify, Webflow, Squarespace, Ghost, or any other platform.
+                </p>
+              </div>
+            </div>
+
+            {/* Payload field table */}
+            <div className="rounded-md border border-border overflow-hidden text-xs">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="text-left px-3 py-2 font-semibold text-foreground">Field</th>
+                    <th className="text-left px-3 py-2 font-semibold text-foreground">Description</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {([
+                    ["title", "Post title"],
+                    ["body_html", "Full article body (HTML)"],
+                    ["meta_title", "SEO meta title (≤60 chars)"],
+                    ["meta_description", "SEO meta description (140–160 chars)"],
+                    ["focus_keyword", "Primary SEO keyword"],
+                    ["url_slug", "URL-safe slug (e.g. best-pitch-deck-tips)"],
+                    ["excerpt", "Short preview blurb (≤500 chars)"],
+                    ["schema_json_ld", "JSON-LD structured data string"],
+                    ["image_url", "Featured image URL"],
+                    ["image_alt_text", "Featured image alt text"],
+                    ["hashtags", "Array of keyword tags"],
+                    ["publish_mode", "\"live\" | \"draft\" | \"scheduled\""],
+                    ["scheduled_publish_date", "ISO 8601 UTC datetime (or null)"],
+                    ["article_level", "\"cornerstone\" | \"pillar\" | \"cluster\""],
+                    ["source", "Always \"BlogBatcher\" — use to filter in Zapier"],
+                  ] as [string, string][]).map(([field, desc]) => (
+                    <tr key={field} className="hover:bg-muted/30">
+                      <td className="px-3 py-1.5 font-mono text-primary">{field}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground">{desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <a
+                href="https://zapier.com/apps/webhook/integrations"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary underline"
+              >
+                Set up Zapier Catch Hook <ExternalLink className="w-3 h-3" />
+              </a>
+              <span className="text-muted-foreground text-xs">·</span>
+              <a
+                href="https://www.make.com/en/help/tools/webhooks"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary underline"
+              >
+                Set up Make Custom Webhook <ExternalLink className="w-3 h-3" />
+              </a>
             </div>
           </CardContent>
         </Card>

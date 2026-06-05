@@ -673,27 +673,78 @@ export async function testWixConnection(
 // ---------------------------------------------------------------------------
 
 /**
- * Send article payload to a Zapier webhook URL.
- * Zapier expects a JSON POST — no authentication on our side.
+ * Send article payload to a Zapier or Make (Integromat) webhook URL.
+ *
+ * This is the recommended publish path for Wix users who need full SEO field
+ * control (URL slug, focus keyword, image alt text, schema) that the Wix Blog
+ * API v3 does not expose to 3rd-party apps.
+ *
+ * The payload is intentionally flat and comprehensive so that any automation
+ * tool (Zapier, Make, n8n, Pabbly, etc.) can map every field to the target CMS
+ * without needing to transform or enrich the data.
+ *
+ * Field reference:
+ *   title                  — Post title (plain text)
+ *   body_html              — Full article body as HTML
+ *   meta_title             — SEO meta title (≤60 chars)
+ *   meta_description       — SEO meta description (140–160 chars)
+ *   focus_keyword          — Primary SEO keyword
+ *   url_slug               — URL-safe slug (e.g. "best-pitch-deck-tips")
+ *   excerpt                — Short preview blurb (≤500 chars, same as meta_description)
+ *   schema_json_ld         — JSON-LD structured data string (or null)
+ *   image_url              — Featured image URL (or null)
+ *   image_alt_text         — Featured image alt text (or null)
+ *   hashtags               — Array of keyword tags derived from focus_keyword
+ *   article_level          — "cornerstone" | "pillar" | "cluster"
+ *   publish_mode           — "live" | "draft" | "scheduled"
+ *   scheduled_publish_date — ISO 8601 UTC datetime string (or null)
+ *   source                 — Always "BlogBatcher" — use to identify the trigger in your Zap/scenario
  */
 export async function publishToZapier(
   credentials: ZapierCredentials,
   article: ArticlePayload
 ): Promise<PublishResult> {
+  // Derive hashtags from focus keyword (same logic as Wix direct path)
+  const hashtags = article.focusKeyword
+    ? article.focusKeyword.split(/[,\s]+/).filter(Boolean).slice(0, 10)
+    : [];
+
+  // Derive publish mode
+  const publishMode = article.publishAsDraft
+    ? "draft"
+    : article.scheduledPublishAt && article.scheduledPublishAt > new Date()
+      ? "scheduled"
+      : "live";
+
   const payload = {
+    // ── Core content ──────────────────────────────────────────────────────────
     title: article.title,
     body_html: article.bodyHtml,
-    meta_title: article.metaTitle,
-    meta_description: article.metaDescription,
-    focus_keyword: article.focusKeyword,
-    url_slug: article.urlSlug,
+    excerpt: article.metaDescription ? article.metaDescription.slice(0, 500) : null,
+
+    // ── SEO fields (all fields — including those Wix API locks for 3rd parties)
+    meta_title: article.metaTitle || article.title,
+    meta_description: article.metaDescription || null,
+    focus_keyword: article.focusKeyword || null,
+    url_slug: article.urlSlug || null,
+    hashtags,
+
+    // ── Structured data ───────────────────────────────────────────────────────
     schema_json_ld: article.schemaMarkup ?? null,
+
+    // ── Media ─────────────────────────────────────────────────────────────────
     image_url: article.imageUrl ?? null,
     image_alt_text: article.imageAltText ?? null,
+
+    // ── Publishing metadata ───────────────────────────────────────────────────
+    article_level: article.level,
+    publish_mode: publishMode,
     scheduled_publish_date: article.scheduledPublishAt
       ? article.scheduledPublishAt.toISOString()
       : null,
-    level: article.level,
+
+    // ── Source identifier ─────────────────────────────────────────────────────
+    source: "BlogBatcher",
   };
 
   try {

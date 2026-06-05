@@ -256,7 +256,7 @@ export async function executeScheduledPublish(
       );
     } else if (publisherPlatform === "wix") {
       result = await publishToWix(
-        { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "" },
+        { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" },
         payload
       );
     } else {
