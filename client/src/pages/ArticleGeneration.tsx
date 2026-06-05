@@ -96,6 +96,11 @@ export default function ArticleGeneration() {
     onError: (err) => toast.error(err.message),
   });
 
+  const markReadyMutation = trpc.articles.updateStatus.useMutation({
+    onSuccess: () => toast.success("Article marked as ready for review."),
+    onError: (err) => toast.error(err.message),
+  });
+
   const regenUnderTargetMutation = trpc.articles.regenerateUnderTarget.useMutation({
     onSuccess: (data) => {
       if (data.queued === 0) {
@@ -320,16 +325,30 @@ export default function ArticleGeneration() {
                           </button>
                         )}
                         {article.status === "failed" && (
-                          <button
-                            className="btn-ghost"
-                            style={{ padding:"5px 12px", fontSize:12, color:"#dc2626", borderColor:"#fca5a5", display:"flex", alignItems:"center", gap:4 }}
-                            disabled={regenerateSingleMutation.isPending}
-                            onClick={() => regenerateSingleMutation.mutate({ articleId: article.id })}
-                          >
-                            {regenerateSingleMutation.isPending
-                              ? <><Loader2 style={{ width:11, height:11 }} className="animate-spin" /> Retrying…</>
-                              : <><RefreshCw style={{ width:11, height:11 }} /> Retry</>}
-                          </button>
+                          <div style={{ display:"flex", gap:4 }}>
+                            {article.hasContent ? (
+                              <button
+                                className="btn-ghost"
+                                style={{ padding:"5px 10px", fontSize:11, color:"#166534", borderColor:"#86efac", display:"flex", alignItems:"center", gap:3, whiteSpace:"nowrap" }}
+                                disabled={markReadyMutation.isPending}
+                                onClick={() => markReadyMutation.mutate({ articleId: article.id, status: "generated" })}
+                              >
+                                {markReadyMutation.isPending
+                                  ? <><Loader2 style={{ width:10, height:10 }} className="animate-spin" /> Saving…</>
+                                  : <><CheckCircle2 style={{ width:10, height:10 }} /> Keep &amp; review</>}
+                              </button>
+                            ) : null}
+                            <button
+                              className="btn-ghost"
+                              style={{ padding:"5px 10px", fontSize:11, color:"#dc2626", borderColor:"#fca5a5", display:"flex", alignItems:"center", gap:3 }}
+                              disabled={regenerateSingleMutation.isPending}
+                              onClick={() => regenerateSingleMutation.mutate({ articleId: article.id })}
+                            >
+                              {regenerateSingleMutation.isPending
+                                ? <><Loader2 style={{ width:10, height:10 }} className="animate-spin" /> Retrying…</>
+                                : <><RefreshCw style={{ width:10, height:10 }} /> Retry</>}
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

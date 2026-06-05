@@ -21,7 +21,7 @@ const require = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const archiver = require("archiver") as (format: string, options?: object) => any;
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   articleImages,
@@ -400,6 +400,7 @@ export const articlesRouter = router({
           status: articles.status,
           generationAttempts: articles.generationAttempts,
           errorMessage: articles.errorMessage,
+          hasContent: sql<number>`(CASE WHEN ${articles.bodyHtml} IS NOT NULL AND LENGTH(${articles.bodyHtml}) > 0 THEN 1 ELSE 0 END)`,
           approvedAt: articles.approvedAt,
           publishedAt: articles.publishedAt,
           createdAt: articles.createdAt,
@@ -572,14 +573,14 @@ export const articlesRouter = router({
   updateStatus: protectedProcedure
     .input(z.object({
       articleId: z.number(),
-      status: z.enum(["pending_approval", "approved"]),
+      status: z.enum(["generated", "pending_approval", "approved"]),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const [article] = await db
-        .select({ businessId: articles.businessId, status: articles.status })
+        .select({ businessId: articles.businessId, status: articles.status, bodyHtml: articles.bodyHtml })
         .from(articles)
         .where(eq(articles.id, input.articleId))
         .limit(1);
@@ -588,7 +589,12 @@ export const articlesRouter = router({
 
       await assertBusinessOwnership(ctx.user.id, article.businessId);
 
-      const updates: Partial<typeof articles.$inferInsert> = { status: input.status };
+      // If marking a failed article as generated, require it to have content
+      if (input.status === "generated" && !article.bodyHtml) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot mark as ready — article has no content. Use Retry to regenerate it." });
+      }
+
+      const updates: Partial<typeof articles.$inferInsert> = { status: input.status, errorMessage: null };
       if (input.status === "approved") {
         updates.approvedAt = new Date();
       }
