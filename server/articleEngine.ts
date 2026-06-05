@@ -1105,13 +1105,7 @@ Return ONLY the expanded HTML wrapped in:
     }
   }
 
-  // --- AI Citation Disclosure ---
-  // Prepend a one-line AI disclosure to every article before scoring and storage.
-  // This appears at the very top of the published post.
-  const aiDisclosureHtml = `<p class="ai-disclosure" style="font-size:0.85em;color:#6b7280;border-left:3px solid #e5e7eb;padding:4px 10px;margin-bottom:1.5em;"><em>This article was researched and drafted with AI assistance and reviewed for accuracy by ${ctx.businessName}.</em></p>\n`;
-  const aiDisclosureMd = `> *This article was researched and drafted with AI assistance and reviewed for accuracy by ${ctx.businessName}.*\n\n`;
-  bodyHtml = aiDisclosureHtml + bodyHtml;
-  bodyMarkdown = aiDisclosureMd + bodyMarkdown;
+  // AI disclosure removed — not added to article body.
 
   // --- Line spacing: insert a blank line between block-level elements for clean CMS rendering ---
   // This ensures headings and paragraphs are visually separated when published to Wix/WordPress.
