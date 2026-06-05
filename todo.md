@@ -849,9 +849,15 @@
 - [x] Show which article is currently regenerating and how many remain
 
 ## Per-Article Publish Actions (Review Panel)
-- [ ] Add publishSingle tRPC procedure — publishes one approved article to CMS immediately
-- [ ] Add scheduleSingle tRPC procedure — sets a specific publish date/time for one article
-- [ ] Add pushAsDraft tRPC procedure — pushes one article to CMS as a draft
-- [ ] Add per-article action panel to ArticleReview: "Publish Now", "Schedule", "Push as Draft", "Download" buttons visible for approved articles
-- [ ] Schedule picker: date + time input, confirm button
-- [ ] Download: generates ZIP with bodyHtml, bodyMarkdown, meta fields, schema JSON, primary keyword
+- [x] Add publishSingle tRPC procedure — publishes one approved article to CMS immediately
+- [x] Add scheduleSingle tRPC procedure — sets a specific publish date/time for one article
+- [x] Add pushAsDraft tRPC procedure — pushes one article to CMS as a draft
+- [x] Add per-article action panel to ArticleReview: "Publish Now", "Schedule", "Push as Draft", "Download" buttons visible for approved articles
+- [x] Schedule picker: date + time input, confirm button
+- [x] Download: generates ZIP with bodyHtml, bodyMarkdown, meta fields, schema JSON, primary keyword
+
+## Review Panel SEO Fixes (Session 6)
+- [x] Highlight failing SEO fields in the right panel — show which specific 15-point checks are failing with red/amber indicators next to each field
+- [x] Auto-rescore the 15-point checklist when any SEO field is saved (meta title, meta description, focus keyword, schema) — no manual refresh needed
+- [x] Add manual copy panel on right side: copyable meta title, meta description, focus keyword, schema JSON, and slug (for manual publishing)
+- [x] Add line spacing between headings and paragraphs in generated article HTML (one blank line between each element for clean rendering in CMS)

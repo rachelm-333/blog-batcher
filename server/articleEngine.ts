@@ -1112,6 +1112,17 @@ Return ONLY the expanded HTML wrapped in:
   const aiDisclosureMd = `> *This article was researched and drafted with AI assistance and reviewed for accuracy by ${ctx.businessName}.*\n\n`;
   bodyHtml = aiDisclosureHtml + bodyHtml;
   bodyMarkdown = aiDisclosureMd + bodyMarkdown;
+
+  // --- Line spacing: insert a blank line between block-level elements for clean CMS rendering ---
+  // This ensures headings and paragraphs are visually separated when published to Wix/WordPress.
+  bodyHtml = bodyHtml
+    // Add newline before each opening block tag (if not already preceded by a newline)
+    .replace(/([^\n])<(h[1-6]|p|ul|ol|blockquote|div|figure|table|pre)([\s>])/g, "$1\n<$2$3")
+    // Add newline after each closing block tag (if not already followed by a newline)
+    .replace(/<\/(h[1-6]|p|ul|ol|blockquote|div|figure|table|pre)>([^\n])/g, "</$1>\n$2")
+    // Collapse 3+ consecutive newlines down to 2 (avoid excessive whitespace)
+    .replace(/\n{3,}/g, "\n\n");
+
   // Recount words after prepending disclosure (disclosure words are minimal, ~15 words)
   wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
 

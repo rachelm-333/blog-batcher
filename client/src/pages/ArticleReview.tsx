@@ -54,6 +54,244 @@ import { useLocation } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
 
 // ---------------------------------------------------------------------------
+// Client-side Pass 1 SEO checker (mirrors server/articleEngine.ts runPass1Scorer)
+// ---------------------------------------------------------------------------
+
+const WORD_COUNT_RULES = {
+  cornerstone: { min: 2400, max: 3000 },
+  pillar: { min: 1500, max: 1800 },
+  cluster: { min: 800, max: 1200 },
+} as const;
+
+const BANNED_PHRASES = [
+  "in today's world",
+  "it's important to note",
+  "it is important to note",
+  "delve into",
+  "game-changer",
+  "game changer",
+  "leverage",
+  "synergy",
+  "transformative",
+] as const;
+
+interface Pass1Checks {
+  p1_keyword_density: boolean;
+  p2_keyword_in_h1: boolean;
+  p3_keyword_in_h2: boolean;
+  p4_keyword_in_h3: boolean;
+  p5_keyword_first_100: boolean;
+  p6_keyword_in_slug: boolean;
+  p7_meta_title: boolean;
+  p8_meta_description: boolean;
+  p9_opening_answer: boolean;
+  p10_external_link: boolean;
+  p11_internal_cta: boolean;
+  p12_internal_blog_links: boolean;
+  p13_schema: boolean;
+  p14_eeat: boolean;
+  p15_human_authenticity: boolean;
+  p16_word_count: boolean;
+}
+
+function computePass1Checks(params: {
+  bodyHtml: string;
+  title: string;
+  metaTitle: string;
+  metaDescription: string;
+  urlSlug: string;
+  wordCount: number;
+  level: "cornerstone" | "pillar" | "cluster";
+  focusKeyword: string;
+  schemaMarkup: string | null | undefined;
+}): Pass1Checks {
+  const { bodyHtml, title, metaTitle, metaDescription, urlSlug, wordCount, level, focusKeyword, schemaMarkup } = params;
+
+  const kw = focusKeyword.toLowerCase().trim();
+  if (!kw) {
+    // Can't score without keyword — return all false except structural checks
+    const bodyLower = bodyHtml.toLowerCase();
+    return {
+      p1_keyword_density: false,
+      p2_keyword_in_h1: false,
+      p3_keyword_in_h2: false,
+      p4_keyword_in_h3: false,
+      p5_keyword_first_100: false,
+      p6_keyword_in_slug: false,
+      p7_meta_title: false,
+      p8_meta_description: false,
+      p9_opening_answer: !!bodyHtml && /[?]/.test(bodyHtml.slice(0, 800)),
+      p10_external_link: /href=["'](https?:\/\/[^"']+)["']/i.test(bodyHtml),
+      p11_internal_cta: /href=["']\/[^"']+["']/i.test(bodyHtml) || /href=["']#/i.test(bodyHtml),
+      p12_internal_blog_links: (bodyHtml.match(/href=["']\/[^"']+["']/gi) || []).length >= 2,
+      p13_schema: !!(schemaMarkup && schemaMarkup.trim().length > 10),
+      p14_eeat: bodyLower.includes("year") || bodyLower.includes("experience") || bodyLower.includes("client") || bodyLower.includes("award"),
+      p15_human_authenticity: !BANNED_PHRASES.some(phrase => bodyLower.includes(phrase.toLowerCase())),
+      p16_word_count: wordCount >= WORD_COUNT_RULES[level].min && wordCount <= WORD_COUNT_RULES[level].max,
+    };
+  }
+
+  const bodyText = bodyHtml.replace(/<[^>]+>/g, " ").toLowerCase();
+  const bodyLower = bodyHtml.toLowerCase();
+  const titleLower = title.toLowerCase();
+
+  // Keyword occurrence count
+  const kwEscaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const kwMatches = (bodyText.match(new RegExp(kwEscaped, "g")) || []).length;
+  const kwDensity = wordCount > 0 ? kwMatches / wordCount : 0;
+
+  function kwWordsInOrder(text: string): boolean {
+    const t = text.toLowerCase();
+    if (t.includes(kw)) return true;
+    const kwWords = kw.split(/\s+/);
+    let pos = 0;
+    for (const word of kwWords) {
+      const idx = t.indexOf(word, pos);
+      if (idx === -1) return false;
+      pos = idx + word.length;
+    }
+    return true;
+  }
+
+  // H1 (title)
+  const h1Present = kwWordsInOrder(titleLower);
+
+  // H2
+  const h2Matches = bodyHtml.match(/<h2[^>]*>(.*?)<\/h2>/gi) || [];
+  const kwInH2 = h2Matches.some(h => kwWordsInOrder(h));
+
+  // H3
+  const h3Matches = bodyHtml.match(/<h3[^>]*>(.*?)<\/h3>/gi) || [];
+  const kwInH3 = h3Matches.length === 0 || h3Matches.some(h => kwWordsInOrder(h));
+
+  // First 150 words
+  const first150 = bodyText.split(/\s+/).slice(0, 150).join(" ");
+  const kwInFirst100 = first150.includes(kw) || kwWordsInOrder(first150);
+
+  // Slug
+  const slugLower = urlSlug.toLowerCase();
+  const kwInSlug = (() => {
+    if (slugLower.includes(kw.replace(/\s+/g, "-"))) return true;
+    const kwWords = kw.split(/\s+/);
+    let pos = 0;
+    for (const word of kwWords) {
+      const idx = slugLower.indexOf(word, pos);
+      if (idx === -1) return false;
+      pos = idx + word.length;
+    }
+    return true;
+  })();
+
+  // Meta title
+  const metaTitleOk = metaTitle.toLowerCase().includes(kw) && metaTitle.length <= 60;
+
+  // Meta description
+  const metaDescOk = (() => {
+    const descLower = metaDescription.toLowerCase();
+    const inRange = metaDescription.length >= 140 && metaDescription.length <= 160;
+    if (!inRange) return false;
+    if (descLower.includes(kw)) return true;
+    const kwWords = kw.split(/\s+/);
+    let pos = 0;
+    for (const word of kwWords) {
+      const idx = descLower.indexOf(word, pos);
+      if (idx === -1) return false;
+      pos = idx + word.length;
+    }
+    return true;
+  })();
+
+  // Opening answer
+  const first600Html = bodyHtml.slice(0, 800);
+  const first600Lower = first600Html.toLowerCase();
+  const openingAnswer = (() => {
+    if (/<(strong|b)[^>]*>[^<]*\?[^<]*<\/(strong|b)>/i.test(first600Html)) return true;
+    if (/<p[^>]*>[^<]{5,200}\?/i.test(first600Html)) return true;
+    if (/<h[23][^>]*>[^<]*\?[^<]*<\/h[23]>/i.test(first600Html)) return true;
+    const first300Text = bodyText.slice(0, 300);
+    if (/\b(how|what|why|when|where|who|which|is|are|does|do|can|should)\b[^.!?]{5,200}\?/.test(first300Text)) return true;
+    if (first600Lower.includes("?")) return true;
+    return false;
+  })();
+
+  // External link
+  const externalLink = (() => {
+    const externalHrefPattern = /href=["'](https?:\/\/[^"']+)["']/gi;
+    let match;
+    while ((match = externalHrefPattern.exec(bodyHtml)) !== null) {
+      const href = match[1].toLowerCase();
+      if (!href.includes("localhost") && !href.startsWith("/")) return true;
+    }
+    return false;
+  })();
+
+  // Internal CTA (any internal link)
+  const internalCta = /href=["']\/[^"']+["']/i.test(bodyHtml) || /href=["']#/i.test(bodyHtml);
+
+  // Internal blog links (2+ internal links)
+  const internalBlogLinks = (bodyHtml.match(/href=["']\/[^"']+["']/gi) || []).length >= 2;
+
+  // Schema
+  const schemaPresent = !!(schemaMarkup && schemaMarkup.trim().length > 10);
+
+  // E-E-A-T
+  const eeat = bodyLower.includes("year") || bodyLower.includes("experience") || bodyLower.includes("client") || bodyLower.includes("award");
+
+  // Human authenticity
+  const humanAuth = !BANNED_PHRASES.some(phrase => bodyLower.includes(phrase.toLowerCase()));
+
+  // Word count
+  const wc = WORD_COUNT_RULES[level];
+  const wordCountOk = wordCount >= wc.min && wordCount <= wc.max;
+
+  return {
+    p1_keyword_density: kwMatches >= 5 && kwDensity >= 0.005 && kwDensity <= 0.025,
+    p2_keyword_in_h1: h1Present,
+    p3_keyword_in_h2: kwInH2,
+    p4_keyword_in_h3: kwInH3,
+    p5_keyword_first_100: kwInFirst100,
+    p6_keyword_in_slug: kwInSlug,
+    p7_meta_title: metaTitleOk,
+    p8_meta_description: metaDescOk,
+    p9_opening_answer: openingAnswer,
+    p10_external_link: externalLink,
+    p11_internal_cta: internalCta,
+    p12_internal_blog_links: internalBlogLinks,
+    p13_schema: schemaPresent,
+    p14_eeat: eeat,
+    p15_human_authenticity: humanAuth,
+    p16_word_count: wordCountOk,
+  };
+}
+
+const PASS1_CHECK_LABELS: Record<keyof Pass1Checks, string> = {
+  p1_keyword_density: "Keyword density (0.5–2.5%)",
+  p2_keyword_in_h1: "Keyword in H1 title",
+  p3_keyword_in_h2: "Keyword in H2 heading",
+  p4_keyword_in_h3: "Keyword in H3 heading",
+  p5_keyword_first_100: "Keyword in first 150 words",
+  p6_keyword_in_slug: "Keyword in URL slug",
+  p7_meta_title: "Meta title ≤60 chars + keyword",
+  p8_meta_description: "Meta description 140–160 chars + keyword",
+  p9_opening_answer: "Opening answer / question block",
+  p10_external_link: "External link present",
+  p11_internal_cta: "Internal CTA link present",
+  p12_internal_blog_links: "2+ internal blog links",
+  p13_schema: "Schema markup present",
+  p14_eeat: "E-E-A-T signals (experience, clients, awards)",
+  p15_human_authenticity: "No AI fingerprint phrases",
+  p16_word_count: "Word count in target range",
+};
+
+// Which checks are directly affected by editable SEO fields
+const FIELD_CHECK_MAP = {
+  urlSlug: ["p6_keyword_in_slug"] as (keyof Pass1Checks)[],
+  metaTitle: ["p7_meta_title"] as (keyof Pass1Checks)[],
+  metaDescription: ["p8_meta_description"] as (keyof Pass1Checks)[],
+  focusKeyword: ["p1_keyword_density", "p2_keyword_in_h1", "p3_keyword_in_h2", "p4_keyword_in_h3", "p5_keyword_first_100", "p6_keyword_in_slug", "p7_meta_title", "p8_meta_description"] as (keyof Pass1Checks)[],
+};
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -486,6 +724,34 @@ export default function ArticleReview() {
     onError: (err) => toast.error(err.message),
   });
 
+  // ---------------------------------------------------------------------------
+  // Live SEO check computation — re-runs whenever seoEdits or fullArticle changes
+  // ---------------------------------------------------------------------------
+  const liveChecks = useMemo((): Pass1Checks | null => {
+    if (!fullArticle || !selectedItem) return null;
+    const fa = fullArticle as any;
+    return computePass1Checks({
+      bodyHtml: fa.bodyHtml ?? "",
+      title: fa.title ?? "",
+      metaTitle: seoEdits.metaTitle,
+      metaDescription: seoEdits.metaDescription,
+      urlSlug: seoEdits.urlSlug,
+      wordCount: fa.wordCount ?? 0,
+      level: selectedItem.level,
+      focusKeyword: seoEdits.focusKeyword,
+      schemaMarkup: fa.schemaMarkup,
+    });
+  }, [fullArticle, selectedItem, seoEdits.metaTitle, seoEdits.metaDescription, seoEdits.urlSlug, seoEdits.focusKeyword]);
+
+  const livePassCount = liveChecks ? Object.values(liveChecks).filter(Boolean).length : null;
+  const liveTotalChecks = 16;
+
+  // Helper: does a field have a failing check?
+  function fieldFailing(field: keyof typeof FIELD_CHECK_MAP): boolean {
+    if (!liveChecks || isApproved) return false;
+    return FIELD_CHECK_MAP[field].some(key => !liveChecks[key]);
+  }
+
   // Derived state
   const approvedCount = articleList.filter(
     a => a.status === "approved" || a.status === "scheduled" || a.status === "published"
@@ -891,6 +1157,23 @@ export default function ArticleReview() {
               {/* Score badge */}
               <ScoreBadgePanel badge={selectedItem.statusBadge as StatusBadge} />
 
+              {/* Live SEO check counter */}
+              {liveChecks && !isApproved && (
+                <div className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-medium ${
+                  livePassCount === liveTotalChecks
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
+                    : livePassCount !== null && livePassCount >= 14
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-600"
+                }`}>
+                  <span>
+                    {livePassCount === liveTotalChecks ? "✅" : livePassCount !== null && livePassCount >= 14 ? "⚡" : "⚠️"}
+                    {" "}{livePassCount}/{liveTotalChecks} SEO checks passing
+                  </span>
+                  <span className="text-[10px] font-normal opacity-70">updates as you type</span>
+                </div>
+              )}
+
               {/* Over-editing warning */}
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-400">
                 <AlertTriangle className="inline h-3 w-3 mr-1" />
@@ -900,67 +1183,85 @@ export default function ArticleReview() {
               {/* URL Slug */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Label className="text-xs font-semibold text-foreground">URL Slug</Label>
+                  <Label className={`text-xs font-semibold ${fieldFailing("urlSlug") ? "text-amber-600" : "text-foreground"}`}>URL Slug</Label>
+                  {fieldFailing("urlSlug") && <AlertTriangle className="h-3 w-3 text-amber-500" />}
                   <HelpLink slug="url-slug-best-practices" label="How to write a good URL slug" />
                 </div>
                 <Input
                   value={seoEdits.urlSlug}
                   onChange={e => setSeoEdits(prev => ({ ...prev, urlSlug: e.target.value }))}
                   placeholder="url-slug-here"
-                  className="text-xs font-mono"
+                  className={`text-xs font-mono ${fieldFailing("urlSlug") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
                   disabled={isApproved}
                 />
+                {fieldFailing("urlSlug") && (
+                  <p className="text-[11px] text-amber-600">Include your focus keyword in the slug (e.g. focus-keyword-topic)</p>
+                )}
               </div>
 
               {/* Meta Title */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Label className="text-xs font-semibold text-foreground">Meta Title</Label>
+                  <Label className={`text-xs font-semibold ${fieldFailing("metaTitle") ? "text-red-600" : "text-foreground"}`}>Meta Title</Label>
+                  {fieldFailing("metaTitle") && <XCircle className="h-3 w-3 text-red-500" />}
                   <HelpLink slug="meta-title-description" label="Meta title best practices" />
                 </div>
                 <Input
                   value={seoEdits.metaTitle}
                   onChange={e => setSeoEdits(prev => ({ ...prev, metaTitle: e.target.value }))}
                   placeholder="Meta title (max 60 chars)"
-                  className="text-xs"
+                  className={`text-xs ${fieldFailing("metaTitle") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
                   disabled={isApproved}
                 />
-                <div className={`text-xs text-right ${metaTitleLen > 60 ? "text-destructive" : "text-muted-foreground"}`}>
-                  {metaTitleLen} / 60 chars {metaTitleLen <= 60 ? "✓" : "✗"}
+                <div className={`text-xs text-right ${
+                  metaTitleLen > 60 ? "text-destructive" :
+                  fieldFailing("metaTitle") ? "text-amber-600" :
+                  "text-muted-foreground"
+                }`}>
+                  {metaTitleLen} / 60 chars {metaTitleLen <= 60 && !fieldFailing("metaTitle") ? "✓" : metaTitleLen > 60 ? "✗ too long" : "⚠ add keyword"}
                 </div>
               </div>
 
               {/* Meta Description */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Label className="text-xs font-semibold text-foreground">Meta Description</Label>
+                  <Label className={`text-xs font-semibold ${fieldFailing("metaDescription") ? "text-red-600" : "text-foreground"}`}>Meta Description</Label>
+                  {fieldFailing("metaDescription") && <XCircle className="h-3 w-3 text-red-500" />}
                   <HelpLink slug="meta-title-description" label="Meta description best practices" />
                 </div>
                 <Textarea
                   value={seoEdits.metaDescription}
                   onChange={e => setSeoEdits(prev => ({ ...prev, metaDescription: e.target.value }))}
                   placeholder="Meta description (140–160 chars)"
-                  className="text-xs min-h-[70px] resize-none"
+                  className={`text-xs min-h-[70px] resize-none ${fieldFailing("metaDescription") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
                   disabled={isApproved}
                 />
-                <div className={`text-xs text-right ${metaDescLen < 140 || metaDescLen > 160 ? "text-amber-600" : "text-muted-foreground"}`}>
-                  {metaDescLen} / 160 chars {metaDescLen >= 140 && metaDescLen <= 160 ? "✓" : "⚠"}
+                <div className={`text-xs text-right ${
+                  (metaDescLen < 140 || metaDescLen > 160) ? "text-amber-600" :
+                  fieldFailing("metaDescription") ? "text-amber-600" :
+                  "text-muted-foreground"
+                }`}>
+                  {metaDescLen} / 160 chars {metaDescLen >= 140 && metaDescLen <= 160 && !fieldFailing("metaDescription") ? "✓" : metaDescLen < 140 ? "⚠ too short" : metaDescLen > 160 ? "⚠ too long" : "⚠ add keyword"}
                 </div>
               </div>
 
               {/* Focus Keyword */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Label className="text-xs font-semibold text-foreground">Focus Keyword</Label>
+                  <Label className={`text-xs font-semibold ${fieldFailing("focusKeyword") ? "text-amber-600" : "text-foreground"}`}>Focus Keyword</Label>
+                  {fieldFailing("focusKeyword") && <AlertTriangle className="h-3 w-3 text-amber-500" />}
                   <HelpLink slug="focus-keyword" label="What is a focus keyword?" />
                 </div>
                 <Input
                   value={seoEdits.focusKeyword}
                   onChange={e => setSeoEdits(prev => ({ ...prev, focusKeyword: e.target.value }))}
                   placeholder="focus keyword phrase"
-                  className="text-xs"
+                  className={`text-xs ${fieldFailing("focusKeyword") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
                   disabled={isApproved}
                 />
+                {fieldFailing("focusKeyword") && (
+                  <p className="text-[11px] text-amber-600">Keyword should appear in H1, H2, first 150 words, meta title, and slug</p>
+                )}
               </div>
 
               {/* Image */}

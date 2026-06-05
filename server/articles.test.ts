@@ -51,8 +51,8 @@ function makeContext(overrides: Partial<ArticleContext> = {}): ArticleContext {
     paaQuestion: "How quickly can an emergency plumber arrive?",
     articleType: "cornerstone_guide",
     level: "cornerstone",
-    wordCountMin: 2500,
-    wordCountMax: 3200,
+    wordCountMin: 2400,
+    wordCountMax: 3000,
     urlSlug: "emergency-plumber-sydney",
     allBatchSlugs: ["/emergency-plumber-sydney", "/blocked-drains-sydney", "/hot-water-repairs"],
     ...overrides,
@@ -89,9 +89,9 @@ describe("Generation order", () => {
     expect(WORD_COUNT_RULES.cluster).toBeDefined();
   });
 
-  it("Cornerstone word count range is 2500–3200", () => {
-    expect(WORD_COUNT_RULES.cornerstone.min).toBe(2500);
-    expect(WORD_COUNT_RULES.cornerstone.max).toBe(3200);
+  it("Cornerstone word count range is 2400–3000", () => {
+    expect(WORD_COUNT_RULES.cornerstone.min).toBe(2400);
+    expect(WORD_COUNT_RULES.cornerstone.max).toBe(3000);
   });
 
   it("Pillar word count range is 1500–1800", () => {
@@ -99,8 +99,8 @@ describe("Generation order", () => {
     expect(WORD_COUNT_RULES.pillar.max).toBe(1800);
   });
 
-  it("Cluster word count range is 1000–1200", () => {
-    expect(WORD_COUNT_RULES.cluster.min).toBe(1000);
+  it("Cluster word count range is 800–1200", () => {
+    expect(WORD_COUNT_RULES.cluster.min).toBe(800);
     expect(WORD_COUNT_RULES.cluster.max).toBe(1200);
   });
 
@@ -261,7 +261,7 @@ describe("16-point Authority Standard in generation prompt", () => {
     const clusterCtx = makeContext({
       level: "cluster",
       articleType: "how_to",
-      wordCountMin: 1000,
+      wordCountMin: 800,
       wordCountMax: 1200,
     });
     const p = buildGenerationPrompt(clusterCtx);
@@ -269,8 +269,8 @@ describe("16-point Authority Standard in generation prompt", () => {
   });
 
   it("Prompt includes word count range and hard maximum", () => {
-    expect(prompt).toContain("2500–3200");
-    expect(prompt).toContain("HARD MAXIMUM: 3200");
+    expect(prompt).toContain("2400–3000");
+    expect(prompt).toContain("HARD MAXIMUM: 3000");
   });
 
   it("Prompt includes business name", () => {
@@ -332,7 +332,7 @@ describe("AI fingerprint scrub pass", () => {
 
   it("Scrub prompt instructs to preserve HTML tags", () => {
     const scrubPrompt = buildScrubPrompt("<p>Test</p>", "Test");
-    expect(scrubPrompt).toContain("Preserve all HTML tags");
+    expect(scrubPrompt).toContain("Preserve ALL HTML tags");
   });
 
   it("Scrub prompt instructs to remove em dash overuse", () => {
