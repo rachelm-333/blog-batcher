@@ -1349,6 +1349,143 @@ ${row.bodyHtml ?? ""}
     }),
 
   /**
+   * Publish a single approved article to the connected CMS immediately.
+   */
+  publishSingle: protectedProcedure
+    .input(
+      z.object({
+        articleId: z.number(),
+        platform: z.enum(["wordpress", "wix", "zapier"]),
+        publishAs: z.enum(["live", "draft"]).default("live"),
+        scheduledAt: z.number().optional(), // UTC ms timestamp for scheduled publish
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      // Load article with node + image
+      const [row] = await db
+        .select({
+          id: articles.id,
+          businessId: articles.businessId,
+          status: articles.status,
+          title: articles.title,
+          bodyHtml: articles.bodyHtml,
+          metaTitle: articles.metaTitle,
+          metaDescription: articles.metaDescription,
+          focusKeyword: articles.focusKeyword,
+          urlSlug: articles.urlSlug,
+          schemaMarkup: articles.schemaMarkup,
+          level: articleNodes.level,
+          imageUrl: articleImages.imageUrl,
+          altText: articleImages.altText,
+        })
+        .from(articles)
+        .leftJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
+        .leftJoin(articleImages, eq(articleImages.articleId, articles.id))
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, row.businessId);
+
+      if (!(["approved", "scheduled", "generated", "pending_approval"].includes(row.status))) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Article must be approved before publishing" });
+      }
+
+      // Load integration credentials
+      const [integration] = await db
+        .select({ credentialsEncrypted: integrations.credentialsEncrypted })
+        .from(integrations)
+        .where(
+          and(
+            eq(integrations.businessId, row.businessId),
+            eq(integrations.platform, input.platform)
+          )
+        )
+        .limit(1);
+
+      if (!integration?.credentialsEncrypted) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `No ${input.platform} credentials found. Connect your CMS in Integrations first.`,
+        });
+      }
+
+      const creds = decryptCredentials(integration.credentialsEncrypted);
+      if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt CMS credentials" });
+
+      const scheduledDate = input.scheduledAt ? new Date(input.scheduledAt) : null;
+
+      const payload: ArticlePayload = {
+        title: row.title ?? "",
+        bodyHtml: row.bodyHtml ?? "",
+        metaTitle: row.metaTitle ?? row.title ?? "",
+        metaDescription: row.metaDescription ?? "",
+        focusKeyword: row.focusKeyword ?? "",
+        urlSlug: row.urlSlug ?? "",
+        schemaMarkup: row.schemaMarkup ?? null,
+        imageUrl: row.imageUrl ?? null,
+        imageAltText: row.altText ?? null,
+        scheduledPublishAt: scheduledDate,
+        level: (row.level ?? "cluster") as "cornerstone" | "pillar" | "cluster",
+        publishAsDraft: input.publishAs === "draft",
+      };
+
+      let result;
+      if (input.platform === "wordpress") {
+        result = await publishToWordPress(
+          {
+            siteUrl: creds.siteUrl ?? "",
+            username: creds.username ?? "",
+            applicationPassword: creds.applicationPassword ?? "",
+            seoPlugin: (creds.seoPlugin as "yoast" | "rankmath" | "aioseo" | "none") ?? "none",
+          },
+          payload
+        );
+      } else if (input.platform === "wix") {
+        result = await publishToWix(
+          { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "" },
+          payload
+        );
+      } else {
+        result = await publishToZapier(
+          { webhookUrl: creds.webhookUrl ?? "" },
+          payload
+        );
+      }
+
+      if (result.success) {
+        const isScheduled = scheduledDate && scheduledDate > new Date();
+        const isDraft = input.publishAs === "draft";
+        await db
+          .update(articles)
+          .set({
+            status: isDraft ? "approved" : isScheduled ? "scheduled" : "published",
+            publishedAt: isDraft || isScheduled ? null : new Date(),
+            scheduledPublishAt: scheduledDate,
+            cmsPostId: result.cmsPostId ?? null,
+            cmsPostUrl: result.cmsPostUrl ?? null,
+            errorMessage: null,
+          })
+          .where(eq(articles.id, input.articleId));
+        return {
+          success: true,
+          cmsPostUrl: result.cmsPostUrl ?? null,
+          cmsPostId: result.cmsPostId ?? null,
+          status: isDraft ? "draft_pushed" : isScheduled ? "scheduled" : "published",
+        };
+      } else {
+        await db
+          .update(articles)
+          .set({ status: "failed", errorMessage: result.error ?? "Publish failed" })
+          .where(eq(articles.id, input.articleId));
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Publish failed" });
+      }
+    }),
+
+  /**
    * Retry publishing a single failed article.
    * Resets status to approved so publish can be called again.
    */

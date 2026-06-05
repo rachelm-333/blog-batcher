@@ -28,15 +28,19 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import {
   AlertTriangle,
   ArrowRight,
+  Calendar,
   CheckCircle2,
   ClipboardCopy,
   Code2,
+  Download,
   ExternalLink,
   FileText,
+  Globe,
   ImageIcon,
   Loader2,
   RefreshCw,
   Save,
+  Send,
   Shield,
   Star,
   Trophy,
@@ -422,6 +426,54 @@ export default function ArticleReview() {
   // AI instruction panel state
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiInstruction, setAiInstruction] = useState("");
+
+  // Per-article publish action panel state
+  const [publishPanelOpen, setPublishPanelOpen] = useState(false);
+  const [publishMode, setPublishMode] = useState<"live" | "draft" | "schedule">("live");
+  const [scheduleDate, setScheduleDate] = useState(""); // datetime-local string
+
+  // Integration data (to know which platforms are connected)
+  const { data: integrationsData } = trpc.integrations.get.useQuery(
+    { businessId: business?.id ?? 0 },
+    { enabled: !!business?.id }
+  );
+  const connectedPlatforms = (integrationsData ?? []).filter((i: any) => i.connected).map((i: any) => i.platform as string);
+  const defaultPlatform = connectedPlatforms.includes("wix") ? "wix" : connectedPlatforms.includes("wordpress") ? "wordpress" : connectedPlatforms[0] ?? null;
+  const [publishPlatform, setPublishPlatform] = useState<string | null>(null);
+
+  const publishSingle = trpc.articles.publishSingle.useMutation({
+    onSuccess: (data) => {
+      if (data.status === "draft_pushed") {
+        toast.success("Article pushed as draft to your CMS.");
+      } else if (data.status === "scheduled") {
+        toast.success("Article scheduled for publishing.");
+      } else {
+        toast.success("Article published successfully!");
+      }
+      setPublishPanelOpen(false);
+      refetchArticles();
+      refetchFull();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  function handlePublishSingle() {
+    if (!selectedItem?.id) return;
+    const platform = publishPlatform ?? defaultPlatform;
+    if (!platform) {
+      toast.error("No CMS connected. Go to Integrations to connect WordPress, Wix, or Zapier.");
+      return;
+    }
+    const scheduledAt = publishMode === "schedule" && scheduleDate
+      ? new Date(scheduleDate).getTime()
+      : undefined;
+    publishSingle.mutate({
+      articleId: selectedItem.id,
+      platform: platform as "wordpress" | "wix" | "zapier",
+      publishAs: publishMode === "draft" ? "draft" : "live",
+      scheduledAt,
+    });
+  }
 
   const aiEditInstruction = trpc.articles.aiEditInstruction.useMutation({
     onSuccess: (data) => {
@@ -1024,9 +1076,146 @@ export default function ArticleReview() {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Article approved. Proceed to Publish &amp; Schedule when all articles are ready.
+                /* ── Per-article publish action panel ─────────────────── */
+                <div className="space-y-2 mt-1">
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    Article approved.
+                  </div>
+
+                  {/* Publish action button */}
+                  {!publishPanelOpen ? (
+                    <Button
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => {
+                        setPublishPlatform(defaultPlatform);
+                        setPublishMode("live");
+                        setScheduleDate("");
+                        setPublishPanelOpen(true);
+                      }}
+                    >
+                      <Send className="h-3 w-3 mr-1.5" />
+                      Publish this article →
+                    </Button>
+                  ) : (
+                    <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">Publish Options</span>
+                        <button
+                          type="button"
+                          onClick={() => setPublishPanelOpen(false)}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >✕</button>
+                      </div>
+
+                      {/* Platform selector */}
+                      {connectedPlatforms.length > 0 ? (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Platform</Label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {connectedPlatforms.map(p => (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => setPublishPlatform(p)}
+                                className={`text-xs px-2.5 py-1 rounded-md border font-medium capitalize transition-colors ${
+                                  (publishPlatform ?? defaultPlatform) === p
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-background border-border text-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {p === "wix" ? "Wix" : p === "wordpress" ? "WordPress" : "Zapier"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-amber-500 flex items-center gap-1.5">
+                          <AlertTriangle className="h-3 w-3" />
+                          No CMS connected. <a href="/integrations" className="underline">Go to Integrations</a>
+                        </div>
+                      )}
+
+                      {/* Publish mode */}
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Action</Label>
+                        <div className="flex gap-1.5">
+                          {([
+                            { mode: "live" as const, icon: Globe, label: "Publish live" },
+                            { mode: "draft" as const, icon: Save, label: "Push as draft" },
+                            { mode: "schedule" as const, icon: Calendar, label: "Schedule" },
+                          ] as const).map(({ mode, icon: Icon, label }) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => setPublishMode(mode)}
+                              className={`flex-1 text-[11px] px-2 py-1.5 rounded-md border font-medium transition-colors flex flex-col items-center gap-0.5 ${
+                                publishMode === mode
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-background border-border text-foreground hover:bg-muted"
+                              }`}
+                            >
+                              <Icon className="h-3 w-3" />
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Date/time picker for schedule mode */}
+                      {publishMode === "schedule" && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Publish date &amp; time</Label>
+                          <Input
+                            type="datetime-local"
+                            value={scheduleDate}
+                            onChange={e => setScheduleDate(e.target.value)}
+                            min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                            className="text-xs h-8"
+                          />
+                        </div>
+                      )}
+
+                      {/* Download option */}
+                      <div className="pt-1 border-t border-border">
+                        <a
+                          href={`/api/articles/export-zip?businessId=${business?.id}&articleId=${selectedItem?.id}`}
+                          download
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <Download className="h-3 w-3" />
+                          Download article as ZIP
+                        </a>
+                      </div>
+
+                      {/* Confirm button */}
+                      <Button
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={handlePublishSingle}
+                        disabled={publishSingle.isPending || (publishMode === "schedule" && !scheduleDate) || connectedPlatforms.length === 0}
+                      >
+                        {publishSingle.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : publishMode === "live" ? (
+                          <Globe className="h-3 w-3 mr-1" />
+                        ) : publishMode === "draft" ? (
+                          <Save className="h-3 w-3 mr-1" />
+                        ) : (
+                          <Calendar className="h-3 w-3 mr-1" />
+                        )}
+                        {publishSingle.isPending
+                          ? "Publishing…"
+                          : publishMode === "live"
+                          ? "Publish live now"
+                          : publishMode === "draft"
+                          ? "Push as draft"
+                          : "Schedule"
+                        }
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 

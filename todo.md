@@ -847,3 +847,11 @@
 - [x] Add regenerateUnderTarget tRPC procedure — finds all articles below their word count min and regenerates them sequentially
 - [x] Add "Regenerate All Under Target" button to ArticleGeneration page with live progress counter
 - [x] Show which article is currently regenerating and how many remain
+
+## Per-Article Publish Actions (Review Panel)
+- [ ] Add publishSingle tRPC procedure — publishes one approved article to CMS immediately
+- [ ] Add scheduleSingle tRPC procedure — sets a specific publish date/time for one article
+- [ ] Add pushAsDraft tRPC procedure — pushes one article to CMS as a draft
+- [ ] Add per-article action panel to ArticleReview: "Publish Now", "Schedule", "Push as Draft", "Download" buttons visible for approved articles
+- [ ] Schedule picker: date + time input, confirm button
+- [ ] Download: generates ZIP with bodyHtml, bodyMarkdown, meta fields, schema JSON, primary keyword

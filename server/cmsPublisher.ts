@@ -32,6 +32,8 @@ export interface ArticlePayload {
   scheduledPublishAt: Date | null;
   /** Article level: cornerstone | pillar | cluster */
   level: string;
+  /** If true, push to CMS as draft rather than live */
+  publishAsDraft?: boolean;
 }
 
 export interface PublishResult {
@@ -180,9 +182,9 @@ export async function publishToWordPress(
     }
 
     // ── Step 2: Determine publish status and date ────────────────────────────
-    let wpStatus: "publish" | "future" | "draft" = "publish";
+    let wpStatus: "publish" | "future" | "draft" = article.publishAsDraft ? "draft" : "publish";
     let wpDate: string | undefined;
-    if (article.scheduledPublishAt) {
+    if (!article.publishAsDraft && article.scheduledPublishAt) {
       const now = new Date();
       if (article.scheduledPublishAt > now) {
         wpStatus = "future";
@@ -411,7 +413,15 @@ export async function publishToWix(
       return { success: false, error: "Wix did not return a draft post ID" };
     }
 
-    // ── Step 2: Publish the draft ────────────────────────────────────────────
+    // ── Step 2: Publish the draft (or leave as draft if publishAsDraft is set) ──────────
+    if (article.publishAsDraft) {
+      return {
+        success: true,
+        cmsPostId: draftId,
+        cmsPostUrl: "",
+      };
+    }
+
     const publishRes = await fetch(
       `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
       {
