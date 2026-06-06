@@ -1391,6 +1391,20 @@ export default function ArticleReview() {
                       View on CMS
                     </a>
                   )}
+                  {/* Save Changes button for published articles */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-xs"
+                    onClick={handleSaveDraft}
+                    disabled={updateSeoFields.isPending}
+                  >
+                    {updateSeoFields.isPending ? (
+                      <><span className="animate-spin mr-1.5">⟳</span> Saving...</>
+                    ) : (
+                      <>Save Changes</>
+                    )}
+                  </Button>
                   {/* Re-publish panel — same as approved state */}
                   {!publishPanelOpen ? (
                     <Button
