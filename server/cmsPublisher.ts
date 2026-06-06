@@ -528,11 +528,20 @@ export async function publishToWix(
     // Pre-process body HTML before converting to Ricos:
     // 1. Remove the first <h1> tag (Wix renders the post title separately — having it in the body creates a duplicate)
     // 2. Remove the AI disclosure paragraph (it's a meta note, not article content)
+    // 3. Prepend the featured image inline so it appears in the post body (Wix featured image only shows in post card/header, not body)
     let cleanBodyHtml = article.bodyHtml
       .replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, "")  // strip first H1 (duplicate of title) — multiline
       .replace(/<p[^>]*class="ai-disclosure"[^>]*>[\s\S]*?<\/p>/i, "") // strip AI disclosure by class
       .replace(/<p[^>]*>[\s\S]*?This article was researched and drafted with AI assistance[\s\S]*?<\/p>/i, "") // fallback: strip by text content
       .trim();
+
+    // Prepend inline image block at the top of the body so it appears inside the post content
+    if (article.imageUrl) {
+      const altText = article.imageAltText || article.title;
+      // Use the original imageUrl (works for both wix:image:// and https:// in Ricos)
+      const imageBlock = `<figure><img src="${article.imageUrl}" alt="${altText.replace(/"/g, '&quot;')}" /></figure>`;
+      cleanBodyHtml = imageBlock + "\n" + cleanBodyHtml;
+    }
 
     // Build excerpt from meta description (max 500 chars per Wix limit)
     const excerpt = article.metaDescription
@@ -549,24 +558,42 @@ export async function publishToWix(
     // We import the image via the Wix Media Manager Import File API to get a media ID.
     let wixMediaId: string | null = null;
     if (article.imageUrl) {
-      try {
-        const importRes = await fetch("https://www.wixapis.com/site-media/v1/files/import", {
-          method: "POST",
-          headers: baseHeaders,
-          body: JSON.stringify({
-            url: article.imageUrl,
-            mediaType: "IMAGE",
-            displayName: `${article.title} - Cover Image`,
-          }),
-        });
-        if (importRes.ok) {
-          const importData = (await importRes.json()) as { file?: { id?: string } };
-          wixMediaId = importData.file?.id ?? null;
+      const wixInternalMatch = article.imageUrl.match(/^wix:image:\/\/v1\/([^/]+)/);
+      if (wixInternalMatch) {
+        // Already a Wix-hosted image — extract the media file ID directly
+        wixMediaId = wixInternalMatch[1];
+        console.log(`[Wix] Detected wix:image:// URL — using media ID directly: ${wixMediaId}`);
+      } else if (article.imageUrl.startsWith("https://") || article.imageUrl.startsWith("http://")) {
+        // External URL — import into Wix Media Manager first
+        console.log(`[Wix] Importing external cover image from URL: ${article.imageUrl}`);
+        try {
+          const importRes = await fetch("https://www.wixapis.com/site-media/v1/files/import", {
+            method: "POST",
+            headers: baseHeaders,
+            body: JSON.stringify({
+              url: article.imageUrl,
+              mediaType: "IMAGE",
+              displayName: `${article.title} - Cover Image`,
+            }),
+          });
+          const importText = await importRes.text();
+          console.log(`[Wix] Image import response status: ${importRes.status}`);
+          console.log(`[Wix] Image import response body: ${importText.slice(0, 500)}`);
+          if (importRes.ok) {
+            const importData = JSON.parse(importText) as { file?: { id?: string } };
+            wixMediaId = importData.file?.id ?? null;
+            console.log(`[Wix] Got media ID from import: ${wixMediaId}`);
+          } else {
+            console.log(`[Wix] Image import failed — continuing without cover image`);
+          }
+        } catch (err) {
+          console.log(`[Wix] Image import exception: ${err}`);
         }
-        // If import fails, continue without cover image (non-fatal)
-      } catch {
-        // Non-fatal — continue without cover image
+      } else {
+        console.log(`[Wix] Unrecognised image URL format: ${article.imageUrl} — skipping cover image`);
       }
+    } else {
+      console.log(`[Wix] No imageUrl provided — skipping cover image`);
     }
 
     const draftBody: Record<string, unknown> = {
@@ -576,7 +603,7 @@ export async function publishToWix(
         memberId: credentials.memberId,
         ...(excerpt ? { excerpt } : {}),
         ...(hashtags.length > 0 ? { hashtags } : {}),
-        ...(wixMediaId ? { media: { wixMedia: { image: { id: wixMediaId } }, displayed: true, custom: true } } : {}),
+        ...(wixMediaId ? { media: { wixMedia: { image: { id: wixMediaId, altText: article.imageAltText || article.title } }, displayed: true, custom: true } } : {}),
         seoData: {
           tags: [
             {
