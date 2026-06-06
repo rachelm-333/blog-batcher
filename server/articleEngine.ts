@@ -428,7 +428,7 @@ Return a single JSON object with these exact fields:
   "title": "H1 title of the article",
   "metaTitle": "SEO meta title (max 60 chars, includes primary keyword)",
   "metaDescription": "SEO meta description (140–160 chars exactly, includes primary keyword)",
-  "bodyHtml": "Full article body as clean HTML (h2, h3, p, ul, ol, a tags only — no inline styles)",
+  "bodyHtml": "Full article body as clean HTML. FORMATTING RULES: (1) Use h2, h3, p, ul, ol, li, a, strong, em, blockquote tags — no inline styles. (2) BULLET LISTS: Every <li> must be a direct child of <ul> or <ol>. Add a blank line (newline) between each <li> item so Wix/WordPress renders spacing between bullets. Do NOT indent <ul> tags — keep them flush with the left margin. (3) FAQ SECTION: If the article includes a FAQ, format each Q&A pair as: <div class=\"faq-item\"><hr><p><strong>Q: [question]</strong></p><p>A: [answer]</p></div> — the <hr> creates a visible divider line between each Q&A pair. The FAQ section must start with <h2>Frequently Asked Questions</h2>. Do NOT use Q: and A: as plain text paragraphs — always wrap them in this structure.",
   "bodyMarkdown": "Full article body as Markdown",
   "schemaMarkup": "JSON-LD schema as a string (Article + Breadcrumb${isCornerstoneOrPillar ? " + FAQ" : ""})",
   "faqItems": ${isCornerstoneOrPillar ? '[{"question": "...", "answer": "..."}] — include 3–5 FAQ items' : "null — Cluster articles do not get FAQ"},
