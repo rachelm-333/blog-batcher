@@ -1161,9 +1161,20 @@ ${row.bodyHtml ?? ""}
       const creds = decryptCredentials(integration.credentialsEncrypted);
       if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt CMS credentials" });
 
+      // Apply formatting pass to bodyHtml before publishing:
+      // - Ensure bullet list items have margin-bottom for Wix/WordPress spacing
+      // - Convert plain Q:/A: FAQ paragraphs to structured format with <hr> dividers
+      let publishBodyHtml = row.bodyHtml ?? "";
+      publishBodyHtml = publishBodyHtml
+        .replace(/<li>/g, '<li style="margin-bottom:0.75em">')
+        .replace(/<li /g, '<li style="margin-bottom:0.75em" ');
+      publishBodyHtml = publishBodyHtml
+        .replace(/<p>\s*Q:\s*/g, '<hr><p><strong>Q: ')
+        .replace(/<\/strong>\s*<\/p>\s*<p>\s*A:\s*/g, '</strong></p><p>A: ');
+
       const payload: ArticlePayload = {
         title: row.title ?? "",
-        bodyHtml: row.bodyHtml ?? "",
+        bodyHtml: publishBodyHtml,
         metaTitle: row.metaTitle ?? row.title ?? "",
         metaDescription: row.metaDescription ?? "",
         focusKeyword: row.focusKeyword ?? "",

@@ -576,7 +576,7 @@ export default function ArticleReview() {
         metaTitle: (fullArticle as any).metaTitle ?? "",
         metaDescription: (fullArticle as any).metaDescription ?? "",
         focusKeyword: (fullArticle as any).focusKeyword ?? "",
-        imageUrl: "",
+        imageUrl: (fullArticle as any).imageUrl ?? "",
       });
     }
   }, [(fullArticle as any)?.id]);
