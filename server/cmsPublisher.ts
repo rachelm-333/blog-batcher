@@ -535,13 +535,8 @@ export async function publishToWix(
       .replace(/<p[^>]*>[\s\S]*?This article was researched and drafted with AI assistance[\s\S]*?<\/p>/i, "") // fallback: strip by text content
       .trim();
 
-    // Prepend inline image block at the top of the body so it appears inside the post content
-    if (article.imageUrl) {
-      const altText = article.imageAltText || article.title;
-      // Use the original imageUrl (works for both wix:image:// and https:// in Ricos)
-      const imageBlock = `<figure><img src="${article.imageUrl}" alt="${altText.replace(/"/g, '&quot;')}" /></figure>`;
-      cleanBodyHtml = imageBlock + "\n" + cleanBodyHtml;
-    }
+    // NOTE: Do NOT prepend image HTML — the htmlToRicos converter skips <figure>/<img> tags.
+    // Instead we inject a proper Ricos IMAGE node directly after conversion (see below).
 
     // Build excerpt from meta description (max 500 chars per Wix limit)
     const excerpt = article.metaDescription
@@ -596,14 +591,60 @@ export async function publishToWix(
       console.log(`[Wix] No imageUrl provided — skipping cover image`);
     }
 
+    // Convert body HTML to Ricos richContent
+    const richContent = htmlToRicos(cleanBodyHtml);
+
+    // Inject a proper Ricos IMAGE node at the TOP of the content nodes so the image
+    // appears inside the post body. The htmlToRicos converter skips <figure>/<img> tags
+    // so we must inject directly. Format confirmed from Wix developer examples.
+    if (wixMediaId) {
+      const altText = article.imageAltText || article.title;
+      const imageNode: Record<string, unknown> = {
+        type: "IMAGE",
+        id: "img1",
+        nodes: [],
+        imageData: {
+          containerData: {
+            width: { custom: "700px" },
+            alignment: "CENTER",
+            spoiler: { enabled: false },
+            textWrap: true,
+          },
+          image: {
+            src: {
+              private: false,
+              url: `https://static.wixstatic.com/media/${wixMediaId}`,
+              id: wixMediaId,
+            },
+            altText,
+          },
+        },
+      };
+      // Prepend image node + spacer paragraph
+      const spacer: Record<string, unknown> = {
+        type: "PARAGRAPH",
+        id: "img-spacer",
+        nodes: [{ type: "TEXT", id: "img-spacer-t", nodes: [], textData: { text: "", decorations: [] } }],
+        paragraphData: {},
+      };
+      (richContent.nodes as Record<string, unknown>[]).unshift(spacer, imageNode);
+    }
+
     const draftBody: Record<string, unknown> = {
       draftPost: {
         title: article.title,
-        richContent: htmlToRicos(cleanBodyHtml),
+        richContent,
         memberId: credentials.memberId,
         ...(excerpt ? { excerpt } : {}),
         ...(hashtags.length > 0 ? { hashtags } : {}),
-        ...(wixMediaId ? { media: { wixMedia: { image: { id: wixMediaId, altText: article.imageAltText || article.title } }, displayed: true, custom: true } } : {}),
+        // heroImage sets the featured image with alt text (confirmed working format)
+        ...(wixMediaId ? {
+          heroImage: {
+            id: wixMediaId,
+            url: `https://static.wixstatic.com/media/${wixMediaId}`,
+            altText: article.imageAltText || article.title,
+          }
+        } : {}),
         seoData: {
           tags: [
             {
