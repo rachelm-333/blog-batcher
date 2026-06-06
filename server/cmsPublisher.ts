@@ -544,6 +544,31 @@ export async function publishToWix(
       ? article.focusKeyword.split(/[,\s]+/).filter(Boolean).slice(0, 10)
       : [];
 
+    // ── Step 1b: Import cover image into Wix Media Manager (if imageUrl provided) ──
+    // Wix Blog API requires a Wix Media ID for cover images — external URLs are not accepted directly.
+    // We import the image via the Wix Media Manager Import File API to get a media ID.
+    let wixMediaId: string | null = null;
+    if (article.imageUrl) {
+      try {
+        const importRes = await fetch("https://www.wixapis.com/site-media/v1/files/import", {
+          method: "POST",
+          headers: baseHeaders,
+          body: JSON.stringify({
+            url: article.imageUrl,
+            mediaType: "IMAGE",
+            displayName: `${article.title} - Cover Image`,
+          }),
+        });
+        if (importRes.ok) {
+          const importData = (await importRes.json()) as { file?: { id?: string } };
+          wixMediaId = importData.file?.id ?? null;
+        }
+        // If import fails, continue without cover image (non-fatal)
+      } catch {
+        // Non-fatal — continue without cover image
+      }
+    }
+
     const draftBody: Record<string, unknown> = {
       draftPost: {
         title: article.title,
@@ -551,6 +576,7 @@ export async function publishToWix(
         memberId: credentials.memberId,
         ...(excerpt ? { excerpt } : {}),
         ...(hashtags.length > 0 ? { hashtags } : {}),
+        ...(wixMediaId ? { media: { wixMedia: { image: { id: wixMediaId } }, displayed: true, custom: true } } : {}),
         seoData: {
           tags: [
             {
