@@ -45,11 +45,10 @@ import {
   Shield,
   Star,
   Trophy,
-  Upload,
   XCircle,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
@@ -622,31 +621,7 @@ export default function ArticleReview() {
     onError: (err) => toast.error(err.message),
   });
 
-  // Image upload
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const saveImage = trpc.articles.saveImage.useMutation({
-    onSuccess: (data) => {
-      toast.success("Image saved.");
-      setSeoEdits(prev => ({ ...prev, imageUrl: data.imageUrl }));
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !selectedItem?.id) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = (ev.target?.result as string).split(",")[1];
-      saveImage.mutate({
-        articleId: selectedItem.id,
-        imageBase64: base64,
-        mimeType: file.type,
-        filename: file.name,
-      });
-    };
-    reader.readAsDataURL(file);
-  }
+  // Image URL is saved via updateSeoFields — no file upload needed
 
   const retryPublish = trpc.articles.retryPublish.useMutation({
     onSuccess: () => {
@@ -821,10 +796,8 @@ export default function ArticleReview() {
       metaTitle: seoEdits.metaTitle || undefined,
       metaDescription: seoEdits.metaDescription || undefined,
       focusKeyword: seoEdits.focusKeyword || undefined,
+      imageUrl: seoEdits.imageUrl || undefined,
     });
-    if (seoEdits.imageUrl) {
-      saveImage.mutate({ articleId: selectedItem.id!, imageUrl: seoEdits.imageUrl });
-    }
   }
 
   function handleApprove() {
@@ -843,6 +816,7 @@ export default function ArticleReview() {
           metaTitle: seoEdits.metaTitle || undefined,
           metaDescription: seoEdits.metaDescription || undefined,
           focusKeyword: seoEdits.focusKeyword || undefined,
+          imageUrl: seoEdits.imageUrl || undefined,
         },
         {
           onSuccess: () => {
@@ -1326,38 +1300,21 @@ export default function ArticleReview() {
                 )}
               </div>
 
-              {/* Image */}
+              {/* Image URL */}
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-foreground">Image (optional)</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs font-semibold text-foreground">Featured Image URL</Label>
+                  <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">optional</span>
+                </div>
                 <Input
                   value={seoEdits.imageUrl}
                   onChange={e => setSeoEdits(prev => ({ ...prev, imageUrl: e.target.value }))}
-                  placeholder="Paste image URL or upload below"
+                  placeholder="https://your-site.com/wp-content/uploads/image.jpg"
                   className="text-xs"
                 />
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-xs mt-1"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={saveImage.isPending}
-                  >
-                    {saveImage.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                    ) : (
-                      <Upload className="h-3 w-3 mr-1" />
-                    )}
-                    Upload Image
-                  </Button>
-                </>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Paste the public URL of your image. Upload the image to your CMS media library first (Wix Media, WordPress Media, Shopify Files, etc.), then copy and paste the URL here. This URL will be sent to your CMS when you publish.
+                </p>
               </div>
 
               {/* Action buttons */}

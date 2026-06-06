@@ -624,6 +624,7 @@ export const articlesRouter = router({
       focusKeyword: z.string().max(512).optional(),
       schemaMarkup: z.string().optional(),
       faqItems: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
+      imageUrl: z.string().url().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -638,10 +639,8 @@ export const articlesRouter = router({
       if (!article) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
       await assertBusinessOwnership(ctx.user.id, article.businessId);
 
-      // Block edits to approved articles that have been published
-      if (article.status === "published") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Published articles cannot be edited here. Edit directly in your CMS." });
-      }
+      // SEO fields (slug, meta title, meta description, focus keyword, image URL) are always editable
+      // even after publishing, so users can update them before re-publishing to CMS.
 
       // Validate meta title length
       if (input.metaTitle && input.metaTitle.length > 60) {
@@ -660,7 +659,31 @@ export const articlesRouter = router({
       if (input.schemaMarkup !== undefined) updates.schemaMarkup = input.schemaMarkup;
       if (input.faqItems !== undefined) updates.faqItems = input.faqItems as unknown;
 
-      await db.update(articles).set(updates).where(eq(articles.id, input.articleId));
+      if (Object.keys(updates).length > 0) {
+        await db.update(articles).set(updates).where(eq(articles.id, input.articleId));
+      }
+
+      // Save imageUrl to articleImages table if provided
+      if (input.imageUrl) {
+        const existing = await db
+          .select({ id: articleImages.id })
+          .from(articleImages)
+          .where(eq(articleImages.articleId, input.articleId))
+          .limit(1);
+        if (existing.length > 0) {
+          await db.update(articleImages)
+            .set({ imageUrl: input.imageUrl })
+            .where(eq(articleImages.articleId, input.articleId));
+        } else {
+          await db.insert(articleImages).values({
+            articleId: input.articleId,
+            imageUrl: input.imageUrl,
+            storageKey: null,
+            altText: null,
+          });
+        }
+      }
+
       return { updated: true };
     }),
 
