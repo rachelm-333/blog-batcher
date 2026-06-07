@@ -635,9 +635,48 @@ export async function publishToWix(
         paragraphData: {},
       };
       const nodes = richContent.nodes as Record<string, unknown>[];
-      // Find the index of the first PARAGRAPH node to insert after it
-      const firstParaIdx = nodes.findIndex(n => n.type === "PARAGRAPH");
-      const insertAt = firstParaIdx >= 0 ? firstParaIdx + 1 : 0;
+
+      // We want to insert the image after the entire opening answer block.
+      // The block consists of: [bold-question paragraph] [spacer] [answer paragraph]
+      // After htmlToRicos + spacer insertion, the layout is:
+      //   0: PARAGRAPH (question, has BOLD text node)
+      //   1: PARAGRAPH (empty spacer)
+      //   2: PARAGRAPH (answer text)
+      //   3: PARAGRAPH (empty spacer)
+      //   ...
+      // Strategy: skip the first real paragraph + any following spacers, then skip
+      // the second real paragraph, and insert after that.
+      // A "spacer" paragraph is one whose only text node has empty text.
+      const isSpacerNode = (n: Record<string, unknown>) => {
+        if (n.type !== "PARAGRAPH") return false;
+        const children = n.nodes as Record<string, unknown>[] | undefined;
+        if (!children || children.length === 0) return true;
+        return children.every(c => {
+          const td = (c as Record<string, unknown>).textData as Record<string, unknown> | undefined;
+          return !td || (td.text as string) === "";
+        });
+      };
+
+      let realParaCount = 0;
+      let insertAt = nodes.length; // fallback: append at end
+      for (let i = 0; i < nodes.length; i++) {
+        if (!isSpacerNode(nodes[i])) {
+          realParaCount++;
+          if (realParaCount === 2) {
+            // Insert after this node (and any immediately following spacer)
+            let j = i + 1;
+            while (j < nodes.length && isSpacerNode(nodes[j])) j++;
+            insertAt = j;
+            break;
+          }
+        }
+      }
+      // If there's only one real paragraph (very short intro), fall back to after the first
+      if (realParaCount < 2) {
+        const firstParaIdx = nodes.findIndex(n => n.type === "PARAGRAPH");
+        insertAt = firstParaIdx >= 0 ? firstParaIdx + 1 : 0;
+      }
+
       nodes.splice(insertAt, 0, spacerBefore, imageNode, spacerAfter);
     }
 
