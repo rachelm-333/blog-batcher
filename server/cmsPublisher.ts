@@ -620,14 +620,25 @@ export async function publishToWix(
           },
         },
       };
-      // Prepend image node + spacer paragraph
-      const spacer: Record<string, unknown> = {
+      // Insert image after the first paragraph node, with blank-line spacers above and below.
+      // This places the featured image after the intro paragraph rather than at the very top.
+      const spacerBefore: Record<string, unknown> = {
         type: "PARAGRAPH",
-        id: "img-spacer",
-        nodes: [{ type: "TEXT", id: "img-spacer-t", nodes: [], textData: { text: "", decorations: [] } }],
+        id: "img-spacer-before",
+        nodes: [{ type: "TEXT", id: "img-spacer-before-t", nodes: [], textData: { text: "", decorations: [] } }],
         paragraphData: {},
       };
-      (richContent.nodes as Record<string, unknown>[]).unshift(spacer, imageNode);
+      const spacerAfter: Record<string, unknown> = {
+        type: "PARAGRAPH",
+        id: "img-spacer-after",
+        nodes: [{ type: "TEXT", id: "img-spacer-after-t", nodes: [], textData: { text: "", decorations: [] } }],
+        paragraphData: {},
+      };
+      const nodes = richContent.nodes as Record<string, unknown>[];
+      // Find the index of the first PARAGRAPH node to insert after it
+      const firstParaIdx = nodes.findIndex(n => n.type === "PARAGRAPH");
+      const insertAt = firstParaIdx >= 0 ? firstParaIdx + 1 : 0;
+      nodes.splice(insertAt, 0, spacerBefore, imageNode, spacerAfter);
     }
 
     const draftBody: Record<string, unknown> = {
