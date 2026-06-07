@@ -435,13 +435,29 @@ function ScoreBadgePanel({ badge, liveChecks }: { badge: StatusBadge; liveChecks
     );
   }
   if (badge === "strong") {
+    const failingChecks = liveChecks
+      ? (Object.keys(liveChecks) as (keyof Pass1Checks)[]).filter(k => !liveChecks[k])
+      : [];
     return (
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/10 border border-primary/30">
-        <div className="text-2xl">⚡</div>
-        <div>
-          <div className="text-sm font-bold text-primary">Strong</div>
-          <div className="text-xs text-primary">14–15 points met. Good to publish.</div>
+      <div className="rounded-lg bg-primary/10 border border-primary/30 p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-lg">⚡</span>
+          <div>
+            <div className="text-sm font-bold text-primary">Strong</div>
+            <div className="text-xs text-primary">13–15 points met. Below the 15-point threshold.</div>
+          </div>
         </div>
+        {failingChecks.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1">
+            <div className="text-xs font-semibold text-primary/80 mb-1">Failing checks ({failingChecks.length}):</div>
+            {failingChecks.map(k => (
+              <div key={k} className="flex items-start gap-1.5 text-xs text-primary/70">
+                <span className="mt-0.5 shrink-0">✗</span>
+                <span>{PASS1_CHECK_LABELS[k]}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -455,7 +471,7 @@ function ScoreBadgePanel({ badge, liveChecks }: { badge: StatusBadge; liveChecks
           <span className="text-lg">⚠️</span>
           <div>
             <div className="text-sm font-bold text-amber-400">Needs Review</div>
-            <div className="text-xs text-amber-500">Below 14 points. Fix the items below to improve your score.</div>
+            <div className="text-xs text-amber-500">Below 13 points. Fix the items below to reach the 15-point threshold.</div>
           </div>
         </div>
         {failingChecks.length > 0 && (
@@ -610,6 +626,15 @@ export default function ArticleReview() {
     onError: (err) => toast.error(err.message),
   });
 
+  const updateStatus = trpc.articles.updateStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Article moved back to review.");
+      refetchArticles();
+      refetchFull();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const approve = trpc.articles.approve.useMutation({
     onSuccess: (data) => {
       if (data.alreadyApproved) {
@@ -756,8 +781,9 @@ export default function ArticleReview() {
   const liveTotalChecks = 16;
 
   // Helper: does a field have a failing check?
+  // Works for all states including approved so users can see what to fix.
   function fieldFailing(field: keyof typeof FIELD_CHECK_MAP): boolean {
-    if (!liveChecks || isApproved) return false;
+    if (!liveChecks) return false;
     return FIELD_CHECK_MAP[field].some(key => !liveChecks[key]);
   }
 
@@ -1171,18 +1197,19 @@ export default function ArticleReview() {
               {/* Score badge */}
               <ScoreBadgePanel badge={selectedItem.statusBadge as StatusBadge} liveChecks={liveChecks} />
 
-              {/* Live SEO check counter */}
-              {liveChecks && !isApproved && (
+              {/* Live SEO check counter — shown for all states so score is always visible */}
+              {liveChecks && (
                 <div className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-medium ${
                   livePassCount === liveTotalChecks
                     ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
-                    : livePassCount !== null && livePassCount >= 14
+                    :                   livePassCount !== null && livePassCount >= 15
                     ? "bg-primary/10 border-primary/30 text-primary"
                     : "bg-amber-500/10 border-amber-500/30 text-amber-600"
                 }`}>
                   <span>
-                    {livePassCount === liveTotalChecks ? "✅" : livePassCount !== null && livePassCount >= 14 ? "⚡" : "⚠️"}
+                    {livePassCount === liveTotalChecks ? "✅" : livePassCount !== null && livePassCount >= 15 ? "⚡" : "⚠️"}
                     {" "}{livePassCount}/{liveTotalChecks} SEO checks passing
+                    {livePassCount !== null && livePassCount < 15 && ` — need ${15 - livePassCount} more to reach threshold`}
                   </span>
                   <span className="text-[10px] font-normal opacity-70">updates as you type</span>
                 </div>
@@ -1490,11 +1517,21 @@ export default function ArticleReview() {
                   )}
                 </div>
               ) : (
-                /* ── Per-article publish action panel ─────────────────── */
+                /* ── Per-article publish action panel ───────────────────── */
                 <div className="space-y-2 mt-1">
-                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                    Article approved.
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      Article approved.
+                    </span>
+                    <button
+                      type="button"
+                      className="text-[10px] text-amber-500 hover:text-amber-400 underline transition-colors"
+                      onClick={() => selectedItem?.id && updateStatus.mutate({ articleId: selectedItem.id, status: "pending_approval" })}
+                      disabled={updateStatus.isPending}
+                    >
+                      {updateStatus.isPending ? "Reverting…" : "Unapprove"}
+                    </button>
                   </div>
 
                   {/* Publish action button */}
