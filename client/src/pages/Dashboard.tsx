@@ -156,8 +156,27 @@ export default function Dashboard() {
         {/* ── Header ── */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 8 }}>
-              AUTHORITY PACK · {bizName.toUpperCase()}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af" }}>
+                AUTHORITY PACK · {bizName.toUpperCase()}
+              </div>
+              {businesses && businesses.length > 1 && (
+                <select
+                  value={selectedBusinessId ?? ""}
+                  onChange={e => setSelectedBusinessId(Number(e.target.value))}
+                  style={{ fontSize: 11, color: "#6e5afe", border: "1px solid #c4b5fd", borderRadius: 6, padding: "2px 6px", background: "#ede9ff", cursor: "pointer", fontWeight: 600 }}
+                >
+                  {businesses.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={() => setLocation("/onboarding?new=1")}
+                style={{ fontSize: 11, color: "#6e5afe", border: "1px solid #c4b5fd", borderRadius: 6, padding: "2px 8px", background: "#ede9ff", cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}
+              >
+                <Plus style={{ width: 10, height: 10 }} /> Add business
+              </button>
             </div>
             <h1 style={{ fontSize: 36, fontWeight: 800, color: "#1a1a2e", lineHeight: 1.15, margin: 0 }}>
               Your whole blog, in{" "}

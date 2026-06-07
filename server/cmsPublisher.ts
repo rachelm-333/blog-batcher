@@ -650,10 +650,14 @@ export async function publishToWix(
             {
               type: "title",
               children: article.metaTitle || article.title,
+              custom: false,
+              isDisabled: false,
             },
             {
               type: "meta",
               props: { name: "description", content: article.metaDescription || "" },
+              custom: false,
+              isDisabled: false,
             },
           ],
         },
@@ -676,10 +680,12 @@ export async function publishToWix(
 
     if (!createRes.ok) {
       const errText = await createRes.text();
+      console.error(`[Wix] Draft creation failed — HTTP ${createRes.status}`);
+      console.error(`[Wix] Response body: ${errText.slice(0, 2000)}`);
       let errMsg = `Wix API error ${createRes.status}`;
       try {
-        const parsed = JSON.parse(errText) as { message?: string };
-        if (parsed.message) errMsg = parsed.message;
+        const parsed = JSON.parse(errText) as { message?: string; details?: unknown };
+        if (parsed.message) errMsg = `${parsed.message}${parsed.details ? ` — ${JSON.stringify(parsed.details)}` : ''}`;
       } catch { /* use status */ }
       return { success: false, error: errMsg };
     }

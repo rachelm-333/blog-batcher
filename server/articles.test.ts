@@ -51,7 +51,7 @@ function makeContext(overrides: Partial<ArticleContext> = {}): ArticleContext {
     paaQuestion: "How quickly can an emergency plumber arrive?",
     articleType: "cornerstone_guide",
     level: "cornerstone",
-    wordCountMin: 2400,
+    wordCountMin: 2000,
     wordCountMax: 3000,
     urlSlug: "emergency-plumber-sydney",
     allBatchSlugs: ["/emergency-plumber-sydney", "/blocked-drains-sydney", "/hot-water-repairs"],
@@ -89,8 +89,8 @@ describe("Generation order", () => {
     expect(WORD_COUNT_RULES.cluster).toBeDefined();
   });
 
-  it("Cornerstone word count range is 2400–3000", () => {
-    expect(WORD_COUNT_RULES.cornerstone.min).toBe(2400);
+  it("Cornerstone word count range is 2000–3000", () => {
+    expect(WORD_COUNT_RULES.cornerstone.min).toBe(2000);
     expect(WORD_COUNT_RULES.cornerstone.max).toBe(3000);
   });
 
@@ -128,9 +128,16 @@ describe("Generation order", () => {
 // ---------------------------------------------------------------------------
 
 describe("Word count enforcement", () => {
-  it("Pass 1 scorer fails p16 when word count is below minimum for cornerstone", () => {
-    const result = runPass1Scorer(makePass1Params({ wordCount: 2000, level: "cornerstone" }));
+  it("Pass 1 scorer fails p16 when word count is well below minimum for cornerstone", () => {
+    // 1900 words is 100 below the 2000 minimum, exceeding the 50-word tolerance
+    const result = runPass1Scorer(makePass1Params({ wordCount: 1900, level: "cornerstone" }));
     expect(result.points.p16_word_count).toBe(false);
+  });
+
+  it("Pass 1 scorer passes p16 when word count is within 50-word tolerance of minimum", () => {
+    // 1960 words is 40 below the 2000 minimum, within the 50-word tolerance
+    const result = runPass1Scorer(makePass1Params({ wordCount: 1960, level: "cornerstone" }));
+    expect(result.points.p16_word_count).toBe(true);
   });
 
   it("Pass 1 scorer fails p16 when word count exceeds maximum for cornerstone", () => {
@@ -269,7 +276,7 @@ describe("16-point Authority Standard in generation prompt", () => {
   });
 
   it("Prompt includes word count range and hard maximum", () => {
-    expect(prompt).toContain("2400–3000");
+    expect(prompt).toContain("2000–3000");
     expect(prompt).toContain("HARD MAXIMUM: 3000");
   });
 

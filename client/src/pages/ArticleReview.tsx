@@ -58,7 +58,7 @@ import { HelpLink } from "@/components/HelpLink";
 // ---------------------------------------------------------------------------
 
 const WORD_COUNT_RULES = {
-  cornerstone: { min: 2400, max: 3000 },
+  cornerstone: { min: 2000, max: 3000 },
   pillar: { min: 1500, max: 2000 },
   cluster: { min: 800, max: 1200 },
 } as const;

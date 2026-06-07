@@ -14,7 +14,7 @@ import { toast } from "sonner";
 
 // Word count minimums per level (must match server)
 const WORD_COUNT_MIN: Record<string, number> = {
-  cornerstone: 2400,
+  cornerstone: 2000,
   pillar: 1500,
   cluster: 800,
 };

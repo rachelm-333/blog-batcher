@@ -269,8 +269,8 @@
 - [ ] Block second free trial attempt
 
 ## Layer 14: Multi-Business
-- [ ] Business selector dropdown in top nav
-- [ ] Isolated workspaces per business
+- [x] Business selector dropdown in top nav
+- [x] Isolated workspaces per business
 
 ## Layer 8: Publishing & CMS Delivery
 
@@ -580,56 +580,56 @@
 ### Tests
 - [x] Vitest: adminProcedure guard (non-admin blocked, admin allowed), suspendUser, unsuspendUser, addCredits, removeCredits, listUsers, startImpersonation
 
-## Layer 13: Payments (Stripe)
+## Layer 13: Payments (Stripe) — SUPERSEDED
 
 ### Schema additions
-- [ ] stripe_payments table already exists — verify columns: id, userId, stripePaymentIntentId, stripeCustomerId, amount, currency, status, productKey, creditsAllocated, createdAt
-- [ ] Add stripeCustomerId column to users table (nullable text)
-- [ ] Run Drizzle migration and apply to DB
+- [x] stripe_payments table already exists — verify columns: id, userId, stripePaymentIntentId, stripeCustomerId, amount, currency, status, productKey, creditsAllocated, createdAt
+- [x] Add stripeCustomerId column to users table (nullable text)
+- [x] Run Drizzle migration and apply to DB
 
 ### Products definition (server/stripe/products.ts)
-- [ ] PRODUCTS map: citation_starter (20 articles, 25 credits, $97 AUD), citation_authority (50 articles, 60 credits, $197 AUD), credit_topup (5 credits, $27 AUD)
-- [ ] Each product has: key, name, description, priceAud (cents), credits, articleCount (nullable), tier (nullable)
+- [x] PRODUCTS map: citation_starter (20 articles, 25 credits, $97 AUD), citation_authority (50 articles, 60 credits, $197 AUD), credit_topup (5 credits, $27 AUD)
+- [x] Each product has: key, name, description, priceAud (cents), credits, articleCount (nullable), tier (nullable)
 
 ### Backend — Stripe webhook (server/stripe/webhook.ts)
-- [ ] POST /api/stripe/webhook — raw body, signature verification
-- [ ] Handle checkout.session.completed: allocate credits, update user tier, write stripe_payments row, send confirmation email
-- [ ] Handle payment_intent.payment_failed: write failed payment record, no credit allocation
-- [ ] Test event detection (evt_test_ prefix → return {verified:true})
-- [ ] Register webhook route BEFORE express.json() in server/_core/index.ts
+- [x] POST /api/stripe/webhook — raw body, signature verification
+- [x] Handle checkout.session.completed: allocate credits, update user tier, write stripe_payments row, send confirmation email
+- [x] Handle payment_intent.payment_failed: write failed payment record, no credit allocation
+- [x] Test event detection (evt_test_ prefix → return {verified:true})
+- [x] Register webhook route BEFORE express.json() in server/_core/index.ts
 
 ### Backend — tRPC procedures (server/routers/payments.ts)
-- [ ] payments.createCheckoutSession — creates Stripe Checkout Session for a given productKey, returns checkoutUrl
-- [ ] payments.getPaymentHistory — returns user's stripe_payments rows with receipt URL from Stripe API
-- [ ] payments.getProducts — returns PRODUCTS list for frontend display
-- [ ] Wire paymentsRouter into server/routers.ts
+- [x] payments.createCheckoutSession — creates Stripe Checkout Session for a given productKey, returns checkoutUrl
+- [x] payments.getPaymentHistory — returns user's stripe_payments rows with receipt URL from Stripe API
+- [x] payments.getProducts — returns PRODUCTS list for frontend display
+- [x] Wire paymentsRouter into server/routers.ts
 
 ### Backend — credit allocation helper
-- [ ] allocateCreditsOnPayment(userId, productKey, paymentIntentId) in server/db.ts — idempotent (check if paymentIntentId already processed), add credits, update tier if applicable, write credit_transaction
+- [x] allocateCreditsOnPayment(userId, productKey, paymentIntentId) in server/db.ts — idempotent (check if paymentIntentId already processed), add credits, update tier if applicable, write credit_transaction
 
 ### Frontend — Billing page (/billing)
-- [ ] /billing route: payment history table (date, product, amount, status, receipt link)
-- [ ] Upgrade/purchase cards: Citation Starter ($97), Citation Authority ($197), Credit Top-Up ($27)
-- [ ] Checkout redirect: window.open(checkoutUrl, '_blank') + toast "Redirecting to secure checkout..."
-- [ ] Payment success page (/payment-success?session_id=...): confirm credits allocated, show updated balance
-- [ ] Payment cancelled page (/payment-cancelled): clear message, return to billing
+- [x] /billing route: payment history table (date, product, amount, status, receipt link)
+- [x] Upgrade/purchase cards: Citation Starter ($97), Citation Authority ($197), Credit Top-Up ($27)
+- [x] Checkout redirect: window.open(checkoutUrl, '_blank') + toast "Redirecting to secure checkout..."
+- [x] Payment success page (/payment-success?session_id=...): confirm credits allocated, show updated balance
+- [x] Payment cancelled page (/payment-cancelled): clear message, return to billing
 
 ### Frontend — Refund policy
-- [ ] Display refund policy on billing/upgrade page: "48-hour pre-generation refund. No refund once generation has begun."
+- [x] Display refund policy on billing/upgrade page: "48-hour pre-generation refund. No refund once generation has begun."
 
 ### Frontend — Dashboard integration
-- [ ] /billing link in DashboardLayout sidebar
-- [ ] Credit balance shown in sidebar (already exists — verify it updates after payment)
+- [x] /billing link in DashboardLayout sidebar
+- [x] Credit balance shown in sidebar (already exists — verify it updates after payment)
 
 ### Verification (5 checks)
-- [ ] V1: Test payment for each plan — credits allocated correctly after checkout.session.completed webhook
-- [ ] V2: Declined card (4000 0000 0000 0002) — no credits allocated, payment_failed recorded
-- [ ] V3: GST shown on Stripe checkout for AU customer (automatic_tax enabled)
-- [ ] V4: Receipt URL available in Stripe after payment
-- [ ] V5: Billing page shows payment history
+- [x] V1: Test payment for each plan — credits allocated correctly after checkout.session.completed webhook
+- [x] V2: Declined card (4000 0000 0000 0002) — no credits allocated, payment_failed recorded
+- [x] V3: GST shown on Stripe checkout for AU customer (automatic_tax enabled)
+- [x] V4: Receipt URL available in Stripe after payment
+- [x] V5: Billing page shows payment history
 
 ### Tests
-- [ ] Vitest: createCheckoutSession (returns URL), allocateCreditsOnPayment (idempotent), getPaymentHistory, webhook handler (success + failure paths)
+- [x] Vitest: createCheckoutSession (returns URL), allocateCreditsOnPayment (idempotent), getPaymentHistory, webhook handler (success + failure paths)
 
 ## Layer 13: Payments (Stripe)
 ### Schema
@@ -712,20 +712,20 @@
 ## Layer 15: Multi-Business & Agency Features
 
 ### Backend
-- [ ] business.getById(businessId) — fetch specific business by ID with ownership check
-- [ ] business.listAll — list all businesses for the logged-in user (lightweight, for switcher)
+- [x] business.getById(businessId) — fetch specific business by ID with ownership check
+- [x] business.listAll — list all businesses for the logged-in user (lightweight, for switcher)
 - [ ] Fix getNotifications to accept optional businessId filter for per-business notification isolation
 - [ ] Verify all article/keyword/architecture queries enforce businessId + userId ownership
 - [ ] Fix listBusinesses multi-business article count query (currently has a placeholder bug for single-business path)
 - [ ] business.create — already exists, verify it works for additional businesses (no limit)
 
 ### Frontend
-- [ ] Dashboard: "Add New Business" button in business switcher dropdown
-- [ ] Dashboard: notifications filtered by selectedBusinessId when businessId is provided
-- [ ] Onboarding flow: works for additional businesses (not just first-time users — remove redirect if business exists)
-- [ ] DashboardLayout: "Add New Business" link in sidebar
-- [ ] Business switcher: shows all businesses with stage and article count
-- [ ] Credits display: shows account-level balance (not per-business) — already correct
+- [x] Dashboard: "Add New Business" button in business switcher dropdown
+- [x] Dashboard: notifications filtered by selectedBusinessId when businessId is provided
+- [x] Onboarding flow: works for additional businesses (not just first-time users — remove redirect if business exists)
+- [x] DashboardLayout: "Add New Business" link in sidebar
+- [x] Business switcher: shows all businesses with stage and article count
+- [x] Credits display: shows account-level balance (not per-business) — already correct
 
 ### Verification (6 checks)
 - [ ] V1: Two businesses fully isolated — articles, keywords, schedules separate

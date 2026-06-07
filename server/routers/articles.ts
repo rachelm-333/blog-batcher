@@ -520,9 +520,9 @@ export const articlesRouter = router({
 
       await assertBusinessOwnership(ctx.user.id, input.businessId);
 
-      // Word count minimums per article type
+      // Word count minimums per article type (must match WORD_COUNT_RULES in articleEngine.ts)
       const WORD_COUNT_MIN: Record<string, number> = {
-        cornerstone: 2400,
+        cornerstone: 2000,
         pillar: 1500,
         cluster: 800,
       };

@@ -103,6 +103,67 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <span className="font-bold text-sm" style={{ color: "#1a1a2e" }}>BlogBatcher</span>
         </div>
 
+        {/* Business switcher */}
+        <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
+          <div className="relative" ref={bizDropRef}>
+            <button
+              onClick={() => setBizDropOpen(v => !v)}
+              className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-left transition-colors"
+              style={{ background: bizDropOpen ? "#ede9ff" : "#f5f3ec", border: "1px solid #e5e7eb" }}
+            >
+              <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                style={{ background: "#6e5afe" }}>
+                <span className="text-white font-bold" style={{ fontSize: "9px" }}>B</span>
+              </div>
+              <span className="flex-1 truncate text-xs font-semibold" style={{ color: "#1a1a2e" }}>
+                {activeBiz?.name ?? "Select business"}
+              </span>
+              <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: "#9ca3af", transform: bizDropOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
+            </button>
+            {bizDropOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 rounded-lg shadow-lg z-50 overflow-hidden"
+                style={{ background: "#fff", border: "1px solid #e5e7eb" }}>
+                {businesses?.map(biz => (
+                  <button
+                    key={biz.id}
+                    onClick={() => { setSelectedBizId(biz.id); setBizDropOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                    style={{
+                      background: biz.id === activeBiz?.id ? "#ede9ff" : "transparent",
+                      color: biz.id === activeBiz?.id ? "#6e5afe" : "#374151",
+                      fontSize: "12px",
+                      fontWeight: biz.id === activeBiz?.id ? 600 : 400,
+                    }}
+                    onMouseEnter={e => { if (biz.id !== activeBiz?.id) (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec"; }}
+                    onMouseLeave={e => { if (biz.id !== activeBiz?.id) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+                  >
+                    <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
+                      style={{ background: biz.id === activeBiz?.id ? "#6e5afe" : "#e5e7eb" }}>
+                      <span style={{ fontSize: "8px", color: biz.id === activeBiz?.id ? "#fff" : "#9ca3af", fontWeight: 700 }}>
+                        {biz.name?.charAt(0).toUpperCase() ?? "B"}
+                      </span>
+                    </div>
+                    <span className="flex-1 truncate">{biz.name}</span>
+                    {biz.id === activeBiz?.id && <span style={{ fontSize: 10, color: "#6e5afe" }}>✓</span>}
+                  </button>
+                ))}
+                <div style={{ borderTop: "1px solid #e5e7eb" }}>
+                  <button
+                    onClick={() => { setBizDropOpen(false); setLocation("/onboarding?new=1"); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                    style={{ color: "#6e5afe", fontSize: "12px", fontWeight: 600 }}
+                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec"}
+                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add new business
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Scrollable nav */}
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {/* WORKFLOW */}
