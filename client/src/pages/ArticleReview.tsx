@@ -420,7 +420,7 @@ function LevelLabel({ level }: { level: "cornerstone" | "pillar" | "cluster" }) 
   );
 }
 
-function ScoreBadgePanel({ badge }: { badge: StatusBadge }) {
+function ScoreBadgePanel({ badge, liveChecks }: { badge: StatusBadge; liveChecks?: Pass1Checks | null }) {
   if (badge === "authority_ready") {
     return (
       <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
@@ -444,13 +444,29 @@ function ScoreBadgePanel({ badge }: { badge: StatusBadge }) {
     );
   }
   if (badge === "needs_review") {
+    const failingChecks = liveChecks
+      ? (Object.keys(liveChecks) as (keyof Pass1Checks)[]).filter(k => !liveChecks[k])
+      : [];
     return (
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-        <div className="text-2xl">⚠️</div>
-        <div>
-          <div className="text-sm font-bold text-amber-400">Needs Review</div>
-          <div className="text-xs text-amber-500">Below 14 points. Review SEO fields before publishing.</div>
+      <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">⚠️</span>
+          <div>
+            <div className="text-sm font-bold text-amber-400">Needs Review</div>
+            <div className="text-xs text-amber-500">Below 14 points. Fix the items below to improve your score.</div>
+          </div>
         </div>
+        {failingChecks.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1">
+            <div className="text-xs font-semibold text-amber-400 mb-1">Points to fix:</div>
+            {failingChecks.map(k => (
+              <div key={k} className="flex items-start gap-1.5 text-xs text-amber-600">
+                <span className="mt-0.5 shrink-0">✗</span>
+                <span>{PASS1_CHECK_LABELS[k]}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -1151,7 +1167,7 @@ export default function ArticleReview() {
             {/* ── SEO Panel ───────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
               {/* Score badge */}
-              <ScoreBadgePanel badge={selectedItem.statusBadge as StatusBadge} />
+              <ScoreBadgePanel badge={selectedItem.statusBadge as StatusBadge} liveChecks={liveChecks} />
 
               {/* Live SEO check counter */}
               {liveChecks && !isApproved && (

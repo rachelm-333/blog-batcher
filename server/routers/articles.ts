@@ -132,6 +132,7 @@ async function generateAndSave(
         internalScore: result.internalScore,
         statusBadge: result.statusBadge,
         status: "generated",
+        approvedAt: null,
         generationAttempts: attempts,
         errorMessage: null,
       })
