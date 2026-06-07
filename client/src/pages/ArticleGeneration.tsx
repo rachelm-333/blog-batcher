@@ -183,7 +183,7 @@ export default function ArticleGeneration() {
                 Stage 4 · Article Generation
               </div>
               <h1 style={{ fontSize:32, fontWeight:800, color:"#1a1a2e", lineHeight:1.15, margin:0 }}>
-                Six drafts, written <em style={{ fontFamily:"Lora, Georgia, serif", fontStyle:"italic", fontWeight:600 }}>while</em> you grab a coffee.
+                Your drafts, written <em style={{ fontFamily:"Lora, Georgia, serif", fontStyle:"italic", fontWeight:600 }}>while</em> you grab a coffee.
               </h1>
               <p style={{ fontSize:14, color:"#6b7280", marginTop:8 }}>
                 Each approved keyword becomes a full, SEO-scored draft. One click starts the batch.
