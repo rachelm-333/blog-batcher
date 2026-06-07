@@ -246,7 +246,8 @@ function computePass1Checks(params: {
   const wordCountOk = wordCount >= wc.min - WORD_COUNT_TOLERANCE && wordCount <= wc.max + WORD_COUNT_TOLERANCE;
 
   return {
-    p1_keyword_density: kwMatches >= 5 && kwDensity >= 0.005 && kwDensity <= 0.025,
+    // Pass if: (4+ mentions OR density ≥ 1%) AND density ≤ 2.5%
+    p1_keyword_density: (kwMatches >= 4 || kwDensity >= 0.01) && kwDensity <= 0.025,
     p2_keyword_in_h1: h1Present,
     p3_keyword_in_h2: kwInH2,
     p4_keyword_in_h3: kwInH3,
@@ -266,7 +267,7 @@ function computePass1Checks(params: {
 }
 
 const PASS1_CHECK_LABELS: Record<keyof Pass1Checks, string> = {
-  p1_keyword_density: "Keyword density (0.5–2.5%)",
+  p1_keyword_density: "Keyword density (4+ mentions or ≥1%)",
   p2_keyword_in_h1: "Keyword in H1 title",
   p3_keyword_in_h2: "Keyword in H2 heading",
   p4_keyword_in_h3: "Keyword in H3 heading",

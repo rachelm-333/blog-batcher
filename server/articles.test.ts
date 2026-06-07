@@ -507,9 +507,9 @@ describe("Pass 1 scorer — rules-based", () => {
     expect(result.points.p10_external_link).toBe(false);
   });
 
-  it("p1_keyword_density passes with 5+ mentions and 0.5%–2.5% density", () => {
-    // 5 mentions in ~200 words = 2.5% density
-    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney Services</h2><p>Our emergency plumber sydney team arrives fast. Call emergency plumber sydney now. Best emergency plumber sydney.</p>`;
+  it("p1_keyword_density passes with 4+ mentions (regardless of density)", () => {
+    // 4 mentions in ~200 words = ~2% density — passes on mention count alone
+    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney Services</h2><p>Our emergency plumber sydney team arrives fast. Call emergency plumber sydney now.</p>`;
     const result = runPass1Scorer(makePass1Params({
       bodyHtml: body,
       wordCount: 200,
@@ -518,8 +518,20 @@ describe("Pass 1 scorer — rules-based", () => {
     expect(result.points.p1_keyword_density).toBe(true);
   });
 
-  it("p1_keyword_density fails with fewer than 5 mentions", () => {
-    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Our Services</h2><p>We help you fast.</p>`;
+  it("p1_keyword_density passes with density ≥1% even with fewer than 4 mentions", () => {
+    // 3 mentions in ~200 words = 1.5% density — passes on density alone
+    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney</h2><p>Call emergency plumber sydney now. We help you fast.</p>`;
+    const result = runPass1Scorer(makePass1Params({
+      bodyHtml: body,
+      wordCount: 200,
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    expect(result.points.p1_keyword_density).toBe(true);
+  });
+
+  it("p1_keyword_density fails with fewer than 4 mentions AND density below 1%", () => {
+    // 1 mention in ~200 words = 0.5% density — fails both conditions
+    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Our Services</h2><p>We help you fast. Call us now. Available all day.</p>`;
     const result = runPass1Scorer(makePass1Params({
       bodyHtml: body,
       wordCount: 200,
