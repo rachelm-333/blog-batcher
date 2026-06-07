@@ -423,12 +423,14 @@ function LevelLabel({ level }: { level: "cornerstone" | "pillar" | "cluster" }) 
 }
 
 function ScoreBadgePanel({ badge, liveChecks }: { badge: StatusBadge; liveChecks?: Pass1Checks | null }) {
+  const passCount = liveChecks ? Object.values(liveChecks).filter(Boolean).length : null;
+
   if (badge === "authority_ready") {
     return (
       <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
         <div className="text-2xl">✅</div>
         <div>
-          <div className="text-sm font-bold text-emerald-400">Authority Ready</div>
+          <div className="text-sm font-bold text-emerald-400">Authority Ready — {passCount ?? 16}/16</div>
           <div className="text-xs text-emerald-500">All 16 points met. Publish with confidence.</div>
         </div>
       </div>
@@ -443,8 +445,8 @@ function ScoreBadgePanel({ badge, liveChecks }: { badge: StatusBadge; liveChecks
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">⚡</span>
           <div>
-            <div className="text-sm font-bold text-primary">Strong</div>
-            <div className="text-xs text-primary">13–15 points met. Below the 15-point threshold.</div>
+            <div className="text-sm font-bold text-primary">Strong — {passCount ?? "?"}/16</div>
+            <div className="text-xs text-primary">Below the 15-point threshold. Fix the failing checks to qualify.</div>
           </div>
         </div>
         {failingChecks.length > 0 && (
@@ -470,8 +472,8 @@ function ScoreBadgePanel({ badge, liveChecks }: { badge: StatusBadge; liveChecks
         <div className="flex items-center gap-2 mb-2">
           <span className="text-lg">⚠️</span>
           <div>
-            <div className="text-sm font-bold text-amber-400">Needs Review</div>
-            <div className="text-xs text-amber-500">Below 13 points. Fix the items below to reach the 15-point threshold.</div>
+            <div className="text-sm font-bold text-amber-400">Needs Review — {passCount ?? "?"}/16</div>
+            <div className="text-xs text-amber-500">Fix the failing checks below to reach the 15-point threshold.</div>
           </div>
         </div>
         {failingChecks.length > 0 && (
@@ -1194,26 +1196,21 @@ export default function ArticleReview() {
 
             {/* ── SEO Panel ───────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
-              {/* Score badge */}
-              <ScoreBadgePanel badge={selectedItem.statusBadge as StatusBadge} liveChecks={liveChecks} />
+              {/* Score badge — derived from live check count, not stale stored value */}
+              <ScoreBadgePanel
+                badge={
+                  liveChecks
+                    ? livePassCount === liveTotalChecks
+                      ? "authority_ready"
+                      : livePassCount !== null && livePassCount >= 15
+                      ? "strong"
+                      : "needs_review"
+                    : (selectedItem.statusBadge as StatusBadge)
+                }
+                liveChecks={liveChecks}
+              />
 
-              {/* Live SEO check counter — shown for all states so score is always visible */}
-              {liveChecks && (
-                <div className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-medium ${
-                  livePassCount === liveTotalChecks
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
-                    :                   livePassCount !== null && livePassCount >= 15
-                    ? "bg-primary/10 border-primary/30 text-primary"
-                    : "bg-amber-500/10 border-amber-500/30 text-amber-600"
-                }`}>
-                  <span>
-                    {livePassCount === liveTotalChecks ? "✅" : livePassCount !== null && livePassCount >= 15 ? "⚡" : "⚠️"}
-                    {" "}{livePassCount}/{liveTotalChecks} SEO checks passing
-                    {livePassCount !== null && livePassCount < 15 && ` — need ${15 - livePassCount} more to reach threshold`}
-                  </span>
-                  <span className="text-[10px] font-normal opacity-70">updates as you type</span>
-                </div>
-              )}
+              {/* Live SEO check counter — compact sub-line inside badge panel, no duplicate banner */}
 
               {/* Over-editing warning */}
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-400">
