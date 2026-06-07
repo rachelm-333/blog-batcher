@@ -709,6 +709,13 @@ export async function publishToWix(
               custom: false,
               isDisabled: false,
             },
+            // Focus keyword — populates Wix SEO Assistant "Focus keyword" field
+            ...(article.focusKeyword ? [{
+              type: "meta",
+              props: { name: "keywords", content: article.focusKeyword },
+              custom: false,
+              isDisabled: false,
+            }] : []),
           ],
         },
       },
@@ -746,8 +753,18 @@ export async function publishToWix(
       return { success: false, error: "Wix did not return a draft post ID" };
     }
 
-    // ── Step 2: Publish the draft (or leave as draft if publishAsDraft is set) ──────────
+    // ── Step 2: Publish the draft (or leave as draft / scheduled) ──────────
+    // If publishAsDraft is set, leave as draft — do NOT call publish endpoint
     if (article.publishAsDraft) {
+      return {
+        success: true,
+        cmsPostId: draftId,
+        cmsPostUrl: "",
+      };
+    }
+    // If a future scheduledPublishTime was set in the draft, Wix will auto-publish
+    // at that time — do NOT call the publish endpoint or it fires immediately
+    if (article.scheduledPublishAt && article.scheduledPublishAt > new Date()) {
       return {
         success: true,
         cmsPostId: draftId,
