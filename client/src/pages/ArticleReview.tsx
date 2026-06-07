@@ -1531,6 +1531,22 @@ export default function ArticleReview() {
                     </button>
                   </div>
 
+                  {/* Save Changes button — always visible for approved articles */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-xs"
+                    onClick={handleSaveDraft}
+                    disabled={updateSeoFields.isPending}
+                  >
+                    {updateSeoFields.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Save className="h-3 w-3 mr-1" />
+                    )}
+                    Save Changes
+                  </Button>
+
                   {/* Publish action button */}
                   {!publishPanelOpen ? (
                     <Button
