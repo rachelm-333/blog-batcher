@@ -1447,7 +1447,7 @@ export default function ArticleReview() {
                       <>Save Changes</>
                     )}
                   </Button>
-                  {/* Re-publish panel — same as approved state */}
+                  {/* Re-publish panel — full options (live / draft / schedule) */}
                   {!publishPanelOpen ? (
                     <Button
                       size="sm"
@@ -1466,48 +1466,108 @@ export default function ArticleReview() {
                   ) : (
                     <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-foreground">Publish Options</span>
+                        <span className="text-xs font-semibold text-foreground">Re-publish Options</span>
                         <button
                           type="button"
                           onClick={() => setPublishPanelOpen(false)}
                           className="text-xs text-muted-foreground hover:text-foreground"
                         >✕</button>
                       </div>
-                      {connectedPlatforms.length === 0 ? (
-                        <p className="text-xs text-amber-500">
-                          ⚠ No CMS connected. <a href="/integrations" className="underline">Go to Integrations</a>
-                        </p>
-                      ) : (
+
+                      {/* Platform selector */}
+                      {connectedPlatforms.length > 0 ? (
                         <div className="space-y-1">
-                          {connectedPlatforms.map(p => (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => setPublishPlatform(p)}
-                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
-                                publishPlatform === p
-                                  ? "border-primary bg-primary/10 text-primary font-semibold"
-                                  : "border-border bg-background hover:bg-muted"
-                              }`}
-                            >
-                              <Globe className="h-3.5 w-3.5" />
-                              {p.charAt(0).toUpperCase() + p.slice(1)}
-                            </button>
-                          ))}
+                          <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Platform</Label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {connectedPlatforms.map(p => (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => setPublishPlatform(p)}
+                                className={`text-xs px-2.5 py-1 rounded-md border font-medium capitalize transition-colors ${
+                                  (publishPlatform ?? defaultPlatform) === p
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-background border-border text-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {p === "wix" ? "Wix" : p === "wordpress" ? "WordPress" : "Zapier"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-amber-500 flex items-center gap-1.5">
+                          <AlertTriangle className="h-3 w-3" />
+                          No CMS connected. <a href="/integrations" className="underline">Go to Integrations</a>
                         </div>
                       )}
+
+                      {/* Publish mode — live / draft / schedule */}
+                      {connectedPlatforms.length > 0 && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Action</Label>
+                          <div className="flex gap-1.5">
+                            {([
+                              { mode: "live" as const, icon: Globe, label: "Publish live" },
+                              { mode: "draft" as const, icon: Save, label: "Push as draft" },
+                              { mode: "schedule" as const, icon: Calendar, label: "Schedule" },
+                            ] as const).map(({ mode, icon: Icon, label }) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setPublishMode(mode)}
+                                className={`flex-1 text-[11px] px-2 py-1.5 rounded-md border font-medium transition-colors flex flex-col items-center gap-0.5 ${
+                                  publishMode === mode
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-background border-border text-foreground hover:bg-muted"
+                                }`}
+                              >
+                                <Icon className="h-3 w-3" />
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Date/time picker for schedule mode */}
+                      {publishMode === "schedule" && connectedPlatforms.length > 0 && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Publish date &amp; time</Label>
+                          <Input
+                            type="datetime-local"
+                            value={scheduleDate}
+                            onChange={e => setScheduleDate(e.target.value)}
+                            min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                            className="text-xs h-8"
+                          />
+                        </div>
+                      )}
+
                       {connectedPlatforms.length > 0 && (
                         <Button
                           size="sm"
                           className="w-full text-xs"
                           onClick={handlePublishSingle}
-                          disabled={publishSingle.isPending || !publishPlatform}
+                          disabled={publishSingle.isPending || (publishMode === "schedule" && !scheduleDate)}
                         >
                           {publishSingle.isPending ? (
-                            <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Publishing…</>
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          ) : publishMode === "live" ? (
+                            <Globe className="h-3 w-3 mr-1" />
+                          ) : publishMode === "draft" ? (
+                            <Save className="h-3 w-3 mr-1" />
                           ) : (
-                            <><Globe className="h-3 w-3 mr-1" /> Publish live now</>
+                            <Calendar className="h-3 w-3 mr-1" />
                           )}
+                          {publishSingle.isPending
+                            ? "Publishing…"
+                            : publishMode === "live"
+                            ? "Publish live now"
+                            : publishMode === "draft"
+                            ? "Push as draft"
+                            : "Schedule"
+                          }
                         </Button>
                       )}
                     </div>

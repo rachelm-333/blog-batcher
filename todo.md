@@ -870,3 +870,10 @@
 
 - [x] Register @tailwindcss/typography plugin in index.css so prose classes render headings/paragraphs correctly in article preview
 - [x] Fix Wix publish to send full article HTML as proper Ricos node tree (HEADING, PARAGRAPH, BULLETED_LIST, ORDERED_LIST, BLOCKQUOTE) instead of truncated 5000-char plain text
+
+## Auto-Schedule Cadence + Republish Fix
+
+- [ ] Fix republish bug: show all publish options (Schedule / Live Now / Save as Draft) on already-published articles
+- [ ] Auto-schedule cadence UI on PublishSchedule page: "Auto-Schedule All Articles" panel
+- [ ] Auto-schedule cadence backend: articles.autoSchedule(businessId, startDate, intervalDays) procedure
+- [ ] Heartbeat scheduler: auto-publish articles where scheduledPublishAt <= now and status = approved

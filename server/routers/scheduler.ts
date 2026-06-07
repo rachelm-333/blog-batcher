@@ -460,6 +460,117 @@ export const schedulerRouter = router({
     }),
 
   /**
+   * Auto-schedule all approved articles for a business with a cadence.
+   * Assigns scheduledPublishAt = startDate + (index * intervalDays) days for each
+   * approved article (sorted by sortOrder), then creates a Heartbeat job per article.
+   * Articles already scheduled/published are skipped.
+   */
+  autoSchedule: protectedProcedure
+    .input(
+      z.object({
+        businessId: z.number(),
+        startDate: z.date(),
+        intervalDays: z.number().min(1).max(30),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await assertOwnership(ctx.user.id, input.businessId);
+
+      if (input.startDate <= new Date()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Start date must be in the future" });
+      }
+
+      // Load all approved articles for this business, sorted by node sort order
+      const approvedArticles = await db
+        .select({
+          id: articles.id,
+          title: articles.title,
+          status: articles.status,
+          scheduleCronTaskUid: articles.scheduleCronTaskUid,
+          sortOrder: articleNodes.sortOrder,
+        })
+        .from(articles)
+        .leftJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
+        .where(
+          and(
+            eq(articles.businessId, input.businessId),
+            inArray(articles.status, ["approved"])
+          )
+        )
+        .orderBy(articleNodes.sortOrder);
+
+      if (approvedArticles.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No approved articles found. Approve articles before auto-scheduling.",
+        });
+      }
+
+      const sessionToken = getSessionToken(ctx);
+      const scheduled: { articleId: number; scheduledAt: Date; taskUid: string }[] = [];
+      const failed: { articleId: number; error: string }[] = [];
+
+      for (let i = 0; i < approvedArticles.length; i++) {
+        const article = approvedArticles[i];
+        const scheduledAt = new Date(input.startDate);
+        scheduledAt.setDate(scheduledAt.getDate() + i * input.intervalDays);
+        // Set to 9am UTC on the target day
+        scheduledAt.setUTCHours(9, 0, 0, 0);
+
+        try {
+          // Cancel existing Heartbeat job if one exists
+          if (article.scheduleCronTaskUid) {
+            try {
+              await cancelArticleHeartbeat(article.scheduleCronTaskUid, sessionToken);
+            } catch {
+              // Ignore — job may already be gone
+            }
+          }
+
+          // Create new Heartbeat job
+          const taskUid = await createArticleHeartbeat(article.id, scheduledAt, sessionToken);
+
+          // Update article with new schedule
+          await db
+            .update(articles)
+            .set({
+              status: "scheduled",
+              scheduledPublishAt: scheduledAt,
+              scheduleCronTaskUid: taskUid,
+              publishRetryCount: 0,
+              retryScheduledAt: null,
+            })
+            .where(eq(articles.id, article.id));
+
+          // Write audit log
+          await writeAuditLog({
+            articleId: article.id,
+            businessId: input.businessId,
+            action: "schedule_rescheduled",
+            result: "rescheduled",
+            triggeredBy: "user",
+            newScheduledAt: scheduledAt,
+          });
+
+          scheduled.push({ articleId: article.id, scheduledAt, taskUid });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          failed.push({ articleId: article.id, error: msg });
+          console.error(`[AutoSchedule] Failed to schedule article ${article.id}:`, err);
+        }
+      }
+
+      return {
+        scheduledCount: scheduled.length,
+        failedCount: failed.length,
+        scheduled,
+        failed,
+        firstPublishAt: scheduled[0]?.scheduledAt ?? null,
+        lastPublishAt: scheduled[scheduled.length - 1]?.scheduledAt ?? null,
+      };
+    }),
+
+  /**
    * Simulate a scheduled publish — directly invokes executeScheduledPublish.
    * Used for testing without waiting for a Heartbeat to fire.
    * The article must be in 'scheduled' status and have a scheduleCronTaskUid.
