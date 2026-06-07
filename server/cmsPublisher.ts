@@ -555,7 +555,10 @@ export async function publishToWix(
     if (article.imageUrl) {
       const wixInternalMatch = article.imageUrl.match(/^wix:image:\/\/v1\/([^/]+)/);
       if (wixInternalMatch) {
-        // Already a Wix-hosted image — extract the media file ID directly
+        // Already a Wix-hosted image — extract the media file ID directly.
+        // The wix:image://v1/ path contains the full filename e.g. "abc123~mv2.png".
+        // For the heroImage.id field, Wix expects just the base ID without the ~mv2.ext suffix.
+        // For the image src url/id fields, the full filename is needed.
         wixMediaId = wixInternalMatch[1];
         console.log(`[Wix] Detected wix:image:// URL — using media ID directly: ${wixMediaId}`);
       } else if (article.imageUrl.startsWith("https://") || article.imageUrl.startsWith("http://")) {
@@ -575,9 +578,43 @@ export async function publishToWix(
           console.log(`[Wix] Image import response status: ${importRes.status}`);
           console.log(`[Wix] Image import response body: ${importText.slice(0, 500)}`);
           if (importRes.ok) {
-            const importData = JSON.parse(importText) as { file?: { id?: string } };
-            wixMediaId = importData.file?.id ?? null;
-            console.log(`[Wix] Got media ID from import: ${wixMediaId}`);
+            const importData = JSON.parse(importText) as { file?: { id?: string; operationStatus?: string } };
+            const pendingId = importData.file?.id ?? null;
+            console.log(`[Wix] Got media ID from import: ${pendingId} (status: ${importData.file?.operationStatus})`);
+
+            if (pendingId) {
+              // Wix media import is async — operationStatus starts as PENDING.
+              // We must poll until READY (or timeout) before using the ID in a draft.
+              // Poll every 1.5s for up to 15s.
+              let ready = importData.file?.operationStatus === "READY";
+              if (!ready) {
+                console.log(`[Wix] Waiting for media import to complete...`);
+                for (let attempt = 0; attempt < 10 && !ready; attempt++) {
+                  await new Promise(r => setTimeout(r, 1500));
+                  try {
+                    const pollRes = await fetch(
+                      `https://www.wixapis.com/site-media/v1/files/${encodeURIComponent(pendingId)}`,
+                      { headers: baseHeaders }
+                    );
+                    if (pollRes.ok) {
+                      const pollData = await pollRes.json() as { file?: { operationStatus?: string } };
+                      const status = pollData.file?.operationStatus;
+                      console.log(`[Wix] Media poll attempt ${attempt + 1}: status = ${status}`);
+                      if (status === "READY") ready = true;
+                    }
+                  } catch (pollErr) {
+                    console.log(`[Wix] Media poll error: ${pollErr}`);
+                  }
+                }
+              }
+
+              if (ready) {
+                wixMediaId = pendingId;
+                console.log(`[Wix] Media ready — using ID: ${wixMediaId}`);
+              } else {
+                console.log(`[Wix] Media import timed out waiting for READY — skipping cover image`);
+              }
+            }
           } else {
             console.log(`[Wix] Image import failed — continuing without cover image`);
           }
@@ -687,25 +724,14 @@ export async function publishToWix(
         memberId: credentials.memberId,
         ...(excerpt ? { excerpt } : {}),
         ...(hashtags.length > 0 ? { hashtags } : {}),
-        // heroImage: confirmed working format from Wix API docs (id + url + altText)
+        // heroImage: Wix expects id = base media ID (strip ~mv2.ext suffix if present),
+        // url = full wixstatic URL with filename.
         ...(wixMediaId ? {
           heroImage: {
-            id: wixMediaId,
+            // Strip ~mv2.ext suffix for the id field (Wix media manager lookup key)
+            id: wixMediaId.replace(/~mv2\.[a-z0-9]+$/i, ""),
             url: `https://static.wixstatic.com/media/${wixMediaId}`,
             altText: article.imageAltText || article.focusKeyword || article.title,
-          },
-          // media field also sets the cover image
-          media: {
-            displayed: true,
-            custom: false,
-            wixMedia: {
-              image: {
-                imageInfo: {
-                  altText: article.imageAltText || article.focusKeyword || article.title,
-                  url: `https://static.wixstatic.com/media/${wixMediaId}`,
-                },
-              },
-            },
           },
         } : {}),
         // SEO slug
