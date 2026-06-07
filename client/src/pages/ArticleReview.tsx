@@ -59,9 +59,10 @@ import { HelpLink } from "@/components/HelpLink";
 
 const WORD_COUNT_RULES = {
   cornerstone: { min: 2400, max: 3000 },
-  pillar: { min: 1500, max: 1800 },
+  pillar: { min: 1500, max: 2000 },
   cluster: { min: 800, max: 1200 },
 } as const;
+const WORD_COUNT_TOLERANCE = 50; // within 50 words of min/max = pass
 
 const BANNED_PHRASES = [
   "in today's world",
@@ -127,7 +128,7 @@ function computePass1Checks(params: {
       p13_schema: !!(schemaMarkup && schemaMarkup.trim().length > 10),
       p14_eeat: bodyLower.includes("year") || bodyLower.includes("experience") || bodyLower.includes("client") || bodyLower.includes("award"),
       p15_human_authenticity: !BANNED_PHRASES.some(phrase => bodyLower.includes(phrase.toLowerCase())),
-      p16_word_count: wordCount >= WORD_COUNT_RULES[level].min && wordCount <= WORD_COUNT_RULES[level].max,
+      p16_word_count: wordCount >= WORD_COUNT_RULES[level].min - WORD_COUNT_TOLERANCE && wordCount <= WORD_COUNT_RULES[level].max + WORD_COUNT_TOLERANCE,
     };
   }
 
@@ -242,7 +243,7 @@ function computePass1Checks(params: {
 
   // Word count
   const wc = WORD_COUNT_RULES[level];
-  const wordCountOk = wordCount >= wc.min && wordCount <= wc.max;
+  const wordCountOk = wordCount >= wc.min - WORD_COUNT_TOLERANCE && wordCount <= wc.max + WORD_COUNT_TOLERANCE;
 
   return {
     p1_keyword_density: kwMatches >= 5 && kwDensity >= 0.005 && kwDensity <= 0.025,
