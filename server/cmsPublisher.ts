@@ -687,14 +687,29 @@ export async function publishToWix(
         memberId: credentials.memberId,
         ...(excerpt ? { excerpt } : {}),
         ...(hashtags.length > 0 ? { hashtags } : {}),
-        // heroImage sets the featured image with alt text (confirmed working format)
+        // heroImage: confirmed working format from Wix API docs (id + url + altText)
         ...(wixMediaId ? {
           heroImage: {
             id: wixMediaId,
             url: `https://static.wixstatic.com/media/${wixMediaId}`,
-            altText: article.imageAltText || article.title,
-          }
+            altText: article.imageAltText || article.focusKeyword || article.title,
+          },
+          // media field also sets the cover image
+          media: {
+            displayed: true,
+            custom: false,
+            wixMedia: {
+              image: {
+                imageInfo: {
+                  altText: article.imageAltText || article.focusKeyword || article.title,
+                  url: `https://static.wixstatic.com/media/${wixMediaId}`,
+                },
+              },
+            },
+          },
         } : {}),
+        // SEO slug
+        ...(article.urlSlug ? { seoSlug: article.urlSlug } : {}),
         seoData: {
           tags: [
             {
@@ -721,10 +736,8 @@ export async function publishToWix(
       },
     };
 
-    if (article.scheduledPublishAt && article.scheduledPublishAt > new Date()) {
-      (draftBody.draftPost as Record<string, unknown>).scheduledPublishTime =
-        article.scheduledPublishAt.toISOString();
-    }
+    // Note: Wix scheduledPublishDate is read-only — scheduling is done via
+    // firstPublishedDate on the /publish call (see Step 2 below)
 
     const createRes = await fetch(
       "https://www.wixapis.com/blog/v3/draft-posts",
@@ -762,14 +775,14 @@ export async function publishToWix(
         cmsPostUrl: "",
       };
     }
-    // If a future scheduledPublishTime was set in the draft, Wix will auto-publish
-    // at that time — do NOT call the publish endpoint or it fires immediately
-    if (article.scheduledPublishAt && article.scheduledPublishAt > new Date()) {
-      return {
-        success: true,
-        cmsPostId: draftId,
-        cmsPostUrl: "",
-      };
+
+    // Build publish body — if scheduling, pass firstPublishedDate to Wix
+    // Wix uses firstPublishedDate on the publish call to schedule the post.
+    // The Wix API has no separate "schedule" endpoint; this is the correct approach.
+    const isScheduled = article.scheduledPublishAt && article.scheduledPublishAt > new Date();
+    const publishBody: Record<string, unknown> = {};
+    if (isScheduled) {
+      publishBody.firstPublishedDate = (article.scheduledPublishAt as Date).toISOString();
     }
 
     const publishRes = await fetch(
@@ -777,7 +790,7 @@ export async function publishToWix(
       {
         method: "POST",
         headers: baseHeaders,
-        body: JSON.stringify({}),
+        body: JSON.stringify(publishBody),
       }
     );
 
