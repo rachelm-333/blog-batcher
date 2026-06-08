@@ -738,8 +738,10 @@ export default function ArticleReview() {
       toast.error("No CMS connected. Go to Integrations to connect WordPress, Wix, or Zapier.");
       return;
     }
+    // datetime-local gives "YYYY-MM-DDTHH:mm" with no timezone — treat as local time
+    // by replacing the T separator with a space so JS Date parses it as local, not UTC
     const scheduledAt = publishMode === "schedule" && scheduleDate
-      ? new Date(scheduleDate).getTime()
+      ? new Date(scheduleDate.replace("T", " ")).getTime()
       : undefined;
     publishSingle.mutate({
       articleId: selectedItem.id,
