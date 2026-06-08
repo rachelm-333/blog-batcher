@@ -724,12 +724,13 @@ export async function publishToWix(
         memberId: credentials.memberId,
         ...(excerpt ? { excerpt } : {}),
         ...(hashtags.length > 0 ? { hashtags } : {}),
-        // heroImage: Wix expects id = base media ID (strip ~mv2.ext suffix if present),
+        // heroImage: Wix expects id = full filename (e.g. c79156_abc~mv2.png),
         // url = full wixstatic URL with filename.
         ...(wixMediaId ? {
           heroImage: {
-            // Strip ~mv2.ext suffix for the id field (Wix media manager lookup key)
-            id: wixMediaId.replace(/~mv2\.[a-z0-9]+$/i, ""),
+            // Use the full filename as the id (e.g. c79156_abc123~mv2.png)
+            // Wix media manager lookup uses the full filename, NOT the stripped base ID
+            id: wixMediaId,
             url: `https://static.wixstatic.com/media/${wixMediaId}`,
             altText: article.imageAltText || article.focusKeyword || article.title,
           },
