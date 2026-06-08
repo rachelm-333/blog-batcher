@@ -53,10 +53,22 @@ import {
 } from "../cmsPublisher";
 import { integrations } from "../../drizzle/schema";
 import { notifyOwner } from "../_core/notification";
+import { createArticleHeartbeat, cancelArticleHeartbeat } from "../schedulerService";
+import { COOKIE_NAME } from "../../shared/const";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+function getArticleSessionToken(ctx: { req: { headers: { cookie?: string } } }): string {
+  const cookieHeader = ctx.req.headers.cookie ?? "";
+  const cookies = Object.fromEntries(
+    cookieHeader.split(";").map(c => {
+      const [k, ...v] = c.trim().split("=");
+      return [k, v.join("=")];
+    })
+  );
+  return cookies[COOKIE_NAME] ?? "";
+}
 
 async function assertBusinessOwnership(userId: number, businessId: number) {
   const db = await getDb();
@@ -1500,6 +1512,20 @@ ${row.bodyHtml ?? ""}
       if (result.success) {
         const isScheduled = scheduledDate && scheduledDate > new Date();
         const isDraft = input.publishAs === "draft";
+        // If scheduling, create a Heartbeat job so the article actually publishes at the right time.
+        // The Heartbeat fires at scheduledDate and calls /api/scheduled/publish-article.
+        let scheduleCronTaskUid: string | null = null;
+        if (isScheduled && scheduledDate) {
+          try {
+            const sessionToken = getArticleSessionToken(ctx);
+            scheduleCronTaskUid = await createArticleHeartbeat(input.articleId, scheduledDate, sessionToken);
+            console.log(`[publishSingle] Heartbeat job created: ${scheduleCronTaskUid} for article ${input.articleId} at ${scheduledDate.toISOString()}`);
+          } catch (heartbeatErr) {
+            // Non-fatal: log the error but still mark as scheduled in DB.
+            // The article is a Wix draft and can be published manually if the job fails.
+            console.error("[publishSingle] Failed to create Heartbeat job:", heartbeatErr);
+          }
+        }
         await db
           .update(articles)
           .set({
@@ -1509,6 +1535,7 @@ ${row.bodyHtml ?? ""}
             cmsPostId: result.cmsPostId ?? null,
             cmsPostUrl: result.cmsPostUrl ?? null,
             errorMessage: null,
+            ...(scheduleCronTaskUid ? { scheduleCronTaskUid } : {}),
           })
           .where(eq(articles.id, input.articleId));
         return {
