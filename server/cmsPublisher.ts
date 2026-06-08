@@ -803,13 +803,16 @@ export async function publishToWix(
       };
     }
 
-    // Build publish body — if scheduling, pass firstPublishedDate to Wix
-    // Wix uses firstPublishedDate on the publish call to schedule the post.
-    // The Wix API has no separate "schedule" endpoint; this is the correct approach.
+    // Wix REST API has NO scheduling endpoint — calling /publish always publishes immediately.
+    // For scheduled posts: leave as draft and let the Heartbeat job call publish at the right time.
     const isScheduled = article.scheduledPublishAt && article.scheduledPublishAt > new Date();
-    const publishBody: Record<string, unknown> = {};
     if (isScheduled) {
-      publishBody.firstPublishedDate = (article.scheduledPublishAt as Date).toISOString();
+      console.log(`[Wix] Scheduled post — leaving as draft. Heartbeat will publish at ${(article.scheduledPublishAt as Date).toISOString()}`);
+      return {
+        success: true,
+        cmsPostId: draftId,
+        cmsPostUrl: "",
+      };
     }
 
     const publishRes = await fetch(
@@ -817,7 +820,7 @@ export async function publishToWix(
       {
         method: "POST",
         headers: baseHeaders,
-        body: JSON.stringify(publishBody),
+        body: JSON.stringify({}),
       }
     );
 
