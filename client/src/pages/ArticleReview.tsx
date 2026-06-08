@@ -1435,6 +1435,38 @@ export default function ArticleReview() {
                       View on CMS
                     </a>
                   )}
+                  {/* Wix manual fields notice */}
+                  {connectedPlatforms.includes("wix") && (
+                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                        <div className="text-[11px] text-amber-400 leading-relaxed">
+                          <span className="font-semibold">2 fields must be set manually in Wix</span> — the Wix API does not support setting these programmatically. Copy them below and paste into your Wix post editor.
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        {[
+                          { label: "Focus Keyword", value: (fullArticle as any)?.focusKeyword ?? "", hint: "Wix dashboard → Blog post → SEO tab → Focus keyword" },
+                          { label: "Featured Image Alt Text", value: (fullArticle as any)?.imageAltText ?? "", hint: "Wix dashboard → Blog post → Featured image → Alt text" },
+                        ].map(({ label, value, hint }) => (
+                          <div key={label} className="rounded-md bg-background/60 border border-border p-2 space-y-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-semibold text-foreground">{label}</span>
+                              <button
+                                onClick={() => { navigator.clipboard.writeText(value); toast.success(`${label} copied`); }}
+                                className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors"
+                              >
+                                <ClipboardCopy className="h-3 w-3" />
+                                Copy
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground truncate">{value || "(not set)"}</p>
+                            <p className="text-[9px] text-muted-foreground/60 italic">{hint}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {/* Save Changes button for published articles */}
                   <Button
                     size="sm"
