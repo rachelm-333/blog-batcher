@@ -877,3 +877,13 @@
 - [ ] Auto-schedule cadence UI on PublishSchedule page: "Auto-Schedule All Articles" panel
 - [ ] Auto-schedule cadence backend: articles.autoSchedule(businessId, startDate, intervalDays) procedure
 - [ ] Heartbeat scheduler: auto-publish articles where scheduledPublishAt <= now and status = approved
+
+## Article Truncation Fix (Jun 2026)
+- [x] Replace single-shot article generation with outline-first + section-by-section approach
+- [x] Step 1: LLM plans full article structure (H2 headings + word targets per section) — tiny call, always completes
+- [x] Step 2: Each section written in its own LLM call (max 8192 tokens each) — no single call can be cut off
+- [x] Step 3: Sections assembled into final bodyHtml, then existing scrub/scoring passes run as normal
+- [x] finish_reason === "length" detection on each section call — retries with reduced target, logs warning
+- [x] hasTrailingEmptyHeading() utility — detects truncation signature (empty last heading) as safety net
+- [x] Schema markup generated in a separate small LLM call
+- [x] 358 tests pass (22 new tests covering buildOutlinePrompt, buildSectionPrompt, hasTrailingEmptyHeading)

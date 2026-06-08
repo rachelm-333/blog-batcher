@@ -721,6 +721,184 @@ export function deriveStatusBadge(pass1Score: number, pass2Score: number): {
 }
 
 // ---------------------------------------------------------------------------
+// Outline-first section-by-section generation helpers
+// ---------------------------------------------------------------------------
+
+export interface OutlineSection {
+  heading: string;       // H2 heading text
+  targetWords: number;   // target word count for this section
+  notes: string;         // brief instruction for what this section should cover
+}
+
+export interface ArticleOutline {
+  title: string;
+  metaTitle: string;
+  metaDescription: string;
+  sections: OutlineSection[];
+  schemaMarkup: string;
+  faqItems: Array<{ question: string; answer: string }> | null;
+}
+
+/**
+ * Step 1: Ask the LLM to plan the full article structure.
+ * This is a small, fast call that always completes — no truncation risk.
+ */
+export function buildOutlinePrompt(ctx: ArticleContext): string {
+  const isCornerstoneOrPillar = ctx.level === "cornerstone" || ctx.level === "pillar";
+  const articleTypeLabel: Record<string, string> = {
+    cornerstone_guide: "Cornerstone Guide",
+    top_10_list: "Top 10 List",
+    how_to: "How-To Article",
+    the_why: "The Why Article",
+    comparison: "Comparison Article",
+    myth_busting: "Myth-Busting Article",
+    specialist_post: "Specialist Post",
+  };
+  const typeLabel = articleTypeLabel[ctx.articleType] ?? ctx.articleType;
+
+  return `You are an expert SEO content strategist. Plan the full structure for a ${typeLabel} article.
+
+Business: ${ctx.businessName} (${ctx.industry}, ${ctx.location})
+Primary Keyword: ${ctx.primaryKeyword}
+Secondary Keywords: ${ctx.secondaryKeywords.join(", ") || "None"}
+PAA Question: ${ctx.paaQuestion || "Answer the most likely search intent question"}
+Article Type: ${typeLabel}
+URL Slug: /${ctx.urlSlug}
+Total Word Count Target: ${ctx.wordCountMin}–${ctx.wordCountMax} words
+Level: ${ctx.level}
+
+RULES:
+- The H1 title MUST contain the exact primary keyword verbatim
+- The meta title MUST contain the primary keyword and be ≤60 characters
+- The meta description MUST contain the exact primary keyword phrase and be 140–160 characters
+- Plan ${Math.ceil(ctx.wordCountMin / 250)} to ${Math.ceil(ctx.wordCountMax / 200)} H2 sections so the total hits ${ctx.wordCountMin}–${ctx.wordCountMax} words
+- The FIRST section must be an "Opening Answer Block" (40–60 words) that directly answers the search query
+- The LAST section must be a CTA section titled "Ready to Take the Next Step?" or similar (50–80 words)
+- ${isCornerstoneOrPillar ? "Include a FAQ section (3–5 questions) near the end" : "DO NOT include a FAQ section (Cluster articles only)"}
+- Each section's targetWords should be realistic for that section's depth
+- Use Australian English spelling
+
+Return a single JSON object:
+{
+  "title": "H1 title (contains primary keyword verbatim)",
+  "metaTitle": "SEO meta title (≤60 chars, contains primary keyword)",
+  "metaDescription": "SEO meta description (140–160 chars, contains exact primary keyword phrase)",
+  "sections": [
+    { "heading": "H2 heading text", "targetWords": 200, "notes": "What this section covers in 1 sentence" }
+  ],
+  "schemaMarkupInstructions": "Brief note on what schema types to include: Article + Breadcrumb${isCornerstoneOrPillar ? " + FAQ" : ""}",
+  "faqItems": ${isCornerstoneOrPillar ? '[{"question": "...", "answer": "..."}] — 3–5 items' : "null"}
+}`;
+}
+
+/**
+ * Step 2: Write a single section of the article.
+ * Each section is a separate LLM call — no single call can be truncated mid-article.
+ */
+export function buildSectionPrompt(
+  ctx: ArticleContext,
+  section: OutlineSection,
+  sectionIndex: number,
+  totalSections: number,
+  articleTitle: string,
+  previousSectionsHtml: string
+): string {
+  const isFirst = sectionIndex === 0;
+  const isLast = sectionIndex === totalSections - 1;
+  const isCTA = isLast;
+
+  const internalLinkContext = [
+    ctx.parentCornerstoneUrl ? `Parent Cornerstone URL: ${ctx.parentCornerstoneUrl}` : null,
+    ctx.parentPillarUrl ? `Parent Pillar URL: ${ctx.parentPillarUrl}` : null,
+    ctx.siblingUrls?.length ? `Sibling Cluster URLs for cross-linking: ${ctx.siblingUrls.join(", ")}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const optionalPageLinks: string[] = [];
+  if (ctx.contactPageUrl) optionalPageLinks.push(`Contact Page: ${ctx.contactPageUrl}`);
+  if (ctx.bookingsPageUrl) optionalPageLinks.push(`Bookings/Appointments Page: ${ctx.bookingsPageUrl}`);
+  if (ctx.testimonialsPageUrl) optionalPageLinks.push(`Testimonials/Reviews Page: ${ctx.testimonialsPageUrl}`);
+  if (ctx.shopUrl) optionalPageLinks.push(`Shop/E-commerce Page: ${ctx.shopUrl}`);
+  if (ctx.otherInternalLinks?.length) {
+    ctx.otherInternalLinks.forEach(l => optionalPageLinks.push(`${l.label}: ${l.url}`));
+  }
+
+  const servicesText = ctx.services
+    .map(s => `- ${s.name}${s.pageUrl ? ` (${s.pageUrl})` : ""}`)
+    .join("\n");
+
+  return `You are an expert SEO content writer. Write ONE section of a blog article.
+
+ARTICLE CONTEXT:
+Business: ${ctx.businessName} (${ctx.industry}, ${ctx.location})
+Article Title (H1): ${articleTitle}
+Primary Keyword: ${ctx.primaryKeyword}
+Brand Voice: ${ctx.voiceBrief || "Professional, authoritative, helpful. Sound like a real human expert."}
+Section ${sectionIndex + 1} of ${totalSections}
+
+THIS SECTION TO WRITE:
+H2 Heading: ${section.heading}
+Target Word Count: ${section.targetWords} words (write AT LEAST ${Math.round(section.targetWords * 0.9)} words)
+Section Notes: ${section.notes}
+
+${isFirst ? `OPENING SECTION RULES:
+- Start with the H2 heading: <h2>${section.heading}</h2>
+- Immediately answer the most likely search question in 40–60 words (bold the question)
+- The primary keyword "${ctx.primaryKeyword}" MUST appear in the first 50 words
+- This is the featured snippet target — be direct and specific` : ""}
+
+${isCTA ? `CTA SECTION RULES:
+- Start with <h2>${section.heading}</h2>
+- Write 1–2 sentences summarising the value the reader gained
+- Include a CTA link: <a href="${ctx.ctaUrl}">${ctx.ctaText}</a>
+- Keep it to ${section.targetWords} words` : ""}
+
+${!isFirst && !isCTA ? `CONTENT RULES:
+- Start with <h2>${section.heading}</h2>
+- Write ${section.targetWords} words of specific, practical, expert-level content
+- Use H3 subheadings where appropriate to break up the content
+- Include bullet lists or numbered lists where they add clarity
+- DO NOT fabricate statistics — only cite real, verifiable facts
+- Use Australian English spelling (optimise, colour, organise)
+- Vary sentence length — mix short punchy sentences with longer explanatory ones
+- Sound like a specific human expert, not a generic AI assistant
+- DO NOT use: "in today's world", "it's important to note", "delve into", "game-changer", "leverage", "synergy", "transformative"
+- DO NOT use em dashes (—) excessively` : ""}
+
+${sectionIndex === 1 ? `EXTERNAL LINK RULE (Section 2 only): Include at least one hyperlink to a real, high-authority external source (.gov.au, industry body, or nationally recognised publication). Use descriptive anchor text.` : ""}
+
+${sectionIndex === 2 ? `INTERNAL LINK RULE (Section 3 only): Include at least one internal link to a business service or page:\n${servicesText}\n${optionalPageLinks.length ? optionalPageLinks.join("\n") : ""}\nPrimary CTA: ${ctx.ctaText} → ${ctx.ctaUrl}` : ""}
+
+${internalLinkContext ? `INTERNAL BLOG LINKS (use naturally where relevant):\n${internalLinkContext}\nAll batch slugs: ${ctx.allBatchSlugs.slice(0, 15).join(", ")}` : ""}
+
+PREVIOUS SECTIONS (for context and continuity — DO NOT repeat this content):
+${previousSectionsHtml ? previousSectionsHtml.slice(-2000) : "(This is the first section)"}
+
+Return ONLY the HTML for this section, wrapped in these exact delimiters:
+<SECTION_HTML>
+...section HTML here (h2, h3, p, ul, ol, li, a, strong, em, blockquote tags only — no inline styles)...
+</SECTION_HTML>`;
+}
+
+/**
+ * Detect if an HTML body has a trailing empty heading (truncation signature).
+ * Returns true if the last heading tag has no meaningful content after it.
+ */
+export function hasTrailingEmptyHeading(bodyHtml: string): boolean {
+  // Find all headings and their positions
+  const headingMatches = Array.from(bodyHtml.matchAll(/<h[2-6][^>]*>([^<]+)<\/h[2-6]>/gi));
+  if (headingMatches.length === 0) return false;
+  const lastHeading = headingMatches[headingMatches.length - 1];
+  const lastHeadingEnd = (lastHeading.index ?? 0) + lastHeading[0].length;
+  const afterLastHeading = bodyHtml.slice(lastHeadingEnd).replace(/<[^>]+>/g, " ").trim();
+  // If there are fewer than 10 words after the last heading, it's likely truncated
+  // (10 is low enough to avoid false positives on short CTA/conclusion sections)
+  const wordsAfter = afterLastHeading.split(/\s+/).filter(Boolean).length;
+  return wordsAfter < 10;
+}
+
+// ---------------------------------------------------------------------------
 // Single article generation (one at a time)
 // ---------------------------------------------------------------------------
 
@@ -749,51 +927,157 @@ export async function generateSingleArticle(
 ): Promise<GenerationResult> {
   const ctx = await buildArticleContext(businessId, nodeId, allOrderedNodes);
 
-  // --- Pass A: Generate article ---
-  const genPrompt = buildGenerationPrompt(ctx);
-  // Add a system message to reinforce JSON-only output
-  const genMessages = [
-    {
-      role: "system" as const,
-      content: "You are an expert SEO content writer. You MUST respond with a single valid JSON object only. Do not include any text before or after the JSON. Do not use markdown code fences. Return only the raw JSON object.",
-    },
-    { role: "user" as const, content: genPrompt },
-  ];
+  // =========================================================================
+  // Pass A: Outline-first + section-by-section generation
+  //
+  // WHY: A single LLM call for a full 2,000–3,000 word article risks hitting
+  // the token limit mid-article, producing a truncated article with an empty
+  // last heading. The outline-first approach splits the work:
+  //   Step 1 — Outline: plan all H2 sections + word targets (tiny call, always completes)
+  //   Step 2 — Sections: write each section in its own LLM call (~200–400 words each)
+  //   Step 3 — Assemble: concatenate all sections into the final bodyHtml
+  // No single call can be cut off mid-article.
+  // =========================================================================
 
-  let genParsed: Record<string, unknown>;
-  let lastGenError: unknown;
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  // --- Step 1: Get article outline ---
+  const outlinePrompt = buildOutlinePrompt(ctx);
+  let outline: ArticleOutline;
+  {
+    let outlineParsed: Record<string, unknown> | null = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const outlineResult = await invokeLLMWithCost(
+          {
+            messages: [
+              { role: "system" as const, content: "You are an expert SEO content strategist. Return only a valid JSON object. No markdown, no code fences." },
+              { role: "user" as const, content: outlinePrompt },
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: 4096,
+          },
+          { userId, feature: "article_generation" }
+        );
+        const raw = outlineResult.choices[0]?.message?.content ?? "";
+        const stripped = (typeof raw === "string" ? raw : JSON.stringify(raw))
+          .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        outlineParsed = JSON.parse(stripped);
+        break;
+      } catch (err) {
+        if (attempt === 2) throw new Error(`Article outline generation failed after 2 attempts: ${err}`);
+        console.warn(`[ArticleEngine] Outline attempt ${attempt} failed — retrying...`);
+      }
+    }
+    const parsed = outlineParsed!;
+    const rawSections = Array.isArray(parsed.sections) ? (parsed.sections as OutlineSection[]) : [];
+    // Validate sections — must have at least 3
+    if (rawSections.length < 3) {
+      throw new Error(`Article outline returned too few sections (${rawSections.length}) for node ${nodeId}`);
+    }
+    outline = {
+      title: (parsed.title as string) || "",
+      metaTitle: (parsed.metaTitle as string) || "",
+      metaDescription: (parsed.metaDescription as string) || "",
+      sections: rawSections,
+      schemaMarkup: "",
+      faqItems: Array.isArray(parsed.faqItems) ? (parsed.faqItems as Array<{ question: string; answer: string }>) : null,
+    };
+    console.log(`[ArticleEngine] Outline for node ${nodeId}: "${outline.title}" — ${outline.sections.length} sections planned (target: ${ctx.wordCountMin}–${ctx.wordCountMax} words)`);
+  }
+
+  // --- Step 2: Write each section ---
+  const sectionHtmlParts: string[] = [];
+  for (let i = 0; i < outline.sections.length; i++) {
+    const section = outline.sections[i];
+    const previousHtml = sectionHtmlParts.join("\n");
+    const sectionPrompt = buildSectionPrompt(ctx, section, i, outline.sections.length, outline.title, previousHtml);
+    let sectionHtml = "";
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const sectionResult = await invokeLLMWithCost(
+          {
+            messages: [
+              { role: "system" as const, content: "You are an expert SEO content writer. Return ONLY the section HTML wrapped in <SECTION_HTML>...</SECTION_HTML> delimiters. No other text." },
+              { role: "user" as const, content: sectionPrompt },
+            ],
+            max_tokens: 8192,
+          },
+          { userId, feature: "article_generation" }
+        );
+        const finishReason = sectionResult.choices[0]?.finish_reason;
+        const rawSection = sectionResult.choices[0]?.message?.content ?? "";
+        const rawStr = typeof rawSection === "string" ? rawSection : JSON.stringify(rawSection);
+        // Check for truncation
+        if (finishReason === "length") {
+          console.warn(`[ArticleEngine] Section ${i + 1} truncated (finish_reason=length) for node ${nodeId} — retrying with shorter target`);
+          // Reduce target and retry with a note to be more concise
+          outline.sections[i] = { ...section, targetWords: Math.round(section.targetWords * 0.7), notes: section.notes + " (be concise)" };
+          if (attempt === 2) {
+            // Accept whatever we got — extract partial content
+            const partialMatch = rawStr.match(/<SECTION_HTML>([\s\S]*)/i);
+            sectionHtml = partialMatch ? partialMatch[1].trim() : rawStr.trim();
+            console.warn(`[ArticleEngine] Section ${i + 1} still truncated after retry — using partial content`);
+            break;
+          }
+          continue;
+        }
+        const delimMatch = rawStr.match(/<SECTION_HTML>([\s\S]*?)<\/SECTION_HTML>/i);
+        sectionHtml = delimMatch ? delimMatch[1].trim() : rawStr.trim();
+        if (sectionHtml.length > 50) break;
+        if (attempt === 2) console.warn(`[ArticleEngine] Section ${i + 1} returned very short content for node ${nodeId}`);
+      } catch (err) {
+        if (attempt === 2) {
+          console.warn(`[ArticleEngine] Section ${i + 1} failed after 2 attempts for node ${nodeId}:`, err);
+          sectionHtml = `<h2>${section.heading}</h2><p>Section content unavailable.</p>`;
+        }
+      }
+    }
+    sectionHtmlParts.push(sectionHtml);
+    const sectionWc = sectionHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    console.log(`[ArticleEngine] Section ${i + 1}/${outline.sections.length} written: "${section.heading}" — ${sectionWc} words for node ${nodeId}`);
+  }
+
+  // --- Step 3: Assemble final article ---
+  // Generate schema markup in a separate small call
+  let schemaMarkup = "";
+  {
+    const isCornerstoneOrPillar = ctx.level === "cornerstone" || ctx.level === "pillar";
+    const schemaPrompt = `Generate JSON-LD schema markup for this blog article. Include Article schema and Breadcrumb schema${isCornerstoneOrPillar ? " and FAQ schema" : ""}.
+
+Title: ${outline.title}
+URL: https://example.com/${ctx.urlSlug}
+Business: ${ctx.businessName}
+Primary Keyword: ${ctx.primaryKeyword}
+${outline.faqItems ? `FAQ Items: ${JSON.stringify(outline.faqItems)}` : ""}
+
+Return ONLY the raw JSON-LD string (no markdown, no code fences, no explanation).`;
     try {
-      const genResult = await invokeLLMWithCost(
+      const schemaResult = await invokeLLMWithCost(
         {
-          messages: genMessages,
-          response_format: { type: "json_object" },
-          max_tokens: 65536,
+          messages: [{ role: "user" as const, content: schemaPrompt }],
+          max_tokens: 2048,
         },
         { userId, feature: "article_generation" }
       );
-      const genContent = genResult.choices[0]?.message?.content;
-      const rawContent = typeof genContent === "string" ? genContent : JSON.stringify(genContent);
-      // Strip markdown code fences if the model wrapped the JSON anyway
-      const stripped = rawContent.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-      genParsed = JSON.parse(stripped);
-      break; // success
+      const rawSchema = schemaResult.choices[0]?.message?.content ?? "";
+      schemaMarkup = (typeof rawSchema === "string" ? rawSchema : JSON.stringify(rawSchema))
+        .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     } catch (err) {
-      lastGenError = err;
-      if (attempt === 2) throw new Error(`Article generation returned invalid JSON after ${attempt} attempts: ${err}`);
-      console.warn(`[ArticleEngine] Generation attempt ${attempt} returned invalid JSON — retrying...`);
+      console.warn(`[ArticleEngine] Schema generation failed for node ${nodeId}:`, err);
     }
   }
-  genParsed = genParsed!;
 
-  let bodyHtml = (genParsed.bodyHtml as string) || "";
-  let bodyMarkdown = (genParsed.bodyMarkdown as string) || "";
-  const title = (genParsed.title as string) || "";
-  let metaTitle = (genParsed.metaTitle as string) || "";
-  let metaDescription = (genParsed.metaDescription as string) || "";
-  const schemaMarkup = (genParsed.schemaMarkup as string) || "";
-  const faqItems = (genParsed.faqItems as Array<{ question: string; answer: string }> | null) ?? null;
-  let wordCount = (genParsed.wordCount as number) || bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  let bodyHtml = sectionHtmlParts.join("\n\n");
+  const bodyMarkdown = ""; // Markdown not generated in section-by-section mode
+  const title = outline.title;
+  let metaTitle = outline.metaTitle;
+  let metaDescription = outline.metaDescription;
+  const faqItems = outline.faqItems;
+  let wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
+  // Check for trailing empty heading (truncation signature) — safety net
+  if (hasTrailingEmptyHeading(bodyHtml)) {
+    console.warn(`[ArticleEngine] Trailing empty heading detected for node ${nodeId} — article may be incomplete. Word count: ${wordCount}`);
+  }
 
   // Enforce meta title length: must be ≤60 chars
   if (metaTitle.length > 60) {
@@ -1139,10 +1423,10 @@ Return ONLY the expanded HTML wrapped in:
     wordCount,
     level: ctx.level,
     primaryKeyword: ctx.primaryKeyword,
-    externalLinkPresent: (genParsed.externalLinkPresent as boolean) ?? bodyHtml.includes("http"),
-    internalCtaLinkPresent: (genParsed.internalCtaLinkPresent as boolean) ?? bodyHtml.includes(ctx.ctaUrl),
-    internalBlogLinksPresent: (genParsed.internalBlogLinksPresent as boolean) ?? false,
-    schemaPresent: (genParsed.schemaPresent as boolean) ?? schemaMarkup.length > 0,
+    externalLinkPresent: bodyHtml.includes("http"),
+    internalCtaLinkPresent: bodyHtml.includes(ctx.ctaUrl),
+    internalBlogLinksPresent: ctx.allBatchSlugs.some(slug => bodyHtml.includes(slug)),
+    schemaPresent: schemaMarkup.length > 0,
   });
 
   // --- Pass 2: AI quality scorer ---

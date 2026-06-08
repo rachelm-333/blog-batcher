@@ -652,3 +652,169 @@ describe("Australian English in prompts", () => {
     expect(prompt).toContain('"colour" not "color"');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 10. Outline-first + section-by-section generation
+// ---------------------------------------------------------------------------
+
+import {
+  buildOutlinePrompt,
+  buildSectionPrompt,
+  hasTrailingEmptyHeading,
+  type OutlineSection,
+} from "./articleEngine";
+
+describe("buildOutlinePrompt", () => {
+  it("Contains the primary keyword in the outline prompt", () => {
+    const ctx = makeContext();
+    const prompt = buildOutlinePrompt(ctx);
+    expect(prompt).toContain(ctx.primaryKeyword);
+  });
+
+  it("Specifies the correct word count range for cornerstone", () => {
+    const ctx = makeContext({ level: "cornerstone", wordCountMin: 2000, wordCountMax: 3000 });
+    const prompt = buildOutlinePrompt(ctx);
+    expect(prompt).toContain("2000");
+    expect(prompt).toContain("3000");
+  });
+
+  it("Specifies the correct word count range for cluster", () => {
+    const ctx = makeContext({ level: "cluster", wordCountMin: 800, wordCountMax: 1200 });
+    const prompt = buildOutlinePrompt(ctx);
+    expect(prompt).toContain("800");
+    expect(prompt).toContain("1200");
+  });
+
+  it("Includes FAQ instruction for cornerstone/pillar", () => {
+    const ctx = makeContext({ level: "cornerstone" });
+    const prompt = buildOutlinePrompt(ctx);
+    expect(prompt).toContain("FAQ section");
+  });
+
+  it("Excludes FAQ for cluster articles", () => {
+    const ctx = makeContext({ level: "cluster" });
+    const prompt = buildOutlinePrompt(ctx);
+    expect(prompt).toContain("DO NOT include a FAQ section");
+  });
+
+  it("Requires Australian English spelling", () => {
+    const ctx = makeContext();
+    const prompt = buildOutlinePrompt(ctx);
+    expect(prompt).toContain("Australian English spelling");
+  });
+
+  it("Requires H1 title to contain primary keyword verbatim", () => {
+    const ctx = makeContext();
+    const prompt = buildOutlinePrompt(ctx);
+    expect(prompt).toContain("primary keyword verbatim");
+  });
+
+  it("Plans enough sections for the word count target", () => {
+    const ctx = makeContext({ level: "cornerstone", wordCountMin: 2000, wordCountMax: 3000 });
+    const prompt = buildOutlinePrompt(ctx);
+    // Should plan at least 8 sections (2000/250=8) for a cornerstone
+    const minSections = Math.ceil(2000 / 250);
+    expect(prompt).toContain(`${minSections}`);
+  });
+});
+
+describe("buildSectionPrompt", () => {
+  const ctx = makeContext();
+  const sections: OutlineSection[] = [
+    { heading: "What Is an Emergency Plumber?", targetWords: 60, notes: "Opening answer block" },
+    { heading: "When to Call an Emergency Plumber", targetWords: 300, notes: "Signs of a plumbing emergency" },
+    { heading: "How to Find a Reliable Emergency Plumber in Sydney", targetWords: 300, notes: "Tips for finding a plumber" },
+    { heading: "Ready to Book?", targetWords: 60, notes: "CTA section" },
+  ];
+
+  it("First section prompt mentions opening answer block rules", () => {
+    const prompt = buildSectionPrompt(ctx, sections[0], 0, sections.length, "Emergency Plumber Sydney Guide", "");
+    expect(prompt).toContain("OPENING SECTION RULES");
+    expect(prompt).toContain("featured snippet");
+  });
+
+  it("Last section prompt mentions CTA rules", () => {
+    const prompt = buildSectionPrompt(ctx, sections[3], 3, sections.length, "Emergency Plumber Sydney Guide", "");
+    expect(prompt).toContain("CTA SECTION RULES");
+    expect(prompt).toContain(ctx.ctaUrl);
+  });
+
+  it("Middle section prompt does not include CTA or opening rules", () => {
+    const prompt = buildSectionPrompt(ctx, sections[1], 1, sections.length, "Emergency Plumber Sydney Guide", "");
+    expect(prompt).not.toContain("OPENING SECTION RULES");
+    expect(prompt).not.toContain("CTA SECTION RULES");
+    expect(prompt).toContain("CONTENT RULES");
+  });
+
+  it("Section 2 (index 1) includes external link instruction", () => {
+    const prompt = buildSectionPrompt(ctx, sections[1], 1, sections.length, "Emergency Plumber Sydney Guide", "");
+    expect(prompt).toContain("EXTERNAL LINK RULE");
+    expect(prompt).toContain(".gov.au");
+  });
+
+  it("Section 3 (index 2) includes internal link instruction", () => {
+    const prompt = buildSectionPrompt(ctx, sections[2], 2, sections.length, "Emergency Plumber Sydney Guide", "");
+    expect(prompt).toContain("INTERNAL LINK RULE");
+    expect(prompt).toContain(ctx.ctaUrl);
+  });
+
+  it("Includes the section heading in the prompt", () => {
+    const prompt = buildSectionPrompt(ctx, sections[1], 1, sections.length, "Emergency Plumber Sydney Guide", "");
+    expect(prompt).toContain(sections[1].heading);
+  });
+
+  it("Includes target word count in the prompt", () => {
+    const prompt = buildSectionPrompt(ctx, sections[1], 1, sections.length, "Emergency Plumber Sydney Guide", "");
+    expect(prompt).toContain("300");
+  });
+
+  it("Wraps output in SECTION_HTML delimiters", () => {
+    const prompt = buildSectionPrompt(ctx, sections[1], 1, sections.length, "Emergency Plumber Sydney Guide", "");
+    expect(prompt).toContain("<SECTION_HTML>");
+    expect(prompt).toContain("</SECTION_HTML>");
+  });
+
+  it("Passes previous sections as context", () => {
+    const previousHtml = "<h2>What Is an Emergency Plumber?</h2><p>An emergency plumber is...</p>";
+    const prompt = buildSectionPrompt(ctx, sections[1], 1, sections.length, "Emergency Plumber Sydney Guide", previousHtml);
+    expect(prompt).toContain("PREVIOUS SECTIONS");
+    expect(prompt).toContain("What Is an Emergency Plumber?");
+  });
+});
+
+describe("hasTrailingEmptyHeading", () => {
+  it("Returns false for a complete article with content after the last heading", () => {
+    const html = `
+      <h2>Introduction</h2><p>Some content here about the topic in detail.</p>
+      <h2>Main Section</h2><p>More detailed content about the main topic with lots of words.</p>
+      <h2>Conclusion</h2><p>This is the conclusion section. It has more than ten words of content so it passes the threshold check correctly.</p>
+    `;
+    expect(hasTrailingEmptyHeading(html)).toBe(false);
+  });
+
+  it("Returns true for an article with an empty last heading (truncation signature)", () => {
+    const html = `
+      <h2>Introduction</h2><p>Some content here about the topic.</p>
+      <h2>Main Section</h2><p>More detailed content about the main topic.</p>
+      <h2>When to Consider Funding</h2>
+    `;
+    expect(hasTrailingEmptyHeading(html)).toBe(true);
+  });
+
+  it("Returns true when last heading has fewer than 10 words after it", () => {
+    const html = `
+      <h2>Introduction</h2><p>Some content here about the topic.</p>
+      <h2>Conclusion</h2><p>Just a few words.</p>
+    `;
+    expect(hasTrailingEmptyHeading(html)).toBe(true);
+  });
+
+  it("Returns false for an article with no headings", () => {
+    const html = `<p>Just a paragraph with no headings at all.</p>`;
+    expect(hasTrailingEmptyHeading(html)).toBe(false);
+  });
+
+  it("Returns false for empty string", () => {
+    expect(hasTrailingEmptyHeading("")).toBe(false);
+  });
+});
