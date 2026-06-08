@@ -2,7 +2,7 @@
  * Schedule router — Layer 7 publishing schedule management.
  *
  * Procedures:
- *  schedule.save    — upsert the publishing cadence + startDate for a business
+ *  schedule.save    — upsert the publishing cadence + startDate + publishHour for a business
  *  schedule.get     — return current schedule with calculated publish dates per article
  *  schedule.confirm — lock schedule, set scheduledPublishAt on each article
  */
@@ -31,7 +31,7 @@ async function assertOwnership(userId: number, businessId: number) {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: calculate publish dates from cadence + startDate
+// Helper: calculate publish dates from cadence + startDate + publishHour (UTC)
 // ---------------------------------------------------------------------------
 type Cadence =
   | "every_day"
@@ -54,12 +54,14 @@ function cadenceToDays(cadence: Cadence): number {
 export function calculatePublishDates(
   articleIds: number[],
   cadence: Cadence,
-  startDate: Date
+  startDate: Date,
+  publishHour = 9
 ): { articleId: number; publishDate: Date }[] {
   const intervalDays = cadenceToDays(cadence);
   return articleIds.map((id, index) => {
     const publishDate = new Date(startDate);
     publishDate.setDate(publishDate.getDate() + index * intervalDays);
+    publishDate.setUTCHours(publishHour, 0, 0, 0);
     return { articleId: id, publishDate };
   });
 }
@@ -70,7 +72,7 @@ export function calculatePublishDates(
 
 export const scheduleRouter = router({
   /**
-   * Upsert the publishing cadence + startDate for a business.
+   * Upsert the publishing cadence + startDate + publishHour for a business.
    */
   save: protectedProcedure
     .input(
@@ -84,6 +86,8 @@ export const scheduleRouter = router({
           "twice_per_week",
         ]),
         startDate: z.date(),
+        /** Preferred publish hour in 24-hour UTC (0–23). Defaults to 9 (9am UTC). */
+        publishHour: z.number().min(0).max(23).default(9),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -103,6 +107,7 @@ export const scheduleRouter = router({
           .set({
             cadence: input.cadence,
             startDate: input.startDate,
+            publishHour: input.publishHour,
             confirmed: false,
           })
           .where(eq(schedules.businessId, input.businessId));
@@ -111,6 +116,7 @@ export const scheduleRouter = router({
           businessId: input.businessId,
           cadence: input.cadence,
           startDate: input.startDate,
+          publishHour: input.publishHour,
           confirmed: false,
         });
       }
@@ -164,10 +170,12 @@ export const scheduleRouter = router({
         };
       }
 
+      const publishHour = schedule.publishHour ?? 9;
       const dates = calculatePublishDates(
         approvedArticles.map(a => a.id),
         schedule.cadence as Cadence,
-        schedule.startDate
+        schedule.startDate,
+        publishHour
       );
 
       const dateMap = new Map(dates.map(d => [d.articleId, d.publishDate]));
@@ -223,10 +231,12 @@ export const scheduleRouter = router({
         });
       }
 
+      const publishHour = schedule.publishHour ?? 9;
       const dates = calculatePublishDates(
         approvedArticles.map(a => a.id),
         schedule.cadence as Cadence,
-        schedule.startDate
+        schedule.startDate,
+        publishHour
       );
 
       // Update each article with its scheduled publish date

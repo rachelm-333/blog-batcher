@@ -161,6 +161,16 @@ export default function PublishSchedule() {
     return d;
   });
   const [autoIntervalDays, setAutoIntervalDays] = useState(3);
+  // publishHour: 0-23 in UTC. Default 9 (9am UTC).
+  const [publishHour, setPublishHour] = useState(9);
+  const [publishHourDisplay, setPublishHourDisplay] = useState(9); // 1-12
+  const [publishAmPm, setPublishAmPm] = useState<"AM" | "PM">("AM");
+
+  function updatePublishHour(h: number, ampm: "AM" | "PM") {
+    let utc24 = h % 12;
+    if (ampm === "PM") utc24 += 12;
+    setPublishHour(utc24);
+  }
   const [calendarMonth, setCalendarMonth] = useState<{ year: number; month: number }>(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -173,6 +183,14 @@ export default function PublishSchedule() {
     }
     if (scheduleData?.schedule?.startDate) {
       setStartDate(new Date(scheduleData.schedule.startDate));
+    }
+    if (scheduleData?.schedule?.publishHour != null) {
+      const h24 = scheduleData.schedule.publishHour;
+      const ampm: "AM" | "PM" = h24 >= 12 ? "PM" : "AM";
+      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+      setPublishHour(h24);
+      setPublishHourDisplay(h12);
+      setPublishAmPm(ampm);
     }
   }, [scheduleData?.schedule?.id]);
 
@@ -300,7 +318,7 @@ export default function PublishSchedule() {
 
   function handleSaveAndPreview() {
     if (!business?.id) return;
-    saveSchedule.mutate({ businessId: business.id, cadence, startDate });
+    saveSchedule.mutate({ businessId: business.id, cadence, startDate, publishHour });
   }
 
   function handleSendToCMS() {
@@ -310,7 +328,7 @@ export default function PublishSchedule() {
       return;
     }
     saveSchedule.mutate(
-      { businessId: business.id, cadence, startDate },
+      { businessId: business.id, cadence, startDate, publishHour },
       {
         onSuccess: () => {
           confirmSchedule.mutate(
@@ -339,6 +357,7 @@ export default function PublishSchedule() {
       businessId: business.id,
       startDate: futureStart,
       intervalDays: autoIntervalDays,
+      publishHour,
     });
   }
 
@@ -599,10 +618,50 @@ export default function PublishSchedule() {
                     {totalAutoWeeks > 0 && (
                       <p>Total span: <strong>{totalAutoWeeks} week{totalAutoWeeks !== 1 ? "s" : ""}</strong></p>
                     )}
-                    <p className="text-emerald-500 mt-1">Articles publish automatically at 9am UTC — no manual action needed.</p>
+                    <p className="text-emerald-500 mt-1">Articles publish automatically at {publishHourDisplay}:00 {publishAmPm} — no manual action needed.</p>
                   </div>
                 </div>
               )}
+
+              {/* Publish Time Picker */}
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-2">Publish time</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="border border-border rounded-md px-3 py-2 text-sm bg-card text-foreground"
+                    value={publishHourDisplay}
+                    onChange={(e) => {
+                      const h = Number(e.target.value);
+                      setPublishHourDisplay(h);
+                      updatePublishHour(h, publishAmPm);
+                    }}
+                  >
+                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(h => (
+                      <option key={h} value={h}>{h}:00</option>
+                    ))}
+                  </select>
+                  <div className="flex rounded-md border border-border overflow-hidden">
+                    {(["AM", "PM"] as const).map(period => (
+                      <button
+                        key={period}
+                        type="button"
+                        className={`px-3 py-2 text-sm font-medium transition-colors ${
+                          publishAmPm === period
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card text-muted-foreground hover:bg-muted"
+                        }`}
+                        onClick={() => {
+                          setPublishAmPm(period);
+                          updatePublishHour(publishHourDisplay, period);
+                        }}
+                      >
+                        {period}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs text-muted-foreground">(your local time)</span>
+                </div>
+              </div>
 
               {/* Auto-schedule button */}
               <Button
@@ -715,6 +774,46 @@ export default function PublishSchedule() {
                     disabled={{ before: new Date() }}
                     className="rounded-xl border border-border bg-card"
                   />
+                </div>
+              </div>
+
+              {/* Publish Time Picker */}
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-2">Publish time</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="border border-border rounded-md px-3 py-2 text-sm bg-card text-foreground"
+                    value={publishHourDisplay}
+                    onChange={(e) => {
+                      const h = Number(e.target.value);
+                      setPublishHourDisplay(h);
+                      updatePublishHour(h, publishAmPm);
+                    }}
+                  >
+                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(h => (
+                      <option key={h} value={h}>{h}:00</option>
+                    ))}
+                  </select>
+                  <div className="flex rounded-md border border-border overflow-hidden">
+                    {(["AM", "PM"] as const).map(period => (
+                      <button
+                        key={period}
+                        type="button"
+                        className={`px-3 py-2 text-sm font-medium transition-colors ${
+                          publishAmPm === period
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card text-muted-foreground hover:bg-muted"
+                        }`}
+                        onClick={() => {
+                          setPublishAmPm(period);
+                          updatePublishHour(publishHourDisplay, period);
+                        }}
+                      >
+                        {period}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs text-muted-foreground">(your local time)</span>
                 </div>
               </div>
 

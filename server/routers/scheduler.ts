@@ -471,6 +471,8 @@ export const schedulerRouter = router({
         businessId: z.number(),
         startDate: z.date(),
         intervalDays: z.number().min(1).max(30),
+        /** Preferred publish hour in 24-hour UTC (0–23). Defaults to 9. */
+        publishHour: z.number().min(0).max(23).default(9),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -514,8 +516,8 @@ export const schedulerRouter = router({
         const article = approvedArticles[i];
         const scheduledAt = new Date(input.startDate);
         scheduledAt.setDate(scheduledAt.getDate() + i * input.intervalDays);
-        // Set to 9am UTC on the target day
-        scheduledAt.setUTCHours(9, 0, 0, 0);
+        // Set to the user's preferred publish hour (UTC)
+        scheduledAt.setUTCHours(input.publishHour, 0, 0, 0);
 
         try {
           // Cancel existing Heartbeat job if one exists

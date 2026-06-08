@@ -595,6 +595,11 @@ export const schedules = mysqlTable("schedules", {
   startDate: timestamp("startDate"),
   /** Whether the user has confirmed and locked this schedule. */
   confirmed: boolean("confirmed").default(false).notNull(),
+  /**
+   * Preferred publish hour in 24-hour UTC (0–23). Defaults to 9 (9am UTC).
+   * Stored as UTC; frontend converts from user's local AM/PM selection.
+   */
+  publishHour: int("publishHour").default(9).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

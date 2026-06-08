@@ -1470,7 +1470,51 @@ ${row.bodyHtml ?? ""}
       if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt CMS credentials" });
 
       const scheduledDate = input.scheduledAt ? new Date(input.scheduledAt) : null;
+      const isDraft = input.publishAs === "draft";
+      const isWixScheduled = input.platform === "wix" && scheduledDate && scheduledDate > new Date();
 
+      // ── Wix + future schedule: skip Wix API entirely, just create Heartbeat ──
+      // Wix has no scheduling API. We hold the article in Blog Batcher only.
+      // The Heartbeat fires at scheduledDate and calls publishToWix fresh (create + publish in one shot).
+      if (isWixScheduled && scheduledDate) {
+        // Cancel any existing Heartbeat job for this article
+        const [existingArticle] = await db
+          .select({ scheduleCronTaskUid: articles.scheduleCronTaskUid })
+          .from(articles)
+          .where(eq(articles.id, input.articleId))
+          .limit(1);
+        if (existingArticle?.scheduleCronTaskUid) {
+          try {
+            await cancelArticleHeartbeat(existingArticle.scheduleCronTaskUid, getArticleSessionToken(ctx));
+          } catch { /* ignore — job may already be gone */ }
+        }
+        // Create new Heartbeat job
+        let scheduleCronTaskUid: string;
+        try {
+          scheduleCronTaskUid = await createArticleHeartbeat(input.articleId, scheduledDate, getArticleSessionToken(ctx));
+          console.log(`[publishSingle] Wix scheduled — Heartbeat created: ${scheduleCronTaskUid} fires at ${scheduledDate.toISOString()}`);
+        } catch (heartbeatErr) {
+          console.error("[publishSingle] Failed to create Heartbeat job:", heartbeatErr);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create publish schedule. Please try again." });
+        }
+        await db
+          .update(articles)
+          .set({
+            status: "scheduled",
+            publishedAt: null,
+            scheduledPublishAt: scheduledDate,
+            cmsPostId: null,
+            cmsPostUrl: null,
+            errorMessage: null,
+            scheduleCronTaskUid,
+            publishRetryCount: 0,
+            retryScheduledAt: null,
+          })
+          .where(eq(articles.id, input.articleId));
+        return { success: true, cmsPostUrl: null, cmsPostId: null, status: "scheduled" };
+      }
+
+      // ── All other cases: call CMS API now ────────────────────────────────────
       const payload: ArticlePayload = {
         title: row.title ?? "",
         bodyHtml: row.bodyHtml ?? "",
@@ -1483,7 +1527,7 @@ ${row.bodyHtml ?? ""}
         imageAltText: row.altText ?? null,
         scheduledPublishAt: scheduledDate,
         level: (row.level ?? "cluster") as "cornerstone" | "pillar" | "cluster",
-        publishAsDraft: input.publishAs === "draft",
+        publishAsDraft: isDraft,
       };
 
       let result;
@@ -1511,21 +1555,6 @@ ${row.bodyHtml ?? ""}
 
       if (result.success) {
         const isScheduled = scheduledDate && scheduledDate > new Date();
-        const isDraft = input.publishAs === "draft";
-        // If scheduling, create a Heartbeat job so the article actually publishes at the right time.
-        // The Heartbeat fires at scheduledDate and calls /api/scheduled/publish-article.
-        let scheduleCronTaskUid: string | null = null;
-        if (isScheduled && scheduledDate) {
-          try {
-            const sessionToken = getArticleSessionToken(ctx);
-            scheduleCronTaskUid = await createArticleHeartbeat(input.articleId, scheduledDate, sessionToken);
-            console.log(`[publishSingle] Heartbeat job created: ${scheduleCronTaskUid} for article ${input.articleId} at ${scheduledDate.toISOString()}`);
-          } catch (heartbeatErr) {
-            // Non-fatal: log the error but still mark as scheduled in DB.
-            // The article is a Wix draft and can be published manually if the job fails.
-            console.error("[publishSingle] Failed to create Heartbeat job:", heartbeatErr);
-          }
-        }
         await db
           .update(articles)
           .set({
@@ -1535,7 +1564,6 @@ ${row.bodyHtml ?? ""}
             cmsPostId: result.cmsPostId ?? null,
             cmsPostUrl: result.cmsPostUrl ?? null,
             errorMessage: null,
-            ...(scheduleCronTaskUid ? { scheduleCronTaskUid } : {}),
           })
           .where(eq(articles.id, input.articleId));
         return {
