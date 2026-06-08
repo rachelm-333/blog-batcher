@@ -96,8 +96,12 @@ export default function ArticleGeneration() {
     onError: (err) => toast.error(err.message),
   });
 
+  const utils = trpc.useUtils();
   const markReadyMutation = trpc.articles.updateStatus.useMutation({
-    onSuccess: () => toast.success("Article marked as ready for review."),
+    onSuccess: () => {
+      toast.success("Article moved to review — click Review to open it.");
+      void utils.articles.getAll.invalidate();
+    },
     onError: (err) => toast.error(err.message),
   });
 
@@ -331,7 +335,7 @@ export default function ArticleGeneration() {
                                 className="btn-ghost"
                                 style={{ padding:"5px 10px", fontSize:11, color:"#166534", borderColor:"#86efac", display:"flex", alignItems:"center", gap:3, whiteSpace:"nowrap" }}
                                 disabled={markReadyMutation.isPending}
-                                onClick={() => markReadyMutation.mutate({ articleId: article.id, status: "generated" })}
+                                onClick={() => markReadyMutation.mutate({ articleId: article.id, status: "pending_approval" })}
                               >
                                 {markReadyMutation.isPending
                                   ? <><Loader2 style={{ width:10, height:10 }} className="animate-spin" /> Saving…</>
