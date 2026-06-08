@@ -213,4 +213,17 @@ describe("publishToWix — scheduling behaviour", () => {
     // Heartbeat path: /publish MUST be called
     expect(publishCalls).toHaveLength(1);
   });
+
+  it("PUBLISH BODY: memberId is included in the /publish request body", async () => {
+    const { mockFetch, calls } = setupFetchMock();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    const article = makeArticle({ scheduledPublishAt: null });
+    await publishToWix(CREDS, article);
+
+    const publishCall = calls.find(c => c.url.includes("/publish"));
+    expect(publishCall).toBeDefined();
+    // memberId MUST be in the body — Wix Blog v3 /publish requires it
+    expect((publishCall!.body as any).memberId).toBe(CREDS.memberId);
+  });
 });

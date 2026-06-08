@@ -820,7 +820,8 @@ export async function publishToWix(
       {
         method: "POST",
         headers: baseHeaders,
-        body: JSON.stringify({}),
+        // memberId is required by Wix Blog v3 /publish endpoint to identify the post owner
+        body: JSON.stringify(credentials.memberId ? { memberId: credentials.memberId } : {}),
       }
     );
 
