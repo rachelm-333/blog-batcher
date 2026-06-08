@@ -255,6 +255,7 @@ export async function executeScheduledPublish(
         payload
       );
     } else if (publisherPlatform === "wix") {
+      console.log(`[Heartbeat] Wix publish attempt — memberId from DB: "${creds.memberId ?? "(empty)"}" apiKey present: ${!!creds.apiKey} siteId present: ${!!creds.siteId}`);
       result = await publishToWix(
         { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" },
         payload
