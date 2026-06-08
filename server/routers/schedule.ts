@@ -55,13 +55,14 @@ export function calculatePublishDates(
   articleIds: number[],
   cadence: Cadence,
   startDate: Date,
-  publishHour = 9
+  publishHour = 9,
+  publishMinute = 0
 ): { articleId: number; publishDate: Date }[] {
   const intervalDays = cadenceToDays(cadence);
   return articleIds.map((id, index) => {
     const publishDate = new Date(startDate);
     publishDate.setDate(publishDate.getDate() + index * intervalDays);
-    publishDate.setUTCHours(publishHour, 0, 0, 0);
+    publishDate.setUTCHours(publishHour, publishMinute, 0, 0);
     return { articleId: id, publishDate };
   });
 }
@@ -88,6 +89,8 @@ export const scheduleRouter = router({
         startDate: z.date(),
         /** Preferred publish hour in 24-hour UTC (0–23). Defaults to 9 (9am UTC). */
         publishHour: z.number().min(0).max(23).default(9),
+        /** Preferred publish minute (0, 15, 30, 45). Defaults to 0. */
+        publishMinute: z.number().min(0).max(59).default(0),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -108,6 +111,7 @@ export const scheduleRouter = router({
             cadence: input.cadence,
             startDate: input.startDate,
             publishHour: input.publishHour,
+            publishMinute: input.publishMinute,
             confirmed: false,
           })
           .where(eq(schedules.businessId, input.businessId));
@@ -117,6 +121,7 @@ export const scheduleRouter = router({
           cadence: input.cadence,
           startDate: input.startDate,
           publishHour: input.publishHour,
+          publishMinute: input.publishMinute,
           confirmed: false,
         });
       }
@@ -171,11 +176,13 @@ export const scheduleRouter = router({
       }
 
       const publishHour = schedule.publishHour ?? 9;
+      const publishMinute = schedule.publishMinute ?? 0;
       const dates = calculatePublishDates(
         approvedArticles.map(a => a.id),
         schedule.cadence as Cadence,
         schedule.startDate,
-        publishHour
+        publishHour,
+        publishMinute
       );
 
       const dateMap = new Map(dates.map(d => [d.articleId, d.publishDate]));
@@ -232,11 +239,13 @@ export const scheduleRouter = router({
       }
 
       const publishHour = schedule.publishHour ?? 9;
+      const publishMinute = schedule.publishMinute ?? 0;
       const dates = calculatePublishDates(
         approvedArticles.map(a => a.id),
         schedule.cadence as Cadence,
         schedule.startDate,
-        publishHour
+        publishHour,
+        publishMinute
       );
 
       // Update each article with its scheduled publish date

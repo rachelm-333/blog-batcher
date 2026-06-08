@@ -1,0 +1,1 @@
+ALTER TABLE `schedules` ADD `publishMinute` int DEFAULT 0 NOT NULL;

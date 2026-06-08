@@ -600,6 +600,10 @@ export const schedules = mysqlTable("schedules", {
    * Stored as UTC; frontend converts from user's local AM/PM selection.
    */
   publishHour: int("publishHour").default(9).notNull(),
+  /**
+   * Preferred publish minute (0, 15, 30, 45). Defaults to 0.
+   */
+  publishMinute: int("publishMinute").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

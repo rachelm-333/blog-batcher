@@ -64,6 +64,13 @@
       "when": 1780889790045,
       "tag": "0008_eager_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1780891450462,
+      "tag": "0009_slim_silverclaw",
+      "breakpoints": true
     }
   ]
 }

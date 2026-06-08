@@ -161,15 +161,22 @@ export default function PublishSchedule() {
     return d;
   });
   const [autoIntervalDays, setAutoIntervalDays] = useState(3);
-  // publishHour: 0-23 in UTC. Default 9 (9am UTC).
+  // publishHour/publishMinute stored as UTC. UI shows local time.
   const [publishHour, setPublishHour] = useState(9);
+  const [publishMinute, setPublishMinute] = useState(0);
   const [publishHourDisplay, setPublishHourDisplay] = useState(9); // 1-12
   const [publishAmPm, setPublishAmPm] = useState<"AM" | "PM">("AM");
 
-  function updatePublishHour(h: number, ampm: "AM" | "PM") {
-    let utc24 = h % 12;
-    if (ampm === "PM") utc24 += 12;
-    setPublishHour(utc24);
+  // Convert local 12h + AM/PM + minute → UTC 24h + minute
+  function updatePublishTime(h: number, ampm: "AM" | "PM", minute: number) {
+    let local24 = h % 12;
+    if (ampm === "PM") local24 += 12;
+    // Convert local time to UTC by subtracting the timezone offset
+    const offsetMinutes = new Date().getTimezoneOffset(); // e.g. -600 for AEST
+    const localTotalMinutes = local24 * 60 + minute;
+    const utcTotalMinutes = ((localTotalMinutes + offsetMinutes) % (24 * 60) + 24 * 60) % (24 * 60);
+    setPublishHour(Math.floor(utcTotalMinutes / 60));
+    setPublishMinute(utcTotalMinutes % 60);
   }
   const [calendarMonth, setCalendarMonth] = useState<{ year: number; month: number }>(() => {
     const d = new Date();
@@ -185,12 +192,25 @@ export default function PublishSchedule() {
       setStartDate(new Date(scheduleData.schedule.startDate));
     }
     if (scheduleData?.schedule?.publishHour != null) {
-      const h24 = scheduleData.schedule.publishHour;
-      const ampm: "AM" | "PM" = h24 >= 12 ? "PM" : "AM";
-      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-      setPublishHour(h24);
+      const utcHour = scheduleData.schedule.publishHour;
+      const utcMinute = scheduleData.schedule.publishMinute ?? 0;
+      // Convert UTC back to local time for display
+      const offsetMinutes = new Date().getTimezoneOffset();
+      const utcTotal = utcHour * 60 + utcMinute;
+      const localTotal = ((utcTotal - offsetMinutes) % (24 * 60) + 24 * 60) % (24 * 60);
+      const localHour24 = Math.floor(localTotal / 60);
+      const localMin = localTotal % 60;
+      const ampm: "AM" | "PM" = localHour24 >= 12 ? "PM" : "AM";
+      const h12 = localHour24 % 12 === 0 ? 12 : localHour24 % 12;
+      setPublishHour(utcHour);
+      setPublishMinute(utcMinute);
       setPublishHourDisplay(h12);
       setPublishAmPm(ampm);
+      // Also update the minute selector to show local minute
+      // (publishMinute state holds UTC minute; we need a separate display state if they differ)
+      // For simplicity, snap to nearest 5-minute option
+      const snapped = Math.round(localMin / 5) * 5 % 60;
+      setPublishMinute(snapped === localMin ? utcMinute : Math.round(utcMinute / 5) * 5 % 60);
     }
   }, [scheduleData?.schedule?.id]);
 
@@ -318,7 +338,7 @@ export default function PublishSchedule() {
 
   function handleSaveAndPreview() {
     if (!business?.id) return;
-    saveSchedule.mutate({ businessId: business.id, cadence, startDate, publishHour });
+    saveSchedule.mutate({ businessId: business.id, cadence, startDate, publishHour, publishMinute });
   }
 
   function handleSendToCMS() {
@@ -328,7 +348,7 @@ export default function PublishSchedule() {
       return;
     }
     saveSchedule.mutate(
-      { businessId: business.id, cadence, startDate, publishHour },
+      { businessId: business.id, cadence, startDate, publishHour, publishMinute },
       {
         onSuccess: () => {
           confirmSchedule.mutate(
@@ -358,6 +378,7 @@ export default function PublishSchedule() {
       startDate: futureStart,
       intervalDays: autoIntervalDays,
       publishHour,
+      publishMinute,
     });
   }
 
@@ -618,7 +639,7 @@ export default function PublishSchedule() {
                     {totalAutoWeeks > 0 && (
                       <p>Total span: <strong>{totalAutoWeeks} week{totalAutoWeeks !== 1 ? "s" : ""}</strong></p>
                     )}
-                    <p className="text-emerald-500 mt-1">Articles publish automatically at {publishHourDisplay}:00 {publishAmPm} — no manual action needed.</p>
+                    <p className="text-emerald-500 mt-1">Articles publish automatically at {publishHourDisplay}:{String(publishMinute).padStart(2,'0')} {publishAmPm} — no manual action needed.</p>
                   </div>
                 </div>
               )}
@@ -626,18 +647,32 @@ export default function PublishSchedule() {
               {/* Publish Time Picker */}
               <div>
                 <label className="text-sm font-medium text-foreground block mb-2">Publish time</label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <select
                     className="border border-border rounded-md px-3 py-2 text-sm bg-card text-foreground"
                     value={publishHourDisplay}
                     onChange={(e) => {
                       const h = Number(e.target.value);
                       setPublishHourDisplay(h);
-                      updatePublishHour(h, publishAmPm);
+                      updatePublishTime(h, publishAmPm, publishMinute);
                     }}
                   >
                     {[1,2,3,4,5,6,7,8,9,10,11,12].map(h => (
-                      <option key={h} value={h}>{h}:00</option>
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span className="text-sm text-muted-foreground">:</span>
+                  <select
+                    className="border border-border rounded-md px-3 py-2 text-sm bg-card text-foreground"
+                    value={publishMinute}
+                    onChange={(e) => {
+                      const m = Number(e.target.value);
+                      setPublishMinute(m);
+                      updatePublishTime(publishHourDisplay, publishAmPm, m);
+                    }}
+                  >
+                    {[0,5,10,15,20,25,30,35,40,45,50,55].map(m => (
+                      <option key={m} value={m}>{String(m).padStart(2,'0')}</option>
                     ))}
                   </select>
                   <div className="flex rounded-md border border-border overflow-hidden">
@@ -652,7 +687,7 @@ export default function PublishSchedule() {
                         }`}
                         onClick={() => {
                           setPublishAmPm(period);
-                          updatePublishHour(publishHourDisplay, period);
+                          updatePublishTime(publishHourDisplay, period, publishMinute);
                         }}
                       >
                         {period}
@@ -780,18 +815,32 @@ export default function PublishSchedule() {
               {/* Publish Time Picker */}
               <div>
                 <label className="text-sm font-medium text-foreground block mb-2">Publish time</label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <select
                     className="border border-border rounded-md px-3 py-2 text-sm bg-card text-foreground"
                     value={publishHourDisplay}
                     onChange={(e) => {
                       const h = Number(e.target.value);
                       setPublishHourDisplay(h);
-                      updatePublishHour(h, publishAmPm);
+                      updatePublishTime(h, publishAmPm, publishMinute);
                     }}
                   >
                     {[1,2,3,4,5,6,7,8,9,10,11,12].map(h => (
-                      <option key={h} value={h}>{h}:00</option>
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span className="text-sm text-muted-foreground">:</span>
+                  <select
+                    className="border border-border rounded-md px-3 py-2 text-sm bg-card text-foreground"
+                    value={publishMinute}
+                    onChange={(e) => {
+                      const m = Number(e.target.value);
+                      setPublishMinute(m);
+                      updatePublishTime(publishHourDisplay, publishAmPm, m);
+                    }}
+                  >
+                    {[0,5,10,15,20,25,30,35,40,45,50,55].map(m => (
+                      <option key={m} value={m}>{String(m).padStart(2,'0')}</option>
                     ))}
                   </select>
                   <div className="flex rounded-md border border-border overflow-hidden">
@@ -806,7 +855,7 @@ export default function PublishSchedule() {
                         }`}
                         onClick={() => {
                           setPublishAmPm(period);
-                          updatePublishHour(publishHourDisplay, period);
+                          updatePublishTime(publishHourDisplay, period, publishMinute);
                         }}
                       >
                         {period}
