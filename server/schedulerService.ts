@@ -29,6 +29,10 @@ import {
   publishToWordPress,
   publishToWix,
   publishToZapier,
+  publishToShopify,
+  publishToWebflow,
+  publishToSquarespace,
+  publishToGhost,
   decryptCredentials,
   type ArticlePayload,
 } from "./cmsPublisher";
@@ -179,7 +183,8 @@ export async function executeScheduledPublish(
   // Load integration credentials
   const platform = biz.cmsPlatform as "wordpress" | "wix" | "shopify" | "webflow" | "squarespace" | "ghost";
   // Map to supported publisher platforms
-  const publisherPlatform = (["wordpress", "wix"].includes(platform) ? platform : "zapier") as "wordpress" | "wix" | "zapier";
+  const DIRECT_API_PLATFORMS = ["wordpress", "wix", "shopify", "webflow", "squarespace", "ghost"] as const;
+  const publisherPlatform = (DIRECT_API_PLATFORMS.includes(platform as typeof DIRECT_API_PLATFORMS[number]) ? platform : "zapier") as "wordpress" | "wix" | "shopify" | "webflow" | "squarespace" | "ghost" | "zapier";
 
   const [integration] = await db
     .select({ credentialsEncrypted: integrations.credentialsEncrypted })
@@ -258,6 +263,26 @@ export async function executeScheduledPublish(
       console.log(`[Heartbeat] Wix publish attempt — memberId from DB: "${creds.memberId ?? "(empty)"}" apiKey present: ${!!creds.apiKey} siteId present: ${!!creds.siteId}`);
       result = await publishToWix(
         { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" },
+        payload
+      );
+    } else if (publisherPlatform === "shopify") {
+      result = await publishToShopify(
+        { storeDomain: creds.storeDomain ?? "", adminApiToken: creds.adminApiToken ?? "", blogId: creds.blogId ?? "" },
+        payload
+      );
+    } else if (publisherPlatform === "webflow") {
+      result = await publishToWebflow(
+        { apiToken: creds.apiToken ?? "", collectionId: creds.collectionId ?? "" },
+        payload
+      );
+    } else if (publisherPlatform === "squarespace") {
+      result = await publishToSquarespace(
+        { personalAccessToken: creds.personalAccessToken ?? "" },
+        payload
+      );
+    } else if (publisherPlatform === "ghost") {
+      result = await publishToGhost(
+        { adminUrl: creds.adminUrl ?? "", staffAccessToken: creds.staffAccessToken ?? "" },
         payload
       );
     } else {

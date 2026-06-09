@@ -1,6 +1,12 @@
 /**
  * StageStepper — horizontal progress bar matching the mockup exactly
  * Shows all 6 stages with lime (complete), purple (active), gray (pending)
+ *
+ * currentStage: the highest stage the user has reached (controls which steps are unlocked)
+ * activeStage:  optional override for which step shows as blue/active.
+ *               If not provided, falls back to currentStage.
+ *               Use this to highlight the correct step when the user is on a page
+ *               that is ahead of their stored currentStage (e.g. Publish & Schedule = 6).
  */
 import { useLocation } from "wouter";
 
@@ -15,11 +21,14 @@ const STAGES = [
 
 interface Props {
   currentStage: number;
+  activeStage?: number;
   onNavigate?: (path: string, stage: number) => void;
 }
 
-export default function StageStepper({ currentStage, onNavigate }: Props) {
+export default function StageStepper({ currentStage, activeStage, onNavigate }: Props) {
   const [, setLocation] = useLocation();
+  // The step shown as blue = activeStage if provided, else currentStage
+  const highlightedStage = activeStage ?? currentStage;
 
   function handleClick(stage: typeof STAGES[0]) {
     if (stage.id > currentStage) return; // locked
@@ -39,8 +48,10 @@ export default function StageStepper({ currentStage, onNavigate }: Props) {
       flexShrink: 0,
     }}>
       {STAGES.map((stage, idx) => {
-        const isComplete = stage.id < currentStage;
-        const isActive   = stage.id === currentStage;
+        // A step is "complete" (lime) if it's before the highlighted step AND it's been reached
+        const isComplete = stage.id < highlightedStage && stage.id <= currentStage;
+        const isActive   = stage.id === highlightedStage;
+        // Locked = beyond the furthest stage the user has reached
         const isLocked   = stage.id > currentStage;
 
         return (

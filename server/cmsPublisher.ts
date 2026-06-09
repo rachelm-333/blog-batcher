@@ -1056,3 +1056,290 @@ export function decryptCredentials(encrypted: string): Record<string, string> | 
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Shopify Publisher
+// ---------------------------------------------------------------------------
+
+export interface ShopifyCredentials {
+  storeDomain: string;
+  adminApiToken: string;
+  blogId: string;
+}
+
+/**
+ * Publish an article to Shopify via the Admin REST API.
+ * Creates a blog article under the specified blog.
+ */
+export async function publishToShopify(
+  credentials: ShopifyCredentials,
+  article: ArticlePayload
+): Promise<PublishResult> {
+  const domain = credentials.storeDomain.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const url = `https://${domain}/admin/api/2024-01/blogs/${credentials.blogId}/articles.json`;
+
+  const published = !article.publishAsDraft &&
+    !(article.scheduledPublishAt && article.scheduledPublishAt > new Date());
+
+  const body: Record<string, unknown> = {
+    article: {
+      title: article.title,
+      body_html: article.bodyHtml,
+      published,
+      handle: article.urlSlug || undefined,
+      metafields: [
+        { key: "title_tag", value: article.metaTitle || article.title, type: "single_line_text_field", namespace: "global" },
+        { key: "description_tag", value: article.metaDescription || "", type: "single_line_text_field", namespace: "global" },
+      ],
+    },
+  };
+
+  if (article.imageUrl) {
+    (body.article as Record<string, unknown>).image = { src: article.imageUrl, alt: article.imageAltText || "" };
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": credentials.adminApiToken,
+        "User-Agent": "BlogBatcher/1.0",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, error: `Shopify API error ${res.status}: ${text.slice(0, 300)}` };
+    }
+
+    const data = await res.json() as { article?: { id?: number; handle?: string } };
+    const postId = String(data.article?.id ?? "");
+    const postUrl = data.article?.handle
+      ? `https://${domain}/blogs/${credentials.blogId}/${data.article.handle}`
+      : undefined;
+
+    return { success: true, cmsPostId: postId, cmsPostUrl: postUrl };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Webflow Publisher
+// ---------------------------------------------------------------------------
+
+export interface WebflowCredentials {
+  apiToken: string;
+  collectionId: string;
+}
+
+/**
+ * Publish an article to Webflow CMS via the REST API v2.
+ * Creates a CMS item in the specified Blog collection.
+ */
+export async function publishToWebflow(
+  credentials: WebflowCredentials,
+  article: ArticlePayload
+): Promise<PublishResult> {
+  const url = `https://api.webflow.com/v2/collections/${credentials.collectionId}/items`;
+
+  const isDraft = article.publishAsDraft ||
+    (article.scheduledPublishAt != null && article.scheduledPublishAt > new Date());
+
+  const fieldData: Record<string, unknown> = {
+    name: article.title,
+    slug: article.urlSlug || undefined,
+    "post-body": article.bodyHtml,
+    "post-summary": article.metaDescription || "",
+    "seo-title": article.metaTitle || article.title,
+    "seo-description": article.metaDescription || "",
+  };
+
+  if (article.imageUrl) {
+    fieldData["main-image"] = { url: article.imageUrl, alt: article.imageAltText || "" };
+  }
+
+  const body = {
+    fieldData,
+    isDraft,
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${credentials.apiToken}`,
+        "User-Agent": "BlogBatcher/1.0",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, error: `Webflow API error ${res.status}: ${text.slice(0, 300)}` };
+    }
+
+    const data = await res.json() as { id?: string; fieldData?: { slug?: string } };
+    const postId = data.id ?? "";
+    const slug = data.fieldData?.slug ?? article.urlSlug;
+
+    return { success: true, cmsPostId: postId, cmsPostUrl: slug ? `(slug: ${slug})` : undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Squarespace Publisher
+// ---------------------------------------------------------------------------
+
+export interface SquarespaceCredentials {
+  personalAccessToken: string;
+}
+
+/**
+ * Publish an article to Squarespace via the Blog Posts API.
+ * Requires a Personal Access Token with Blog Posts: Write permission.
+ */
+export async function publishToSquarespace(
+  credentials: SquarespaceCredentials,
+  article: ArticlePayload
+): Promise<PublishResult> {
+  const url = "https://api.squarespace.com/1.0/blog/posts";
+
+  const isDraft = article.publishAsDraft ||
+    (article.scheduledPublishAt != null && article.scheduledPublishAt > new Date());
+
+  const body: Record<string, unknown> = {
+    title: article.title,
+    body: article.bodyHtml,
+    urlSlug: article.urlSlug || undefined,
+    seoData: {
+      seoTitle: article.metaTitle || article.title,
+      seoDescription: article.metaDescription || "",
+    },
+    status: isDraft ? "DRAFT" : "PUBLISHED",
+  };
+
+  if (article.imageUrl) {
+    body.featuredMedia = { url: article.imageUrl, altText: article.imageAltText || "" };
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${credentials.personalAccessToken}`,
+        "User-Agent": "BlogBatcher/1.0",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, error: `Squarespace API error ${res.status}: ${text.slice(0, 300)}` };
+    }
+
+    const data = await res.json() as { id?: string; urlSlug?: string };
+    return {
+      success: true,
+      cmsPostId: data.id ?? "",
+      cmsPostUrl: data.urlSlug ? `(slug: ${data.urlSlug})` : undefined,
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ghost Publisher
+// ---------------------------------------------------------------------------
+
+export interface GhostCredentials {
+  adminUrl: string;
+  staffAccessToken: string;
+}
+
+/**
+ * Publish an article to Ghost via the Admin API.
+ * Uses JWT authentication derived from the Staff Access Token (Admin API Key format: id:secret).
+ */
+export async function publishToGhost(
+  credentials: GhostCredentials,
+  article: ArticlePayload
+): Promise<PublishResult> {
+  // Ghost Admin API Key format: "id:secret" — split and create JWT
+  const [keyId, keySecret] = credentials.staffAccessToken.split(":");
+  if (!keyId || !keySecret) {
+    return { success: false, error: "Invalid Ghost Admin API Key format. Expected format: id:secret" };
+  }
+
+  // Build JWT for Ghost Admin API
+  const { createHmac } = await import("crypto");
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", kid: keyId, typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ iat: now, exp: now + 300, aud: "/admin/" })).toString("base64url");
+  const signingInput = `${header}.${payload}`;
+  const signature = createHmac("sha256", Buffer.from(keySecret, "hex"))
+    .update(signingInput)
+    .digest("base64url");
+  const jwt = `${signingInput}.${signature}`;
+
+  const adminUrl = credentials.adminUrl.replace(/\/$/, "");
+  const url = `${adminUrl}/ghost/api/admin/posts/`;
+
+  const isDraft = article.publishAsDraft ||
+    (article.scheduledPublishAt != null && article.scheduledPublishAt > new Date());
+
+  const postBody: Record<string, unknown> = {
+    title: article.title,
+    html: article.bodyHtml,
+    slug: article.urlSlug || undefined,
+    status: isDraft ? "draft" : "published",
+    meta_title: article.metaTitle || article.title,
+    meta_description: article.metaDescription || "",
+    og_title: article.metaTitle || article.title,
+    og_description: article.metaDescription || "",
+    twitter_title: article.metaTitle || article.title,
+    twitter_description: article.metaDescription || "",
+    tags: article.focusKeyword
+      ? article.focusKeyword.split(/[,\s]+/).filter(Boolean).slice(0, 5).map(t => ({ name: t }))
+      : [],
+  };
+
+  if (article.imageUrl) {
+    postBody.feature_image = article.imageUrl;
+    postBody.feature_image_alt = article.imageAltText || "";
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Ghost ${jwt}`,
+        "User-Agent": "BlogBatcher/1.0",
+      },
+      body: JSON.stringify({ posts: [postBody] }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, error: `Ghost API error ${res.status}: ${text.slice(0, 300)}` };
+    }
+
+    const data = await res.json() as { posts?: Array<{ id?: string; url?: string }> };
+    const post = data.posts?.[0];
+    return {
+      success: true,
+      cmsPostId: post?.id ?? "",
+      cmsPostUrl: post?.url ?? undefined,
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

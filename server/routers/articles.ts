@@ -48,6 +48,10 @@ import {
   publishToWordPress,
   publishToWix,
   publishToZapier,
+  publishToShopify,
+  publishToWebflow,
+  publishToSquarespace,
+  publishToGhost,
   decryptCredentials,
   type ArticlePayload,
 } from "../cmsPublisher";
@@ -1111,7 +1115,7 @@ ${row.bodyHtml ?? ""}
     .input(
       z.object({
         articleId: z.number(),
-        platform: z.enum(["wordpress", "wix", "zapier"]),
+        platform: z.enum(["wordpress", "wix", "shopify", "webflow", "squarespace", "ghost", "zapier"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1215,6 +1219,26 @@ ${row.bodyHtml ?? ""}
           { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" },
           payload
         );
+      } else if (input.platform === "shopify") {
+        result = await publishToShopify(
+          { storeDomain: creds.storeDomain ?? "", adminApiToken: creds.adminApiToken ?? "", blogId: creds.blogId ?? "" },
+          payload
+        );
+      } else if (input.platform === "webflow") {
+        result = await publishToWebflow(
+          { apiToken: creds.apiToken ?? "", collectionId: creds.collectionId ?? "" },
+          payload
+        );
+      } else if (input.platform === "squarespace") {
+        result = await publishToSquarespace(
+          { personalAccessToken: creds.personalAccessToken ?? "" },
+          payload
+        );
+      } else if (input.platform === "ghost") {
+        result = await publishToGhost(
+          { adminUrl: creds.adminUrl ?? "", staffAccessToken: creds.staffAccessToken ?? "" },
+          payload
+        );
       } else {
         result = await publishToZapier(
           { webhookUrl: creds.webhookUrl ?? "" },
@@ -1261,7 +1285,7 @@ ${row.bodyHtml ?? ""}
     .input(
       z.object({
         businessId: z.number(),
-        platform: z.enum(["wordpress", "wix", "zapier"]),
+        platform: z.enum(["wordpress", "wix", "shopify", "webflow", "squarespace", "ghost", "zapier"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1357,6 +1381,26 @@ ${row.bodyHtml ?? ""}
             { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" },
             payload
           );
+        } else if (input.platform === "shopify") {
+          result = await publishToShopify(
+            { storeDomain: creds.storeDomain ?? "", adminApiToken: creds.adminApiToken ?? "", blogId: creds.blogId ?? "" },
+            payload
+          );
+        } else if (input.platform === "webflow") {
+          result = await publishToWebflow(
+            { apiToken: creds.apiToken ?? "", collectionId: creds.collectionId ?? "" },
+            payload
+          );
+        } else if (input.platform === "squarespace") {
+          result = await publishToSquarespace(
+            { personalAccessToken: creds.personalAccessToken ?? "" },
+            payload
+          );
+        } else if (input.platform === "ghost") {
+          result = await publishToGhost(
+            { adminUrl: creds.adminUrl ?? "", staffAccessToken: creds.staffAccessToken ?? "" },
+            payload
+          );
         } else {
           result = await publishToZapier(
             { webhookUrl: creds.webhookUrl ?? "" },
@@ -1408,7 +1452,7 @@ ${row.bodyHtml ?? ""}
     .input(
       z.object({
         articleId: z.number(),
-        platform: z.enum(["wordpress", "wix", "zapier"]),
+        platform: z.enum(["wordpress", "wix", "shopify", "webflow", "squarespace", "ghost", "zapier"]),
         publishAs: z.enum(["live", "draft"]).default("live"),
         scheduledAt: z.number().optional(), // UTC ms timestamp for scheduled publish
       })
@@ -1544,6 +1588,26 @@ ${row.bodyHtml ?? ""}
       } else if (input.platform === "wix") {
         result = await publishToWix(
           { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" },
+          payload
+        );
+      } else if (input.platform === "shopify") {
+        result = await publishToShopify(
+          { storeDomain: creds.storeDomain ?? "", adminApiToken: creds.adminApiToken ?? "", blogId: creds.blogId ?? "" },
+          payload
+        );
+      } else if (input.platform === "webflow") {
+        result = await publishToWebflow(
+          { apiToken: creds.apiToken ?? "", collectionId: creds.collectionId ?? "" },
+          payload
+        );
+      } else if (input.platform === "squarespace") {
+        result = await publishToSquarespace(
+          { personalAccessToken: creds.personalAccessToken ?? "" },
+          payload
+        );
+      } else if (input.platform === "ghost") {
+        result = await publishToGhost(
+          { adminUrl: creds.adminUrl ?? "", staffAccessToken: creds.staffAccessToken ?? "" },
           payload
         );
       } else {

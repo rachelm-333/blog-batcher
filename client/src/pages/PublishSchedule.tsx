@@ -37,7 +37,7 @@ import { HelpLink } from "@/components/HelpLink";
 // Types
 // ---------------------------------------------------------------------------
 
-type PublishMethod = "wix" | "wordpress" | "zapier" | "export_zip";
+type PublishMethod = "wix" | "wordpress" | "shopify" | "webflow" | "squarespace" | "ghost" | "zapier" | "export_zip";
 type PublishAs = "scheduled" | "drafts";
 type ScheduleMode = "manual" | "auto";
 type Cadence =
@@ -69,6 +69,30 @@ const PUBLISH_METHODS: {
     label: "WordPress",
     description: "REST API + Application Password",
     icon: <span className="text-2xl font-black text-primary">WP</span>,
+  },
+  {
+    id: "shopify",
+    label: "Shopify",
+    description: "Publish to your Shopify store blog via Admin API",
+    icon: <span className="text-2xl font-black" style={{ color: "#96bf48" }}>S</span>,
+  },
+  {
+    id: "webflow",
+    label: "Webflow",
+    description: "Publish to Webflow CMS Blog collection",
+    icon: <span className="text-2xl font-black" style={{ color: "#4353ff" }}>W</span>,
+  },
+  {
+    id: "squarespace",
+    label: "Squarespace",
+    description: "Publish via Squarespace Personal Access Token",
+    icon: <span className="text-2xl font-black text-foreground">SS</span>,
+  },
+  {
+    id: "ghost",
+    label: "Ghost",
+    description: "Publish to Ghost blog via Admin API",
+    icon: <span className="text-2xl font-black" style={{ color: "#15171a" }}>G</span>,
   },
   {
     id: "zapier",
@@ -397,7 +421,7 @@ export default function PublishSchedule() {
   return (
     <DashboardLayout>
     <div style={{ background:"#faf9f5", minHeight:"100%" }}>
-      <StageStepper currentStage={currentStage} />
+      <StageStepper currentStage={currentStage} activeStage={6} />
       {/* Header */}
       <div style={{ borderBottom:"1px solid #e5e7eb", background:"#fff", padding:"16px 24px" }}>
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -407,7 +431,7 @@ export default function PublishSchedule() {
               Back to Review
             </Button>
             <div className="h-4 w-px bg-border" />
-            <h1 className="text-sm font-bold text-foreground">Stage 5 — Publish &amp; Schedule</h1>
+            <h1 className="text-sm font-bold text-foreground">Stage 6 — Publish &amp; Schedule</h1>
           </div>
           <div className="text-xs text-muted-foreground">
             {approvedCount} / {totalCount} articles approved
