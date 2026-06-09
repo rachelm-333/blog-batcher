@@ -86,6 +86,24 @@ async function assertBusinessOwnership(userId: number, businessId: number) {
 }
 
 /**
+ * Advance business currentStage to at least `minStage` (never go backwards).
+ * Silently no-ops if the business is already at or beyond the target stage.
+ */
+async function advanceBusinessStage(businessId: number, minStage: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(businesses)
+    .set({ currentStage: minStage })
+    .where(
+      and(
+        eq(businesses.id, businessId),
+        sql`${businesses.currentStage} < ${minStage}`
+      )
+    );
+}
+
+/**
  * Run generation for a single node and save the result to the DB.
  * Returns the article ID.
  */
@@ -854,6 +872,9 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
         .set({ status: "approved", approvedAt: new Date() })
         .where(eq(articles.id, input.articleId));
 
+      // Advance business to stage 5 (Review & edit) when any article is approved
+      await advanceBusinessStage(article.businessId, 5);
+
       return { approved: true, alreadyApproved: false };
     }),
 
@@ -889,6 +910,9 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
         .update(articles)
         .set({ status: "approved", approvedAt: now })
         .where(inArray(articles.id, ids));
+
+      // Advance business to stage 5 (Review & edit)
+      await advanceBusinessStage(input.businessId, 5);
 
       return { approvedCount: ids.length };
     }),
@@ -1258,6 +1282,8 @@ ${row.bodyHtml ?? ""}
             errorMessage: null,
           })
           .where(eq(articles.id, input.articleId));
+        // Advance business to stage 6 (Publish & schedule)
+        await advanceBusinessStage(row.businessId, 6);
       } else {
         await db
           .update(articles)
@@ -1440,6 +1466,11 @@ ${row.bodyHtml ?? ""}
           title: `Publish batch completed with ${failures.length} failure(s)`,
           content: `Published ${published}/${rows.length} articles to ${input.platform}.\n\nFailed:\n${failures.map(f => `\u2022 ${f.title}: ${f.error}`).join("\n")}`,
         });
+      }
+
+      // Advance business to stage 6 if at least one article was published/scheduled
+      if (published > 0) {
+        await advanceBusinessStage(input.businessId, 6);
       }
 
       return { total: rows.length, published, failed, failures };
@@ -1630,6 +1661,8 @@ ${row.bodyHtml ?? ""}
             errorMessage: null,
           })
           .where(eq(articles.id, input.articleId));
+        // Advance business to stage 6 (Publish & schedule)
+        await advanceBusinessStage(row.businessId, 6);
         return {
           success: true,
           cmsPostUrl: result.cmsPostUrl ?? null,

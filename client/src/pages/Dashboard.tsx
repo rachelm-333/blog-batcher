@@ -89,12 +89,28 @@ export default function Dashboard() {
     { enabled: !!selectedBusinessId }
   );
 
-  const currentStage = summary?.business?.currentStage ?? 1;
+  const dbStage = summary?.business?.currentStage ?? 1;
+  const statusCounts = summary?.statusCounts;
   const bizName = summary?.business?.name ?? "Your business";
+
+  // Derive effective stage from actual data so the dashboard is always accurate
+  // even if the DB stage number lags behind what the user has actually done.
+  const approvedCount = (statusCounts?.approved ?? 0) + (statusCounts?.scheduled ?? 0) + (statusCounts?.published ?? 0);
+  const publishedCount = (statusCounts?.published ?? 0) + (statusCounts?.scheduled ?? 0);
+  const generatedCount = (statusCounts?.generated ?? 0) + (statusCounts?.pending_approval ?? 0) + approvedCount;
+
+  // Effective stage: take the max of the DB stage and what the data implies
+  const dataImpliedStage = (() => {
+    if (publishedCount > 0) return 6;
+    if (approvedCount > 0) return 5;
+    if (generatedCount > 0) return 4;
+    return dbStage;
+  })();
+  const currentStage = Math.max(dbStage, dataImpliedStage);
 
   /* ── Quick action CTA ── */
   const ctaPath = STAGES[Math.min(currentStage - 1, 5)].path;
-  const ctaLabel = currentStage <= 6 ? `Resume Stage ${currentStage}` : "View Dashboard";
+  const ctaLabel = currentStage >= 6 ? "View Publish & Schedule" : `Resume Stage ${currentStage}`;
 
   /* ── Stage card status ── */
   function stageStatus(id: number) {

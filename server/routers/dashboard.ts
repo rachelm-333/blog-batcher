@@ -124,7 +124,8 @@ export const dashboardRouter = router({
         if (stage === 2) return "/architecture";
         if (stage === 3) return "/keywords";
         if (stage === 4) return "/generate";
-        return "/review";
+        if (stage === 5) return "/review";
+        return "/publish";
       })();
 
       const quickActionLabel = (() => {
@@ -132,7 +133,8 @@ export const dashboardRouter = router({
         if (stage === 2) return "Set Up Blog Architecture";
         if (stage === 3) return "Research Keywords";
         if (stage === 4) return "Generate Articles";
-        return "Review & Publish Articles";
+        if (stage === 5) return "Review & Approve Articles";
+        return "Publish & Schedule Articles";
       })();
 
       return {
