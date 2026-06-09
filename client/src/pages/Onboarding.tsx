@@ -45,6 +45,9 @@ export default function Onboarding() {
   const { data: business, isLoading: bizLoading, refetch } = trpc.business.get.useQuery(undefined, {
     enabled: !!user && !isNewBusiness,
   });
+  // When adding a new business, treat existing business data as null to avoid
+  // stale cache from previous business bleeding into the new business form fields.
+  const bizData = isNewBusiness ? null : business;
 
   // If user already has a business, pre-populate and skip to step 1
   // (only when NOT adding a new business)
@@ -153,8 +156,8 @@ export default function Onboarding() {
         {step === 0 && (
           <Step0Scrape
             businessId={businessId}
-            businessName={business?.name ?? ""}
-            websiteUrl={business?.websiteUrl ?? ""}
+            businessName={isNewBusiness ? "" : (business?.name ?? "")}
+            websiteUrl={isNewBusiness ? "" : (business?.websiteUrl ?? "")}
             onBusinessCreated={handleBusinessCreated}
             onScrapeComplete={handleScrapeComplete}
             onNext={next}
@@ -164,17 +167,17 @@ export default function Onboarding() {
           <Step1BusinessDetails
             businessId={businessId}
             initial={{
-              name: business?.name ?? scrapeData?.name,
-              industry: business?.industry ?? scrapeData?.industry,
-              location: business?.location ?? scrapeData?.location,
-              serviceArea: business?.serviceArea ?? scrapeData?.serviceArea,
-              physicalAddress: business?.physicalAddress ?? undefined,
-              isPhysicalLocation: business?.isPhysicalLocation ?? false,
-              abnBusinessRegistration: business?.abnBusinessRegistration ?? undefined,
+              name: bizData?.name ?? scrapeData?.name,
+              industry: bizData?.industry ?? scrapeData?.industry,
+              location: bizData?.location ?? scrapeData?.location,
+              serviceArea: bizData?.serviceArea ?? scrapeData?.serviceArea,
+              physicalAddress: bizData?.physicalAddress ?? undefined,
+              isPhysicalLocation: bizData?.isPhysicalLocation ?? false,
+              abnBusinessRegistration: bizData?.abnBusinessRegistration ?? undefined,
               uniqueValueProposition:
-                business?.uniqueValueProposition ?? scrapeData?.uniqueValueProposition,
-              keywordExclusions: business?.keywordExclusions ?? undefined,
-              audiences: (business?.audiences ?? scrapeData?.audiences ?? []).map((a: any) => ({
+                bizData?.uniqueValueProposition ?? scrapeData?.uniqueValueProposition,
+              keywordExclusions: bizData?.keywordExclusions ?? undefined,
+              audiences: (bizData?.audiences ?? scrapeData?.audiences ?? []).map((a: any) => ({
                 label: a.label ?? "",
                 description: a.description ?? "",
               })),
@@ -186,7 +189,7 @@ export default function Onboarding() {
         {step === 2 && businessId && (
           <Step2Services
             businessId={businessId}
-            initial={(business?.services ?? scrapeData?.services ?? []).map((s: any) => ({
+            initial={(bizData?.services ?? scrapeData?.services ?? []).map((s: any) => ({
               name: s.name ?? "",
               pageUrl: s.pageUrl ?? "",
             }))}
@@ -198,14 +201,14 @@ export default function Onboarding() {
           <Step3CtaLinks
             businessId={businessId}
             initial={{
-              primaryCtaText: business?.primaryCtaText ?? scrapeData?.primaryCtaText,
-              primaryCtaUrl: business?.primaryCtaUrl ?? scrapeData?.primaryCtaUrl,
-              contactPageUrl: business?.contactPageUrl ?? scrapeData?.contactPageUrl,
-              bookingsPageUrl: business?.bookingsPageUrl ?? scrapeData?.bookingsPageUrl,
+              primaryCtaText: bizData?.primaryCtaText ?? scrapeData?.primaryCtaText,
+              primaryCtaUrl: bizData?.primaryCtaUrl ?? scrapeData?.primaryCtaUrl,
+              contactPageUrl: bizData?.contactPageUrl ?? scrapeData?.contactPageUrl,
+              bookingsPageUrl: bizData?.bookingsPageUrl ?? scrapeData?.bookingsPageUrl,
               testimonialsPageUrl:
-                business?.testimonialsPageUrl ?? scrapeData?.testimonialsPageUrl,
-              shopUrl: business?.shopUrl ?? scrapeData?.shopUrl,
-              otherInternalLinks: (business?.otherInternalLinks as any) ?? undefined,
+                bizData?.testimonialsPageUrl ?? scrapeData?.testimonialsPageUrl,
+              shopUrl: bizData?.shopUrl ?? scrapeData?.shopUrl,
+              otherInternalLinks: (bizData?.otherInternalLinks as any) ?? undefined,
             }}
             onNext={next}
             onBack={back}
@@ -215,14 +218,14 @@ export default function Onboarding() {
           <Step4BrandVoice
             businessId={businessId}
             initial={{
-              primaryArchetype: (business?.brandVoice?.primaryArchetype ?? scrapeData?.brandVoice?.primaryArchetype) ?? undefined,
-              secondaryArchetype: business?.brandVoice?.secondaryArchetype ?? undefined,
-              namedPersona: business?.brandVoice?.namedPersona ?? undefined,
-              formalityLevel: (business?.brandVoice?.formalityLevel ?? scrapeData?.brandVoice?.formalityLevel) ?? undefined,
-              keyPhrases: business?.brandVoice?.keyPhrases as string[] ?? scrapeData?.brandVoice?.keyPhrases ?? [],
-              phrasesToAvoid: business?.brandVoice?.phrasesToAvoid as string[] ?? scrapeData?.brandVoice?.phrasesToAvoid ?? [],
-              styleNotes: business?.brandVoice?.styleNotes ?? scrapeData?.brandVoice?.styleNotes,
-              finalVoiceBrief: business?.brandVoice?.finalVoiceBrief ?? scrapeData?.brandVoice?.finalVoiceBrief,
+              primaryArchetype: (bizData?.brandVoice?.primaryArchetype ?? scrapeData?.brandVoice?.primaryArchetype) ?? undefined,
+              secondaryArchetype: bizData?.brandVoice?.secondaryArchetype ?? undefined,
+              namedPersona: bizData?.brandVoice?.namedPersona ?? undefined,
+              formalityLevel: (bizData?.brandVoice?.formalityLevel ?? scrapeData?.brandVoice?.formalityLevel) ?? undefined,
+              keyPhrases: bizData?.brandVoice?.keyPhrases as string[] ?? scrapeData?.brandVoice?.keyPhrases ?? [],
+              phrasesToAvoid: bizData?.brandVoice?.phrasesToAvoid as string[] ?? scrapeData?.brandVoice?.phrasesToAvoid ?? [],
+              styleNotes: bizData?.brandVoice?.styleNotes ?? scrapeData?.brandVoice?.styleNotes,
+              finalVoiceBrief: bizData?.brandVoice?.finalVoiceBrief ?? scrapeData?.brandVoice?.finalVoiceBrief,
             }}
             onNext={next}
             onBack={back}
@@ -231,7 +234,7 @@ export default function Onboarding() {
         {step === 5 && businessId && (
           <Step5Competitors
             businessId={businessId}
-            initial={(business?.competitors ?? scrapeData?.competitors ?? []).map((c: any) => ({
+            initial={(bizData?.competitors ?? scrapeData?.competitors ?? []).map((c: any) => ({
               name: c.name ?? "",
               websiteUrl: c.websiteUrl ?? "",
               description: c.description ?? "",
@@ -244,8 +247,8 @@ export default function Onboarding() {
           <Step6PublishingPlatform
             businessId={businessId}
             initial={{
-              cmsPlatform: business?.cmsPlatform ?? undefined,
-              wordpressSeoPlugin: business?.wordpressSeoPlugin ?? undefined,
+              cmsPlatform: bizData?.cmsPlatform ?? undefined,
+              wordpressSeoPlugin: bizData?.wordpressSeoPlugin ?? undefined,
             }}
             onNext={next}
             onBack={back}
@@ -255,9 +258,9 @@ export default function Onboarding() {
           <Step7SocialProof
             businessId={businessId}
             initial={{
-              yearsInBusiness: business?.yearsInBusiness,
-              clientsServed: business?.clientsServed,
-              awardsAccreditations: business?.awardsAccreditations,
+              yearsInBusiness: bizData?.yearsInBusiness,
+              clientsServed: bizData?.clientsServed,
+              awardsAccreditations: bizData?.awardsAccreditations,
             }}
             onNext={next}
             onBack={back}
@@ -274,15 +277,15 @@ export default function Onboarding() {
           <Step8Review
             businessId={businessId}
             summary={{
-              name: business?.name,
-              industry: business?.industry ?? undefined,
-              location: business?.location ?? undefined,
-              audienceCount: business?.audiences?.length ?? 0,
-              serviceCount: business?.services?.length ?? 0,
-              competitorCount: business?.competitors?.length ?? 0,
-              hasBrandVoice: !!business?.brandVoice?.finalVoiceBrief,
-              cmsPlatform: business?.cmsPlatform ?? undefined,
-              yearsInBusiness: business?.yearsInBusiness,
+              name: bizData?.name,
+              industry: bizData?.industry ?? undefined,
+              location: bizData?.location ?? undefined,
+              audienceCount: bizData?.audiences?.length ?? 0,
+              serviceCount: bizData?.services?.length ?? 0,
+              competitorCount: bizData?.competitors?.length ?? 0,
+              hasBrandVoice: !!bizData?.brandVoice?.finalVoiceBrief,
+              cmsPlatform: bizData?.cmsPlatform ?? undefined,
+              yearsInBusiness: bizData?.yearsInBusiness,
             }}
             onBack={back}
           />
