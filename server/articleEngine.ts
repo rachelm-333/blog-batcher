@@ -79,6 +79,70 @@ export const BANNED_PHRASES = [
 ] as const;
 
 // ---------------------------------------------------------------------------
+// Keyword matching utilities (module-level, shared by scorer and generation passes)
+// ---------------------------------------------------------------------------
+
+/**
+ * Stop words that carry no semantic weight for keyword presence checks.
+ * Stripping these lets "starting up a business with no money in Australia" and
+ * "start a business in Australia with no money" reduce to the same meaningful
+ * token set: [start, business, money, australia].
+ */
+const KW_STOP_WORDS = new Set([
+  "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+  "of", "with", "by", "from", "up", "about", "into", "through", "during",
+  "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+  "do", "does", "did", "will", "would", "could", "should", "may", "might",
+  "no", "not", "can", "how", "what", "when", "where", "who", "which",
+  "your", "my", "our", "their", "its", "this", "that", "these", "those",
+]);
+
+/** Light suffix-stripping so "starting" matches "start", "businesses" matches "business" */
+function kwStemWord(w: string): string {
+  return w
+    .replace(/ing$/, "")
+    .replace(/tion$/, "")
+    .replace(/es$/, "")
+    .replace(/s$/, "")
+    .replace(/ed$/, "");
+}
+
+/** Extract meaningful (non-stop) tokens from a string with light stemming */
+export function kwMeaningfulTokens(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !KW_STOP_WORDS.has(w))
+    .map(kwStemWord);
+}
+
+/**
+ * Check whether a primary keyword is present in a text string.
+ * Passes if:
+ *   1. Exact phrase match (fast path), OR
+ *   2. All meaningful keyword tokens appear anywhere in the text (any order, any form)
+ *
+ * This handles:
+ *   - Word order differences: "start a business in Australia with no money"
+ *     vs keyword "starting up a business with no money in Australia"
+ *   - Inflection differences: "starting" vs "start", "businesses" vs "business"
+ *   - Minor insertions: "start a small business in Australia"
+ */
+export function kwPresentInText(keyword: string, text: string): boolean {
+  const kw = keyword.toLowerCase();
+  const t = text.toLowerCase().replace(/<[^>]+>/g, " ");
+  // Fast path: exact phrase
+  if (t.includes(kw)) return true;
+  // Token path: all meaningful keyword tokens present anywhere in text
+  const kwTokens = kwMeaningfulTokens(kw);
+  const textTokens = kwMeaningfulTokens(t);
+  return kwTokens.every(kwTok =>
+    textTokens.some(tTok => tTok === kwTok || tTok.startsWith(kwTok) || kwTok.startsWith(tTok))
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Slug generation
 // ---------------------------------------------------------------------------
 
@@ -522,36 +586,29 @@ export function runPass1Scorer(params: {
 
   // Count keyword occurrences in body text (strip tags first)
   const bodyText = bodyHtml.replace(/<[^>]+>/g, " ").toLowerCase();
-  const kwMatches = (bodyText.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+
+  // Convenience wrapper using the module-level kwPresentInText
+  const kwPresent = (text: string) => kwPresentInText(primaryKeyword, text);
+
+  // Count keyword occurrences — use both exact and token-presence per sentence
+  const exactMatches = (bodyText.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+  // Also count sentences/clauses that contain all keyword tokens (for density)
+  const kwMatches = exactMatches > 0 ? exactMatches : (() => {
+    const paras = bodyText.split(/[.!?\n]+/);
+    return paras.filter(p => kwPresent(p)).length;
+  })();
   const kwDensity = wordCount > 0 ? kwMatches / wordCount : 0;
 
-  // Extract first 100 words
-  const first100Words = bodyText.split(/\s+/).slice(0, 100).join(" ");
+  // H1 check (title) — token-presence match
+  const h1Present = kwPresent(titleLower);
 
-  // Helper: check if all keyword words appear in text in order (non-adjacent allowed)
-  function kwWordsInOrder(text: string): boolean {
-    const textLower = text.toLowerCase();
-    if (textLower.includes(kw)) return true; // exact match
-    const kwWords = kw.split(/\s+/);
-    let pos = 0;
-    for (const word of kwWords) {
-      const idx = textLower.indexOf(word, pos);
-      if (idx === -1) return false;
-      pos = idx + word.length;
-    }
-    return true;
-  }
-
-  // H1 check (title) — exact or ordered-words match
-  const h1Present = kwWordsInOrder(titleLower);
-
-  // H2 check — exact or ordered-words match
+  // H2 check — token-presence match on any H2
   const h2Matches = bodyHtml.match(/<h2[^>]*>(.*?)<\/h2>/gi) || [];
-  const kwInH2 = h2Matches.some(h => kwWordsInOrder(h));
+  const kwInH2 = h2Matches.some(h => kwPresent(h));
 
-  // H3 check — exact or ordered-words match
+  // H3 check — token-presence match on any H3 (pass if no H3s exist)
   const h3Matches = bodyHtml.match(/<h3[^>]*>(.*?)<\/h3>/gi) || [];
-  const kwInH3 = h3Matches.length === 0 || h3Matches.some(h => kwWordsInOrder(h));
+  const kwInH3 = h3Matches.length === 0 || h3Matches.some(h => kwPresent(h));
 
   const wc = WORD_COUNT_RULES[level];
 
@@ -564,7 +621,7 @@ export function runPass1Scorer(params: {
     // P5: keyword in first 150 words — use ordered-words check to handle minor word insertions
     p5_keyword_first_100: (() => {
       const first150 = bodyText.split(/\s+/).slice(0, 150).join(" ");
-      return first150.includes(kw) || kwWordsInOrder(first150);
+      return kwPresent(first150);
     })(),
     // P6: all words in the keyword appear in the slug in order (words may have other words between them)
     p6_keyword_in_slug: (() => {
@@ -1329,7 +1386,8 @@ Return ONLY the expanded HTML wrapped in:
     const kwMatches = (bodyTextRaw.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
     const kwDensity = wordCount > 0 ? kwMatches / wordCount : 0;
     const first150 = bodyTextRaw.split(/\s+/).slice(0, 150).join(" ");
-    const kwInFirst150 = first150.includes(kw);
+    // Use token-presence check (not exact match) — handles word order variations
+    const kwInFirst150 = kwPresentInText(kw, first150);
 
     // Inject keyword into the VERY FIRST <p> tag if it doesn't already contain it
     if (!kwInFirst150) {
@@ -1375,18 +1433,8 @@ Return ONLY the expanded HTML wrapped in:
   {
     const kw = ctx.primaryKeyword.toLowerCase();
     const h2Matches = Array.from(bodyHtml.matchAll(/<h2[^>]*>([^<]+)<\/h2>/gi));
-    const kwInH2 = h2Matches.some((m) => {
-      const h2Text = m[1].toLowerCase();
-      // Check ordered-words match (same as P3 scorer)
-      const kwWords = kw.split(/\s+/);
-      let pos = 0;
-      for (const word of kwWords) {
-        const idx = h2Text.indexOf(word, pos);
-        if (idx === -1) return false;
-        pos = idx + word.length;
-      }
-      return true;
-    });
+    // Use token-presence check (same as P3 scorer) — handles word order variations
+    const kwInH2 = h2Matches.some((m) => kwPresentInText(kw, m[1]));
     if (!kwInH2 && h2Matches.length > 0) {
       // Append keyword to the first H2 that doesn't already contain it
       const firstH2 = h2Matches[0];

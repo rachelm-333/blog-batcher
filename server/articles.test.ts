@@ -818,3 +818,101 @@ describe("hasTrailingEmptyHeading", () => {
     expect(hasTrailingEmptyHeading("")).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 11. kwPresentInText — token-presence keyword matching
+// ---------------------------------------------------------------------------
+
+import { kwPresentInText, kwMeaningfulTokens } from "./articleEngine";
+
+describe("kwMeaningfulTokens", () => {
+  it("Strips stop words and returns content words only", () => {
+    const tokens = kwMeaningfulTokens("starting up a business with no money in Australia");
+    expect(tokens).toContain("australia");
+    expect(tokens).toContain("money");
+    expect(tokens).toContain("start"); // "starting" → strip "ing" → "start"
+    // "business" → strip "es" → "busines" (the actual stemmed form)
+    expect(tokens.some(t => t.startsWith("busin"))).toBe(true);
+    expect(tokens).not.toContain("a");
+    expect(tokens).not.toContain("in");
+    expect(tokens).not.toContain("with");
+  });
+
+  it("Applies light stemming: 'starting' → 'start'", () => {
+    const tokens = kwMeaningfulTokens("starting a business");
+    // "starting" → strip "ing" → "start"
+    expect(tokens).toContain("start");
+  });
+
+  it("Applies light stemming: 'businesses' → 'busines'", () => {
+    const tokens = kwMeaningfulTokens("businesses in Australia");
+    // "businesses" → strip "es" → "busines" (strip 'es' suffix)
+    const joined = tokens.join(" ");
+    expect(joined).toContain("busines");
+  });
+});
+
+describe("kwPresentInText — the real-world failing case from Rachie's screenshot", () => {
+  const keyword = "starting up a business with no money in Australia";
+
+  it("Passes for exact phrase match", () => {
+    expect(kwPresentInText(keyword, "starting up a business with no money in Australia")).toBe(true);
+  });
+
+  it("Passes for the article's actual opening sentence (word order differs)", () => {
+    const text = "You can start a business in Australia with no money. While it presents unique challenges, many successful ventures begin with minimal capital.";
+    expect(kwPresentInText(keyword, text)).toBe(true);
+  });
+
+  it("Passes for the H1 title 'Can you start a business in Australia with no money?'", () => {
+    expect(kwPresentInText(keyword, "Can you start a business in Australia with no money?")).toBe(true);
+  });
+
+  it("Passes when keyword words are in different order", () => {
+    expect(kwPresentInText(keyword, "How to start a business in Australia without money")).toBe(true);
+  });
+
+  it("Passes for inflected form: 'started a business in Australia with no money'", () => {
+    expect(kwPresentInText(keyword, "started a business in Australia with no money")).toBe(true);
+  });
+
+  it("Fails when a key content word is missing (e.g. 'Australia' absent)", () => {
+    expect(kwPresentInText(keyword, "You can start a business with no money")).toBe(false);
+  });
+
+  it("Fails when 'business' is completely absent", () => {
+    expect(kwPresentInText(keyword, "You can start something in Australia with no money")).toBe(false);
+  });
+});
+
+describe("kwPresentInText — Pass 1 scorer integration", () => {
+  const keyword = "starting up a business with no money in Australia";
+
+  it("P2 H1: passes for title 'Starting Up a Business with No Money in Australia: The Smart Founder's Guide'", () => {
+    expect(kwPresentInText(keyword, "Starting Up a Business with No Money in Australia: The Smart Founder's Guide")).toBe(true);
+  });
+
+  it("P3 H2: passes for H2 that contains all keyword tokens including 'money'", () => {
+    // A good H2 for this keyword must reference money/cost/no-money
+    expect(kwPresentInText(keyword, "How to Start a Business in Australia with No Money")).toBe(true);
+  });
+
+  it("P3 H2: correctly fails for H2 missing 'money' (e.g. 'Minimal Capital' is not the same)", () => {
+    // 'Minimal Capital' does not contain 'money' token — correct to fail
+    expect(kwPresentInText(keyword, "How to Start a Business in Australia with Minimal Capital")).toBe(false);
+  });
+
+  it("P5 first 150 words: passes when keyword tokens appear in first paragraph", () => {
+    const first150 = "Can you start a business in Australia with no money? Yes, absolutely. You can start a business in Australia with no money. While it presents unique challenges, many successful ventures begin with minimal capital. They do this by focusing on service-based models using existing skills and strategically bootstrapping to grow organically.";
+    expect(kwPresentInText(keyword, first150)).toBe(true);
+  });
+
+  it("P7 meta title: passes for 'Starting Up a Business with No Money in Aust...'", () => {
+    expect(kwPresentInText(keyword, "Starting Up a Business with No Money in Aust...")).toBe(true);
+  });
+
+  it("P8 meta description: passes for description containing keyword tokens", () => {
+    const desc = "Dreaming of starting up a business with no money in Australia? Discover actionable strategies and resources to launch your venture without breaking the bank.";
+    expect(kwPresentInText(keyword, desc)).toBe(true);
+  });
+});

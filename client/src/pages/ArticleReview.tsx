@@ -136,70 +136,72 @@ function computePass1Checks(params: {
   const bodyLower = bodyHtml.toLowerCase();
   const titleLower = title.toLowerCase();
 
-  // Keyword occurrence count
-  const kwEscaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const kwMatches = (bodyText.match(new RegExp(kwEscaped, "g")) || []).length;
-  const kwDensity = wordCount > 0 ? kwMatches / wordCount : 0;
-
-  function kwWordsInOrder(text: string): boolean {
-    const t = text.toLowerCase();
-    if (t.includes(kw)) return true;
-    const kwWords = kw.split(/\s+/);
-    let pos = 0;
-    for (const word of kwWords) {
-      const idx = t.indexOf(word, pos);
-      if (idx === -1) return false;
-      pos = idx + word.length;
-    }
-    return true;
+  // ---------------------------------------------------------------------------
+  // Keyword matching helpers (mirrors server-side kwPresentInText logic)
+  // Handles word order differences, inflection, and minor insertions.
+  // e.g. keyword "starting up a business with no money in Australia" correctly
+  // matches "start a business in Australia with no money" in the article.
+  // ---------------------------------------------------------------------------
+  const KW_STOP = new Set([
+    "a","an","the","and","or","but","in","on","at","to","for","of","with",
+    "by","from","up","about","into","through","during","is","are","was",
+    "were","be","been","being","have","has","had","do","does","did","will",
+    "would","could","should","may","might","no","not","can","how","what",
+    "when","where","who","which","your","my","our","their","its","this",
+    "that","these","those",
+  ]);
+  function kwStem(w: string) {
+    return w.replace(/ing$/,"").replace(/tion$/,"").replace(/es$/,"").replace(/s$/,"").replace(/ed$/,"");
+  }
+  function kwTokens(text: string): string[] {
+    return text.toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/)
+      .filter(w => w.length > 2 && !KW_STOP.has(w)).map(kwStem);
+  }
+  const primaryKwTokens = kwTokens(kw);
+  function kwPresent(text: string): boolean {
+    const t = text.toLowerCase().replace(/<[^>]+>/g, " ");
+    if (t.includes(kw)) return true; // fast path: exact match
+    const textToks = kwTokens(t);
+    return primaryKwTokens.every(kt => textToks.some(tt => tt === kt || tt.startsWith(kt) || kt.startsWith(tt)));
   }
 
+  // Keyword occurrence count
+  const kwEscaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const exactMatches = (bodyText.match(new RegExp(kwEscaped, "g")) || []).length;
+  const kwMatches = exactMatches > 0 ? exactMatches : bodyText.split(/[.!?\n]+/).filter(s => kwPresent(s)).length;
+  const kwDensity = wordCount > 0 ? kwMatches / wordCount : 0;
+
   // H1 (title)
-  const h1Present = kwWordsInOrder(titleLower);
+  const h1Present = kwPresent(titleLower);
 
   // H2
   const h2Matches = bodyHtml.match(/<h2[^>]*>(.*?)<\/h2>/gi) || [];
-  const kwInH2 = h2Matches.some(h => kwWordsInOrder(h));
+  const kwInH2 = h2Matches.some(h => kwPresent(h));
 
   // H3
   const h3Matches = bodyHtml.match(/<h3[^>]*>(.*?)<\/h3>/gi) || [];
-  const kwInH3 = h3Matches.length === 0 || h3Matches.some(h => kwWordsInOrder(h));
+  const kwInH3 = h3Matches.length === 0 || h3Matches.some(h => kwPresent(h));
 
   // First 150 words
   const first150 = bodyText.split(/\s+/).slice(0, 150).join(" ");
-  const kwInFirst100 = first150.includes(kw) || kwWordsInOrder(first150);
+  const kwInFirst100 = kwPresent(first150);
 
   // Slug
   const slugLower = urlSlug.toLowerCase();
   const kwInSlug = (() => {
     if (slugLower.includes(kw.replace(/\s+/g, "-"))) return true;
-    const kwWords = kw.split(/\s+/);
-    let pos = 0;
-    for (const word of kwWords) {
-      const idx = slugLower.indexOf(word, pos);
-      if (idx === -1) return false;
-      pos = idx + word.length;
-    }
-    return true;
+    // All keyword tokens present in slug
+    return primaryKwTokens.every(kt => slugLower.includes(kt));
   })();
 
   // Meta title
-  const metaTitleOk = metaTitle.toLowerCase().includes(kw) && metaTitle.length <= 60;
+  const metaTitleOk = kwPresent(metaTitle) && metaTitle.length <= 60;
 
   // Meta description
   const metaDescOk = (() => {
-    const descLower = metaDescription.toLowerCase();
     const inRange = metaDescription.length >= 140 && metaDescription.length <= 160;
     if (!inRange) return false;
-    if (descLower.includes(kw)) return true;
-    const kwWords = kw.split(/\s+/);
-    let pos = 0;
-    for (const word of kwWords) {
-      const idx = descLower.indexOf(word, pos);
-      if (idx === -1) return false;
-      pos = idx + word.length;
-    }
-    return true;
+    return kwPresent(metaDescription);
   })();
 
   // Opening answer
