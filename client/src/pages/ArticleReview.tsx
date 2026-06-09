@@ -424,39 +424,56 @@ function LevelLabel({ level }: { level: "cornerstone" | "pillar" | "cluster" }) 
   );
 }
 
-function ScoreBadgePanel({ badge, liveChecks }: { badge: StatusBadge; liveChecks?: Pass1Checks | null }) {
-  const passCount = liveChecks ? Object.values(liveChecks).filter(Boolean).length : null;
+// Publish-readiness threshold: 14+ out of 16 is SEO-optimised and ready to publish.
+// Only show warnings (orange) below 12. 12-13 is a soft info note. 14+ is green.
+const PUBLISH_READY_THRESHOLD = 14;
+const WARN_THRESHOLD = 12;
 
-  if (badge === "authority_ready") {
+function ScoreBadgePanel({ liveChecks }: { badge?: StatusBadge; liveChecks?: Pass1Checks | null }) {
+  const passCount = liveChecks ? Object.values(liveChecks).filter(Boolean).length : null;
+  const score = passCount ?? 0;
+
+  // Checks that are genuinely failing (not just "no H3 headings" which auto-passes)
+  const failingChecks = liveChecks
+    ? (Object.keys(liveChecks) as (keyof Pass1Checks)[]).filter(k => !liveChecks[k])
+    : [];
+
+  // 14+ = Ready to Publish (green) — no warnings, no list of failing checks
+  if (score >= PUBLISH_READY_THRESHOLD) {
+    const label = score === 16 ? "Perfect Score" : score === 15 ? "Authority Ready" : "Ready to Publish";
+    const emoji = score === 16 ? "✨" : "✅";
     return (
       <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
-        <div className="text-2xl">✅</div>
+        <div className="text-xl">{emoji}</div>
         <div>
-          <div className="text-sm font-bold text-emerald-400">Authority Ready — {passCount ?? 16}/16</div>
-          <div className="text-xs text-emerald-500">All 16 points met. Publish with confidence.</div>
+          <div className="text-sm font-bold text-emerald-400">{label} — {score}/16</div>
+          <div className="text-xs text-emerald-600">
+            {score === 16
+              ? "All 16 SEO checks passed. Publish with confidence."
+              : "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards."
+            }
+          </div>
         </div>
       </div>
     );
   }
-  if (badge === "strong") {
-    const failingChecks = liveChecks
-      ? (Object.keys(liveChecks) as (keyof Pass1Checks)[]).filter(k => !liveChecks[k])
-      : [];
+
+  // 12–13 = Soft info note (neutral blue/slate, no hazard icon)
+  if (score >= WARN_THRESHOLD) {
     return (
-      <div className="rounded-lg bg-primary/10 border border-primary/30 p-3">
+      <div className="rounded-lg bg-slate-500/10 border border-slate-500/20 p-3">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-lg">⚡</span>
+          <span className="text-base">📌</span>
           <div>
-            <div className="text-sm font-bold text-primary">Strong — {passCount ?? "?"}/16</div>
-            <div className="text-xs text-primary">Below the 15-point threshold. Fix the failing checks to qualify.</div>
+            <div className="text-sm font-semibold text-slate-300">Good — {score}/16</div>
+            <div className="text-xs text-slate-400">A few optional improvements available.</div>
           </div>
         </div>
         {failingChecks.length > 0 && (
           <div className="mt-2 flex flex-col gap-1">
-            <div className="text-xs font-semibold text-primary/80 mb-1">Failing checks ({failingChecks.length}):</div>
             {failingChecks.map(k => (
-              <div key={k} className="flex items-start gap-1.5 text-xs text-primary/70">
-                <span className="mt-0.5 shrink-0">✗</span>
+              <div key={k} className="flex items-start gap-1.5 text-xs text-slate-400">
+                <span className="mt-0.5 shrink-0">◦</span>
                 <span>{PASS1_CHECK_LABELS[k]}</span>
               </div>
             ))}
@@ -465,34 +482,30 @@ function ScoreBadgePanel({ badge, liveChecks }: { badge: StatusBadge; liveChecks
       </div>
     );
   }
-  if (badge === "needs_review") {
-    const failingChecks = liveChecks
-      ? (Object.keys(liveChecks) as (keyof Pass1Checks)[]).filter(k => !liveChecks[k])
-      : [];
-    return (
-      <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-lg">⚠️</span>
-          <div>
-            <div className="text-sm font-bold text-amber-400">Needs Review — {passCount ?? "?"}/16</div>
-            <div className="text-xs text-amber-500">Fix the failing checks below to reach the 15-point threshold.</div>
-          </div>
+
+  // Below 12 = Needs attention (orange — only here)
+  return (
+    <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-base">⚠️</span>
+        <div>
+          <div className="text-sm font-bold text-amber-400">Needs Attention — {score}/16</div>
+          <div className="text-xs text-amber-500">Below the 12-point minimum. Review the items below.</div>
         </div>
-        {failingChecks.length > 0 && (
-          <div className="mt-2 flex flex-col gap-1">
-            <div className="text-xs font-semibold text-amber-400 mb-1">Points to fix:</div>
-            {failingChecks.map(k => (
-              <div key={k} className="flex items-start gap-1.5 text-xs text-amber-600">
-                <span className="mt-0.5 shrink-0">✗</span>
-                <span>{PASS1_CHECK_LABELS[k]}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
-    );
-  }
-  return null;
+      {failingChecks.length > 0 && (
+        <div className="mt-2 flex flex-col gap-1">
+          <div className="text-xs font-semibold text-amber-400 mb-1">To improve:</div>
+          {failingChecks.map(k => (
+            <div key={k} className="flex items-start gap-1.5 text-xs text-amber-600">
+              <span className="mt-0.5 shrink-0">✗</span>
+              <span>{PASS1_CHECK_LABELS[k]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -786,10 +799,12 @@ export default function ArticleReview() {
   const livePassCount = liveChecks ? Object.values(liveChecks).filter(Boolean).length : null;
   const liveTotalChecks = 16;
 
-  // Helper: does a field have a failing check?
-  // Works for all states including approved so users can see what to fix.
+  // Helper: does a field have a failing check AND the overall score is below the publish threshold?
+  // Only triggers amber/warning styling when the article genuinely needs attention (score < 14).
+  // At 14+ the article is SEO-ready; individual check failures are not surfaced as warnings.
   function fieldFailing(field: keyof typeof FIELD_CHECK_MAP): boolean {
     if (!liveChecks) return false;
+    if ((livePassCount ?? 0) >= PUBLISH_READY_THRESHOLD) return false; // 14+ = no field warnings
     return FIELD_CHECK_MAP[field].some(key => !liveChecks[key]);
   }
 
@@ -1200,27 +1215,8 @@ export default function ArticleReview() {
 
             {/* ── SEO Panel ───────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
-              {/* Score badge — derived from live check count, not stale stored value */}
-              <ScoreBadgePanel
-                badge={
-                  liveChecks
-                    ? livePassCount === liveTotalChecks
-                      ? "authority_ready"
-                      : livePassCount !== null && livePassCount >= 15
-                      ? "strong"
-                      : "needs_review"
-                    : (selectedItem.statusBadge as StatusBadge)
-                }
-                liveChecks={liveChecks}
-              />
-
-              {/* Live SEO check counter — compact sub-line inside badge panel, no duplicate banner */}
-
-              {/* Over-editing warning */}
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-400">
-                <AlertTriangle className="inline h-3 w-3 mr-1" />
-                Over-editing keyword placement can reduce your ranking potential. We recommend publishing as-is.
-              </div>
+              {/* Score badge — derived from live check count */}
+              <ScoreBadgePanel liveChecks={liveChecks} />
 
               {/* URL Slug */}
               <div className="space-y-1">
