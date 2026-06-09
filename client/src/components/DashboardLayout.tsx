@@ -62,7 +62,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [selectedBizId, setSelectedBizId] = useState<number | null>(null);
   const bizDropRef = useRef<HTMLDivElement>(null);
 
-  const { data: businesses } = trpc.business.listAll.useQuery(undefined, { retry: false });
+  const { data: businesses, refetch: refetchBusinesses } = trpc.business.listAll.useQuery(undefined, { retry: false });
+  const deleteBusiness = trpc.business.delete.useMutation({
+    onSuccess: () => { void refetchBusinesses(); },
+  });
+  const [deletingBizId, setDeletingBizId] = useState<number | null>(null);
   const activeBiz = businesses?.find(b => b.id === selectedBizId) ?? businesses?.[0];
   const { data: summary } = trpc.dashboard.getSummary.useQuery(
     { businessId: activeBiz?.id ?? 0 },
@@ -145,6 +149,25 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     </div>
                     <span className="flex-1 truncate">{biz.name}</span>
                     {biz.id === activeBiz?.id && <span style={{ fontSize: 10, color: "#6e5afe" }}>✓</span>}
+                    {biz.id !== activeBiz?.id && (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (!confirm(`Delete "${biz.name}"? This cannot be undone.`)) return;
+                          setDeletingBizId(biz.id);
+                          deleteBusiness.mutate({ businessId: biz.id }, {
+                            onError: (err) => { alert(err.message); setDeletingBizId(null); },
+                            onSettled: () => setDeletingBizId(null),
+                          });
+                        }}
+                        title="Delete this business"
+                        style={{ color: deletingBizId === biz.id ? "#9ca3af" : "#ef4444", padding: "2px", borderRadius: "3px", lineHeight: 1 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "#fee2e2"}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}
+                      >
+                        <span style={{ fontSize: 11 }}>{deletingBizId === biz.id ? "…" : "✕"}</span>
+                      </button>
+                    )}
                   </button>
                 ))}
                 <div style={{ borderTop: "1px solid #e5e7eb" }}>

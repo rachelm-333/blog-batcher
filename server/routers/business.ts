@@ -18,6 +18,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
+  articles,
   brandVoice,
   businessAudiences,
   businessCompetitors,
@@ -639,5 +640,40 @@ Rules:
         );
 
       return { success: true, nextStage };
+    }),
+
+  /**
+   * Delete a business. Only allowed if the business has zero articles
+   * (safety guard to prevent accidental data loss).
+   */
+  delete: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertOwnership(ctx.user.id, input.businessId);
+
+      // Safety: refuse if there are any articles attached
+      const articleRows = await db
+        .select({ id: articles.id })
+        .from(articles)
+        .where(eq(articles.businessId, input.businessId));
+
+      if (articleRows.length > 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Cannot delete a business that has ${articleRows.length} article(s). Delete the articles first or contact support.`,
+        });
+      }
+
+      // Delete related records first (FK order)
+      await db.delete(businessAudiences).where(eq(businessAudiences.businessId, input.businessId));
+      await db.delete(businessServices).where(eq(businessServices.businessId, input.businessId));
+      await db.delete(businessCompetitors).where(eq(businessCompetitors.businessId, input.businessId));
+      await db.delete(businessExistingContent).where(eq(businessExistingContent.businessId, input.businessId));
+      await db.delete(brandVoice).where(eq(brandVoice.businessId, input.businessId));
+      await db.delete(businesses).where(eq(businesses.id, input.businessId));
+
+      return { success: true };
     }),
 });
