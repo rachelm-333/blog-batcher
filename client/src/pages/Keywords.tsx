@@ -214,6 +214,21 @@ export default function Keywords() {
     { businessId },
     { enabled: !!businessId }
   );
+  const { data: archData } = trpc.architecture.getOrCreate.useQuery(
+    { businessId },
+    { enabled: !!businessId }
+  );
+
+  // Detect architecture mismatch: article nodes don't match current config
+  const expectedArticleCount = archData?.architecture
+    ? (() => {
+        const a = archData.architecture;
+        const clusters = (a as { clustersPerPillar?: number }).clustersPerPillar ?? 3;
+        return a.cornerstoneCount + a.cornerstoneCount * a.pillarCount + a.cornerstoneCount * a.pillarCount * clusters;
+      })()
+    : null;
+  const actualArticleCount = kwData?.length ?? null;
+  const architectureMismatch = expectedArticleCount !== null && actualArticleCount !== null && actualArticleCount > 0 && expectedArticleCount !== actualArticleCount;
 
   // Auto-advance sub-stage based on data
   useMemo(() => {
@@ -224,6 +239,15 @@ export default function Keywords() {
     if (allKwApproved) { setSubStage("paa-review"); return; }
     if (kwData.some(k => k.primaryKeyword)) setSubStage("keyword-review");
   }, [kwData]);
+
+  const rebuildNodesMutation = trpc.architecture.rebuildNodes.useMutation({
+    onSuccess: async (data) => {
+      toast.success(`Rebuilt ${data.rebuilt} article slots from current architecture`);
+      await utils.keywords.getAll.invalidate({ businessId });
+      setSubStage("assign");
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   const assignMutation = trpc.keywords.assignAll.useMutation({
     onSuccess: async (data) => {
@@ -347,6 +371,34 @@ export default function Keywords() {
   /* ── Keyword Review sub-stage ── */
   const renderKeywordReview = () => (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {/* Architecture mismatch warning */}
+      {architectureMismatch && (
+        <div style={{ background:"#fef2f2", border:"1.5px solid #fca5a5", borderRadius:10, padding:"14px 18px", display:"flex", gap:12, alignItems:"flex-start" }}>
+          <AlertTriangle style={{ width:18, height:18, color:"#dc2626", flexShrink:0, marginTop:1 }} />
+          <div style={{ flex:1 }}>
+            <p style={{ fontSize:13, fontWeight:700, color:"#991b1b", margin:"0 0 4px" }}>Article count mismatch</p>
+            <p style={{ fontSize:12, color:"#7f1d1d", margin:"0 0 10px", lineHeight:1.6 }}>
+              Your architecture is set to <strong>{expectedArticleCount} articles</strong> but there are currently <strong>{actualArticleCount} keyword slots</strong>.
+              This happens when you change the architecture after keywords were already assigned.
+              Rebuild to sync the article slots with your current architecture, then re-assign keywords.
+            </p>
+            <button
+              className="btn-primary"
+              style={{ background:"#dc2626", fontSize:12, padding:"6px 14px" }}
+              onClick={() => {
+                if (window.confirm(`Rebuild article slots from current architecture (${expectedArticleCount} articles)? This will clear all existing keywords and you'll need to re-assign them.`)) {
+                  rebuildNodesMutation.mutate({ businessId });
+                }
+              }}
+              disabled={rebuildNodesMutation.isPending}
+            >
+              {rebuildNodesMutation.isPending
+                ? <><Loader2 style={{ width:12, height:12 }} className="animate-spin" /> Rebuilding…</>
+                : <><RefreshCw style={{ width:12, height:12 }} /> Rebuild {expectedArticleCount} article slots</>}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Cannibalization warning */}
       {cannibalizationConflicts.length > 0 && (
         <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"12px 16px", display:"flex", gap:10 }}>

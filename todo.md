@@ -910,3 +910,8 @@
 - [x] Update server architecture.ts to use initDefault and pass clustersPerPillar to update
 - [x] Live count cards update as all three sliders are dragged
 - [x] Architecture summary sentence shows full equation
+
+## Keywords Page Fixes (Jun 10 2026)
+- [ ] Fix article count mismatch — keyword assignment generating more articles than architecture config
+- [ ] Fix missing MSV/Competition metrics in keyword list (showing dashes instead of real data)
+- [ ] Add ability to revisit and change keyword selections after initial assignment

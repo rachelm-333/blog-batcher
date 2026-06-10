@@ -383,6 +383,42 @@ export const architectureRouter = router({
     }),
 
   // -------------------------------------------------------------------------
+  // REBUILD NODES — force-regenerate article nodes from current architecture
+  // config even when confirmed. Used when user changes architecture after
+  // keyword assignment (e.g., changed cornerstones/pillars/clusters).
+  // -------------------------------------------------------------------------
+  rebuildNodes: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const existing = await db
+        .select()
+        .from(blogArchitectures)
+        .where(eq(blogArchitectures.businessId, input.businessId))
+        .limit(1);
+      if (!existing.length) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No architecture found." });
+      }
+      const arch = existing[0];
+      const clusters = arch.clustersPerPillar ?? DEFAULT_CLUSTERS_PER_PILLAR;
+      const total = calcTotalArticles(arch.cornerstoneCount, arch.pillarCount, clusters);
+      // Update total count
+      await db
+        .update(blogArchitectures)
+        .set({ totalArticleCount: total })
+        .where(eq(blogArchitectures.id, arch.id));
+      // Regenerate nodes (deletes old ones)
+      await regenerateNodes(db, arch.id, input.businessId, arch.cornerstoneCount, arch.pillarCount, clusters);
+      const nodes = await db
+        .select()
+        .from(articleNodes)
+        .where(eq(articleNodes.architectureId, arch.id));
+      return { rebuilt: nodes.length, total };
+    }),
+
+  // -------------------------------------------------------------------------
   // SET ARTICLE TYPE — update the article type for a single pillar node.
   // -------------------------------------------------------------------------
   setArticleType: protectedProcedure

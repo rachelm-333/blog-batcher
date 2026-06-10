@@ -248,17 +248,25 @@ export const keywordsRouter = router({
       let dfsData: Map<string, { msv: number | null; comp: "high" | "medium" | "low" | null }> = new Map();
 
       if (seedRows.length > 0 && process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
-        for (const seed of seedRows) {
-          try {
-            const suggestions = await getKeywordSuggestions(seed.keyword, 2036, "en", 20);
-            keywordPool.push({ keyword: seed.keyword, msv: null, competition: null });
-            for (const s of suggestions) {
+        // Send ALL seeds in a single combined request — much better results than per-seed calls
+        const seedTerms = seedRows.map((s) => s.keyword);
+        try {
+          const suggestions = await getKeywordSuggestions(seedTerms, 2036, "en", 100);
+          // Add seeds themselves (MSV will be enriched in Step C if not in suggestions)
+          for (const seed of seedTerms) {
+            keywordPool.push({ keyword: seed, msv: null, competition: null });
+          }
+          // Add all suggestions with real MSV data
+          for (const s of suggestions) {
+            if (s.monthlySearchVolume !== null) {
               keywordPool.push({ keyword: s.keyword, msv: s.monthlySearchVolume, competition: s.competitionLevel });
               dfsData.set(s.keyword, { msv: s.monthlySearchVolume, comp: s.competitionLevel });
             }
-          } catch (err) {
-            console.warn(`[Keywords] Pool build failed for seed "${seed.keyword}":`, err);
-            keywordPool.push({ keyword: seed.keyword, msv: null, competition: null });
+          }
+        } catch (err) {
+          console.warn(`[Keywords] Combined pool build failed:`, err);
+          for (const seed of seedTerms) {
+            keywordPool.push({ keyword: seed, msv: null, competition: null });
           }
         }
         // Deduplicate
@@ -269,9 +277,9 @@ export const keywordsRouter = router({
           seen.add(k);
           return true;
         });
-        // Sort by MSV descending
+        // Sort by MSV descending so Claude picks high-value keywords first
         keywordPool.sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
-        console.log(`[Keywords] Built pool of ${keywordPool.length} keywords from ${seedRows.length} seeds`);
+        console.log(`[Keywords] Built pool of ${keywordPool.length} keywords from ${seedTerms.length} seeds (combined request)`);
       }
 
       // ── Step B: Claude assigns one keyword per article slot ───────────────────
