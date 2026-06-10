@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -41,10 +42,32 @@ export default function Onboarding() {
   const [scrapeData, setScrapeData] = useState<any>(null);
 
   const utils = trpc.useUtils();
-  // When adding a new business, skip loading the existing business to avoid redirect
-  const { data: business, isLoading: bizLoading, refetch } = trpc.business.get.useQuery(undefined, {
-    enabled: !!user && !isNewBusiness,
+
+  // Get the currently selected business from context
+  const { selectedBizId, activeBusiness: contextBusiness } = useActiveBusiness();
+
+  // In edit mode, load the selected business by ID (respects business switcher)
+  // In new-business mode, skip loading to avoid stale cache
+  // In first-time onboarding, use business.get (no businessId yet)
+  const editBizId = isEditMode && selectedBizId ? selectedBizId : null;
+
+  const { data: businessById, isLoading: bizByIdLoading } = trpc.business.getById.useQuery(
+    { businessId: editBizId! },
+    { enabled: !!editBizId && !!user }
+  );
+
+  // For first-time onboarding (no edit mode, no new mode), still use business.get
+  const { data: businessGet, isLoading: bizGetLoading, refetch: refetchGet } = trpc.business.get.useQuery(undefined, {
+    enabled: !!user && !isNewBusiness && !isEditMode,
   });
+
+  // Determine which business data to use
+  const business = isEditMode ? businessById : businessGet;
+  const bizLoading = isEditMode ? bizByIdLoading : bizGetLoading;
+  const refetch = isEditMode
+    ? async () => { await utils.business.getById.invalidate({ businessId: editBizId! }); }
+    : async () => { await refetchGet(); };
+
   // When adding a new business, treat existing business data as null to avoid
   // stale cache from previous business bleeding into the new business form fields.
   const bizData = isNewBusiness ? null : business;

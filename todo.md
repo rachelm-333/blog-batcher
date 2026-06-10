@@ -887,3 +887,8 @@
 - [x] hasTrailingEmptyHeading() utility — detects truncation signature (empty last heading) as safety net
 - [x] Schema markup generated in a separate small LLM call
 - [x] 358 tests pass (22 new tests covering buildOutlinePrompt, buildSectionPrompt, hasTrailingEmptyHeading)
+
+## Business Profile Edit Mode Fix (Jun 2026)
+- [x] Onboarding.tsx: use business.getById(selectedBizId) in edit mode instead of business.get (which always returned first business)
+- [x] DashboardLayout: Business Profile sidebar link now navigates to /onboarding?edit=1 when stage 1 is complete
+- [x] BusinessContext migration: all pages (Architecture, Keywords, ArticleReview, PublishSchedule, Integrations, ScheduleManagement) use useActiveBusiness() hook

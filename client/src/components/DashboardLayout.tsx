@@ -221,7 +221,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             return (
               <button
                 key={item.path}
-                onClick={() => !stageLocked && setLocation(item.path)}
+                onClick={() => {
+                  if (stageLocked) return;
+                  // Business Profile: go to edit mode when stage 1 is already complete
+                  if (item.stage === 1 && isStageComplete(1)) {
+                    setLocation("/onboarding?edit=1");
+                  } else {
+                    setLocation(item.path);
+                  }
+                }}
                 className="w-full flex items-center gap-2 px-2 py-2 rounded-md mb-0.5 text-left transition-colors"
                 style={{
                   background: active ? "#ede9ff" : "transparent",
