@@ -59,7 +59,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [bizDropOpen, setBizDropOpen] = useState(false);
-  const [selectedBizId, setSelectedBizId] = useState<number | null>(null);
+  const [selectedBizId, setSelectedBizId] = useState<number | null>(() => {
+    const stored = localStorage.getItem("bb_selected_biz_id");
+    return stored ? parseInt(stored, 10) : null;
+  });
   const bizDropRef = useRef<HTMLDivElement>(null);
 
   const { data: businesses, refetch: refetchBusinesses } = trpc.business.listAll.useQuery(undefined, { retry: false });
@@ -75,7 +78,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const credits = summary?.creditBalance ?? 0;
 
   useEffect(() => {
-    if (businesses?.length && !selectedBizId) {
+    if (!businesses?.length) return;
+    const stored = localStorage.getItem("bb_selected_biz_id");
+    const storedId = stored ? parseInt(stored, 10) : null;
+    // If stored ID exists and is valid for this user, use it; otherwise default to first
+    if (storedId && businesses.some(b => b.id === storedId)) {
+      if (!selectedBizId) setSelectedBizId(storedId);
+    } else if (!selectedBizId) {
       setSelectedBizId(businesses[0].id);
     }
   }, [businesses, selectedBizId]);
@@ -155,7 +164,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 {businesses?.map(biz => (
                   <button
                     key={biz.id}
-                    onClick={() => { setSelectedBizId(biz.id); setBizDropOpen(false); }}
+                    onClick={() => {
+                      setSelectedBizId(biz.id);
+                      localStorage.setItem("bb_selected_biz_id", String(biz.id));
+                      setBizDropOpen(false);
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                     style={{
                       background: biz.id === activeBiz?.id ? "#ede9ff" : "transparent",
