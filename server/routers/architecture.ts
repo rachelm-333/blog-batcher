@@ -14,8 +14,10 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
   articleNodes,
+  articles,
   blogArchitectures,
   businesses,
+  keywords,
 } from "../../drizzle/schema";
 import {
   ARTICLE_TYPES,
@@ -62,7 +64,23 @@ async function regenerateNodes(
   pillarsPerCornerstone: number,
   clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
 ) {
-  // Delete existing nodes
+  // Delete child rows first (foreign key constraints: articles → keywords → article_nodes)
+  const existingNodes = await db
+    .select({ id: articleNodes.id })
+    .from(articleNodes)
+    .where(eq(articleNodes.architectureId, architectureId));
+  const nodeIds = existingNodes.map((n) => n.id);
+  if (nodeIds.length > 0) {
+    // Delete articles referencing these nodes
+    for (const nodeId of nodeIds) {
+      await db.delete(articles).where(eq(articles.articleNodeId, nodeId));
+    }
+    // Delete keywords referencing these nodes
+    for (const nodeId of nodeIds) {
+      await db.delete(keywords).where(eq(keywords.articleNodeId, nodeId));
+    }
+  }
+  // Now safe to delete the nodes themselves
   await db
     .delete(articleNodes)
     .where(eq(articleNodes.architectureId, architectureId));

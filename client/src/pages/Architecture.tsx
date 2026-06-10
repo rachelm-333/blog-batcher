@@ -298,12 +298,9 @@ function SliderRow({
 }) {
   return (
     <div className="space-y-1.5">
-      <div className="flex justify-between items-start">
-        <div>
-          <span className="text-sm font-medium text-foreground">{label}</span>
-          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-        </div>
-        <span className={`text-lg font-bold tabular-nums ${colour}`}>{value}</span>
+      <div>
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
       </div>
       <Slider
         min={min}
@@ -314,9 +311,10 @@ function SliderRow({
         disabled={disabled}
         className="w-full"
       />
-      <div className="flex justify-between text-xs text-muted-foreground/60">
-        <span>{min}</span>
-        <span>{max}</span>
+      <div className="flex justify-between text-xs text-muted-foreground/50 px-0.5">
+        {Array.from({ length: max - min + 1 }, (_, i) => (
+          <span key={i}>{min + i}</span>
+        ))}
       </div>
     </div>
   );
