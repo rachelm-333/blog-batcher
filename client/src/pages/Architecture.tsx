@@ -228,14 +228,14 @@ export default function Architecture() {
     return validateArchitecture(arch.packSize as PackSize, localCornerstones, localPillars);
   }, [arch?.packSize, localCornerstones, localPillars]);
 
+  // Always show what the user has the sliders set to (raw values), not the guardrail-corrected values
   const liveBreakdown = useMemo(
-    () =>
-      calcBreakdown(
-        liveGuardrail?.correctedCornerstones ?? localCornerstones,
-        liveGuardrail?.correctedPillarsPerCornerstone ?? localPillars
-      ),
-    [liveGuardrail, localCornerstones, localPillars]
+    () => calcBreakdown(localCornerstones, localPillars),
+    [localCornerstones, localPillars]
   );
+
+  // Is the current slider config over the pack limit?
+  const isOverLimit = arch?.packSize != null && liveBreakdown.total > arch.packSize;
 
   // Mutations
   const setPackSize = trpc.architecture.setPackSize.useMutation({
@@ -377,20 +377,46 @@ export default function Architecture() {
               {/* Article count summary */}
               <div className="grid grid-cols-4 gap-3">
                 {[
-                  { label: "Cornerstones", value: liveBreakdown.cornerstones, colour: "text-violet-400" },
-                  { label: "Pillars", value: liveBreakdown.totalPillars, colour: "text-primary" },
-                  { label: "Clusters", value: liveBreakdown.totalClusters, colour: "text-muted-foreground" },
-                  { label: "Total Articles", value: liveBreakdown.total, colour: "text-foreground font-bold" },
+                  { label: "Cornerstones", value: liveBreakdown.cornerstones, colour: "text-violet-400", over: false },
+                  { label: "Pillars", value: liveBreakdown.totalPillars, colour: "text-primary", over: false },
+                  { label: "Clusters", value: liveBreakdown.totalClusters, colour: "text-muted-foreground", over: false },
+                  { label: "Total Articles", value: liveBreakdown.total, colour: isOverLimit ? "text-red-500 font-bold" : "text-foreground font-bold", over: isOverLimit },
                 ].map((item) => (
                   <div
                     key={item.label}
-                    className="rounded-lg bg-background border border-border p-3 text-center"
+                    className={`rounded-lg bg-background border p-3 text-center transition-colors ${
+                      item.over ? "border-red-400 bg-red-50" : "border-border"
+                    }`}
                   >
-                    <div className={`text-2xl ${item.colour}`}>{item.value}</div>
+                    <div className={`text-2xl flex items-center justify-center gap-1 ${item.colour}`}>
+                      {item.value}
+                      {item.over && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                    </div>
                     <div className="text-xs text-muted-foreground mt-0.5">{item.label}</div>
+                    {item.over && arch?.packSize && (
+                      <div className="text-xs text-red-500 mt-0.5 font-medium">Limit: {arch.packSize}</div>
+                    )}
                   </div>
                 ))}
               </div>
+
+              {/* Over-limit warning */}
+              {isOverLimit && arch?.packSize && liveGuardrail && (
+                <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-300 px-4 py-3 text-sm text-red-700">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  <div>
+                    <p className="font-semibold">
+                      {liveBreakdown.total} articles exceeds your {arch.packSize}-article pack by {liveBreakdown.total - arch.packSize}.
+                    </p>
+                    <p className="mt-0.5">
+                      Suggested fix: reduce to{" "}
+                      <strong>{liveGuardrail.correctedCornerstones} cornerstone{liveGuardrail.correctedCornerstones > 1 ? "s" : ""}</strong>{" "}
+                      × <strong>{liveGuardrail.correctedPillarsPerCornerstone} pillar{liveGuardrail.correctedPillarsPerCornerstone > 1 ? "s" : ""} per cornerstone</strong>{" "}
+                      = {calcBreakdown(liveGuardrail.correctedCornerstones, liveGuardrail.correctedPillarsPerCornerstone).total} articles.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Cornerstones slider */}
               <div className="space-y-2">
@@ -447,11 +473,11 @@ export default function Architecture() {
                       pillarsPerCornerstone: localPillars,
                     })
                   }
-                  disabled={updateArch.isPending}
+                  disabled={updateArch.isPending || isOverLimit}
                   variant="outline"
                   size="sm"
                 >
-                  {updateArch.isPending ? "Saving…" : "Apply Changes"}
+                  {updateArch.isPending ? "Saving…" : isOverLimit ? "Over pack limit — adjust sliders" : "Apply Changes"}
                 </Button>
               )}
             </CardContent>
