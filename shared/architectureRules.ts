@@ -2,9 +2,10 @@
  * Blog Batcher — Architecture Rules Engine
  *
  * Enforces the Cornerstone → Pillar → Cluster hierarchy rules:
- *  - Cornerstones: 1–6
- *  - Pillars per Cornerstone: 1–6
- *  - Clusters per Pillar: 1–6 (user-configurable, default 3)
+ *  - Cornerstones: 0–5  (0 = pillar-only mode, no cornerstone)
+ *  - Pillars per Cornerstone: 0–5  (0 = cornerstone-only, no pillars)
+ *  - Clusters per Pillar: 0–5  (0 = no clusters)
+ *  - Dependency rule: clusters require pillars; pillars require cornerstones
  *  - No fixed pack size — total is determined by the three sliders
  */
 
@@ -12,12 +13,12 @@ export const PACK_SIZES = [20, 50] as const;
 export type PackSize = (typeof PACK_SIZES)[number];
 
 export const DEFAULT_CLUSTERS_PER_PILLAR = 3;
-export const MIN_CLUSTERS_PER_PILLAR = 1;
-export const MAX_CLUSTERS_PER_PILLAR = 6;
-export const MIN_PILLARS_PER_CORNERSTONE = 1;
-export const MAX_PILLARS_PER_CORNERSTONE = 6;
-export const MIN_CORNERSTONES = 1;
-export const MAX_CORNERSTONES = 6;
+export const MIN_CLUSTERS_PER_PILLAR = 0;
+export const MAX_CLUSTERS_PER_PILLAR = 5;
+export const MIN_PILLARS_PER_CORNERSTONE = 0;
+export const MAX_PILLARS_PER_CORNERSTONE = 5;
+export const MIN_CORNERSTONES = 0;
+export const MAX_CORNERSTONES = 5;
 
 export const ARTICLE_TYPES = [
   "cornerstone_guide",
@@ -47,11 +48,33 @@ export const VALID_TYPES_BY_LEVEL: Record<"cornerstone" | "pillar" | "cluster", 
   cluster: ["how_to", "myth_busting", "specialist_post"],
 };
 
+/** Word count targets and descriptions for each article level */
+export const ARTICLE_LEVEL_INFO: Record<
+  "cornerstone" | "pillar" | "cluster",
+  { wordMin: number; wordMax: number; description: string }
+> = {
+  cornerstone: {
+    wordMin: 2800,
+    wordMax: 3200,
+    description: "Authoritative guide post — the trunk of your content tree. Broad topic, high authority.",
+  },
+  pillar: {
+    wordMin: 1500,
+    wordMax: 2000,
+    description: "In-depth topic post — branches off the cornerstone. Covers one angle in detail.",
+  },
+  cluster: {
+    wordMin: 800,
+    wordMax: 1200,
+    description: "Specific, focused post — leaves of the tree. Answers one precise question.",
+  },
+};
+
 /** Word count targets from the scope */
 export const WORD_COUNT_TARGETS: Record<"cornerstone" | "pillar" | "cluster", { min: number; max: number }> = {
-  cornerstone: { min: 2500, max: 3200 },
-  pillar: { min: 1500, max: 1800 },
-  cluster: { min: 1000, max: 1200 },
+  cornerstone: { min: 2800, max: 3200 },
+  pillar: { min: 1500, max: 2000 },
+  cluster: { min: 800, max: 1200 },
 };
 
 // ─── Default architectures ────────────────────────────────────────────────────
@@ -91,6 +114,40 @@ export function calcBreakdown(
   };
 }
 
+// ─── Dependency enforcement ───────────────────────────────────────────────────
+
+/**
+ * Enforces hierarchy dependencies:
+ *  - If cornerstones = 0, pillars and clusters must also be 0
+ *  - If pillars = 0, clusters must also be 0
+ * Returns the corrected values.
+ */
+export function enforceDependencies(
+  cornerstones: number,
+  pillarsPerCornerstone: number,
+  clustersPerPillar: number
+): { cornerstones: number; pillarsPerCornerstone: number; clustersPerPillar: number; warnings: string[] } {
+  const warnings: string[] = [];
+  let c = cornerstones;
+  let p = pillarsPerCornerstone;
+  let cl = clustersPerPillar;
+
+  if (c === 0 && p > 0) {
+    warnings.push("Pillars require at least 1 cornerstone. Pillars set to 0.");
+    p = 0;
+  }
+  if (p === 0 && cl > 0) {
+    warnings.push("Clusters require at least 1 pillar. Clusters set to 0.");
+    cl = 0;
+  }
+  if (c === 0 && cl > 0) {
+    warnings.push("Clusters require at least 1 cornerstone. Clusters set to 0.");
+    cl = 0;
+  }
+
+  return { cornerstones: c, pillarsPerCornerstone: p, clustersPerPillar: cl, warnings };
+}
+
 // ─── Guardrails validation ────────────────────────────────────────────────────
 
 export interface GuardrailResult {
@@ -103,7 +160,8 @@ export interface GuardrailResult {
 
 /**
  * Validates a proposed architecture configuration against guardrail rules.
- * No pack-size constraint — just clamps each dimension to its allowed range.
+ * No pack-size constraint — just clamps each dimension to its allowed range
+ * and enforces hierarchy dependencies.
  */
 export function validateArchitecture(
   _packSize: PackSize | null,
@@ -118,7 +176,6 @@ export function validateArchitecture(
 
   // ── Clamp cornerstones ────────────────────────────────────────────────────
   if (cornerstones < MIN_CORNERSTONES) {
-    warnings.push(`Minimum ${MIN_CORNERSTONES} cornerstone required. Adjusted to ${MIN_CORNERSTONES}.`);
     cornerstones = MIN_CORNERSTONES;
   }
   if (cornerstones > MAX_CORNERSTONES) {
@@ -128,7 +185,6 @@ export function validateArchitecture(
 
   // ── Clamp pillars per cornerstone ─────────────────────────────────────────
   if (pillarsPerCornerstone < MIN_PILLARS_PER_CORNERSTONE) {
-    warnings.push(`Minimum ${MIN_PILLARS_PER_CORNERSTONE} pillar per cornerstone required. Adjusted to ${MIN_PILLARS_PER_CORNERSTONE}.`);
     pillarsPerCornerstone = MIN_PILLARS_PER_CORNERSTONE;
   }
   if (pillarsPerCornerstone > MAX_PILLARS_PER_CORNERSTONE) {
@@ -138,13 +194,19 @@ export function validateArchitecture(
 
   // ── Clamp clusters per pillar ─────────────────────────────────────────────
   if (clustersPerPillar < MIN_CLUSTERS_PER_PILLAR) {
-    warnings.push(`Minimum ${MIN_CLUSTERS_PER_PILLAR} cluster per pillar required. Adjusted to ${MIN_CLUSTERS_PER_PILLAR}.`);
     clustersPerPillar = MIN_CLUSTERS_PER_PILLAR;
   }
   if (clustersPerPillar > MAX_CLUSTERS_PER_PILLAR) {
     warnings.push(`Maximum ${MAX_CLUSTERS_PER_PILLAR} clusters per pillar allowed. Adjusted to ${MAX_CLUSTERS_PER_PILLAR}.`);
     clustersPerPillar = MAX_CLUSTERS_PER_PILLAR;
   }
+
+  // ── Enforce hierarchy dependencies ───────────────────────────────────────
+  const deps = enforceDependencies(cornerstones, pillarsPerCornerstone, clustersPerPillar);
+  warnings.push(...deps.warnings);
+  cornerstones = deps.cornerstones;
+  pillarsPerCornerstone = deps.pillarsPerCornerstone;
+  clustersPerPillar = deps.clustersPerPillar;
 
   return {
     valid: warnings.length === 0,
