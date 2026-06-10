@@ -314,6 +314,10 @@ export default function Architecture() {
     },
   });
 
+  const unlockArch = trpc.architecture.unlock.useMutation({
+    onSuccess: () => refetchArch(),
+  });
+
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
@@ -347,9 +351,20 @@ export default function Architecture() {
             </p>
           </div>
           {locked && (
-            <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px", borderRadius:99, fontSize:12, fontWeight:600, background:"#dcfce7", color:"#166534" }}>
-              <CheckCircle style={{ width:13, height:13 }} /> Architecture Confirmed
-            </span>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px", borderRadius:99, fontSize:12, fontWeight:600, background:"#dcfce7", color:"#166534" }}>
+                <CheckCircle style={{ width:13, height:13 }} /> Architecture Confirmed
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => businessId && unlockArch.mutate({ businessId })}
+                disabled={unlockArch.isPending}
+                style={{ fontSize:12 }}
+              >
+                {unlockArch.isPending ? "Unlocking…" : "Edit Architecture"}
+              </Button>
+            </div>
           )}
         </div>
       </div>

@@ -383,6 +383,32 @@ export const architectureRouter = router({
     }),
 
   // -------------------------------------------------------------------------
+  // UNLOCK — unconfirm a locked architecture so the user can edit the sliders
+  // again. This does NOT delete nodes or keywords — that happens when they
+  // hit Apply Changes, which calls regenerateNodes.
+  // -------------------------------------------------------------------------
+  unlock: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const existing = await db
+        .select()
+        .from(blogArchitectures)
+        .where(eq(blogArchitectures.businessId, input.businessId))
+        .limit(1);
+      if (!existing.length) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No architecture found." });
+      }
+      await db
+        .update(blogArchitectures)
+        .set({ confirmed: false })
+        .where(eq(blogArchitectures.id, existing[0].id));
+      return { unlocked: true };
+    }),
+
+  // -------------------------------------------------------------------------
   // REBUILD NODES — force-regenerate article nodes from current architecture
   // config even when confirmed. Used when user changes architecture after
   // keyword assignment (e.g., changed cornerstones/pillars/clusters).
