@@ -13,6 +13,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -160,8 +161,8 @@ export default function ScheduleManagement() {
   const { user, loading: authLoading } = useAuth({ redirectOnUnauthenticated: true });
   const utils = trpc.useUtils();
 
-  const businessQuery = trpc.business.get.useQuery(undefined, { enabled: !!user });
-  const businessId = businessQuery.data?.id;
+  const { activeBusiness } = useActiveBusiness();
+  const businessId = activeBusiness?.id;
 
   const scheduleQuery = trpc.scheduler.getSchedule.useQuery(
     { businessId: businessId! },
@@ -203,7 +204,7 @@ export default function ScheduleManagement() {
     onError: (err) => toast.error(`Simulation failed: ${err.message}`),
   });
 
-  if (authLoading || businessQuery.isLoading) {
+  if (authLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">

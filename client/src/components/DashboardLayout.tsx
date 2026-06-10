@@ -5,6 +5,7 @@ import {
   LayoutDashboard, LogOut, Calendar, Puzzle, HelpCircle,
   CreditCard, Shield, ChevronDown, Plus, Menu, X, Search, Grid3X3
 } from "lucide-react";
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
@@ -59,35 +60,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [bizDropOpen, setBizDropOpen] = useState(false);
-  const [selectedBizId, setSelectedBizId] = useState<number | null>(() => {
-    const stored = localStorage.getItem("bb_selected_biz_id");
-    return stored ? parseInt(stored, 10) : null;
-  });
   const bizDropRef = useRef<HTMLDivElement>(null);
 
-  const { data: businesses, refetch: refetchBusinesses } = trpc.business.listAll.useQuery(undefined, { retry: false });
+  const { businesses, activeBusiness: activeBiz, selectedBizId, setSelectedBizId, refetch: refetchBusinesses } = useActiveBusiness();
   const deleteBusiness = trpc.business.delete.useMutation({
     onSuccess: () => { void refetchBusinesses(); },
   });
   const [deletingBizId, setDeletingBizId] = useState<number | null>(null);
-  const activeBiz = businesses?.find(b => b.id === selectedBizId) ?? businesses?.[0];
   const { data: summary } = trpc.dashboard.getSummary.useQuery(
     { businessId: activeBiz?.id ?? 0 },
     { enabled: !!activeBiz?.id, retry: false }
   );
   const credits = summary?.creditBalance ?? 0;
-
-  useEffect(() => {
-    if (!businesses?.length) return;
-    const stored = localStorage.getItem("bb_selected_biz_id");
-    const storedId = stored ? parseInt(stored, 10) : null;
-    // If stored ID exists and is valid for this user, use it; otherwise default to first
-    if (storedId && businesses.some(b => b.id === storedId)) {
-      if (!selectedBizId) setSelectedBizId(storedId);
-    } else if (!selectedBizId) {
-      setSelectedBizId(businesses[0].id);
-    }
-  }, [businesses, selectedBizId]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -166,7 +150,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     key={biz.id}
                     onClick={() => {
                       setSelectedBizId(biz.id);
-                      localStorage.setItem("bb_selected_biz_id", String(biz.id));
                       setBizDropOpen(false);
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"

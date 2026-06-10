@@ -1,3 +1,4 @@
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -197,10 +198,7 @@ export default function Architecture() {
   const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
 
   // Business query
-  const { data: businessData } = trpc.business.get.useQuery(undefined, {
-    enabled: !!user,
-  });
-
+  const { activeBusiness: businessData } = useActiveBusiness();
   const businessId = businessData?.id;
 
   // Architecture query

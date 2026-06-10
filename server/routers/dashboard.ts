@@ -133,7 +133,7 @@ export const dashboardRouter = router({
         if (stage === 2) return "Set Up Blog Architecture";
         if (stage === 3) return "Research Keywords";
         if (stage === 4) return "Generate Articles";
-        if (stage === 5) return "Review & Approve Articles";
+        if (stage === 5) return "Review & Publish Articles";
         return "Publish & Schedule Articles";
       })();
 

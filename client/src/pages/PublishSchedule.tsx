@@ -6,6 +6,7 @@
  *  2. Auto-Schedule   — pick start date + interval in days, system creates Heartbeat jobs automatically
  */
 
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
 import { Button } from "@/components/ui/button";
@@ -158,10 +159,7 @@ export default function PublishSchedule() {
   const [, navigate] = useLocation();
   const { user, loading: authLoading } = useAuth();
 
-  const { data: businessData, isLoading: bizLoading } = trpc.business.get.useQuery(undefined, {
-    enabled: !!user,
-  });
-  const business = businessData ?? null;
+  const { activeBusiness: business, isLoading: bizLoading } = useActiveBusiness();
 
   const { data: articlesData, isLoading: articlesLoading } = trpc.articles.getAll.useQuery(
     { businessId: business?.id ?? 0 },

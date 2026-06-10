@@ -2,7 +2,8 @@
  * Dashboard — matches BlogBatcher mockup exactly
  * Light cream theme, serif italic heading, KPI cards, batch grid, activity feed
  */
-import { useState, useEffect } from "react";
+import { useActiveBusiness } from "@/contexts/BusinessContext";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -70,15 +71,8 @@ function fmtDate(ts: Date | number | string) {
 export default function Dashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [selectedBusinessId, setSelectedBusinessId] = useState<number | null>(null);
-
-  const { data: businesses, isLoading: bizLoading } = trpc.business.listAll.useQuery(undefined, { retry: false });
-
-  useEffect(() => {
-    if (businesses?.length && !selectedBusinessId) {
-      setSelectedBusinessId(businesses[0].id);
-    }
-  }, [businesses, selectedBusinessId]);
+  const { activeBusiness, businesses, setSelectedBizId, isLoading: bizLoading } = useActiveBusiness();
+  const selectedBusinessId = activeBusiness?.id ?? null;
 
   const { data: summary, isLoading: summaryLoading } = trpc.dashboard.getSummary.useQuery(
     { businessId: selectedBusinessId! },
@@ -179,7 +173,7 @@ export default function Dashboard() {
               {businesses && businesses.length > 1 && (
                 <select
                   value={selectedBusinessId ?? ""}
-                  onChange={e => setSelectedBusinessId(Number(e.target.value))}
+                  onChange={e => setSelectedBizId(Number(e.target.value))}
                   style={{ fontSize: 11, color: "#6e5afe", border: "1px solid #c4b5fd", borderRadius: 6, padding: "2px 6px", background: "#ede9ff", cursor: "pointer", fontWeight: 600 }}
                 >
                   {businesses.map(b => (

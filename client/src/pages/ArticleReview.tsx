@@ -16,6 +16,7 @@
  *  approved        → ✓ Approved (green)
  */
 
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
 import { Badge } from "@/components/ui/badge";
@@ -556,11 +557,7 @@ export default function ArticleReview() {
   const { user, loading: authLoading } = useAuth();
 
   // Business + articles data
-  const { data: businessData, isLoading: bizLoading } = trpc.business.get.useQuery(undefined, {
-    enabled: !!user,
-  });
-  // business.get returns the flat business row (not nested under .business)
-  const business = businessData ?? null;
+  const { activeBusiness: business, isLoading: bizLoading } = useActiveBusiness();
 
   const { data: articlesData, isLoading: articlesLoading, refetch: refetchArticles } = trpc.articles.getAll.useQuery(
     { businessId: business?.id ?? 0 },

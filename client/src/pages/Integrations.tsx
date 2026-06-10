@@ -15,6 +15,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -892,10 +893,7 @@ export default function IntegrationsPage() {
   const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
 
-  const { data: business } = trpc.business.get.useQuery(undefined, {
-    enabled: !!user,
-  });
-
+  const { activeBusiness: business } = useActiveBusiness();
   const businessId = business?.id;
 
   const { data: integrationsList, refetch } = trpc.integrations.get.useQuery(

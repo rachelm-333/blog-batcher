@@ -3,6 +3,7 @@
  * Matches the BlogBatcher mockup: light cream theme, horizontal stage stepper,
  * serif italic heading, table with Level/Title/Keyword/MSV/Competition/Status/Actions
  */
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -204,10 +205,9 @@ export default function Keywords() {
   const [subStage, setSubStage] = useState<SubStage>("assign");
   const [swapTarget, setSwapTarget] = useState<KwRow | null>(null);
 
-  const { data: businesses, isLoading: bizLoading } = trpc.business.listAll.useQuery(undefined, { retry: false });
-  const business = businesses?.[0];
+  const { activeBusiness: business, isLoading: bizLoading } = useActiveBusiness();
   const businessId = business?.id ?? 0;
-  const currentStage = business?.currentStage ?? 1;
+  const currentStage = (business?.currentStage as number | undefined) ?? 1;
 
   const utils = trpc.useUtils();
   const { data: kwData, isLoading: kwLoading, refetch: refetchKw } = trpc.keywords.getAll.useQuery(
@@ -330,8 +330,8 @@ export default function Keywords() {
         </p>
         <div style={{ background:"#faf9f5", border:"1px solid #e5e7eb", borderRadius:8, padding:"14px 16px", marginBottom:20, fontSize:13, color:"#6b7280", display:"flex", flexDirection:"column", gap:4 }}>
           <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Business:</span> {business.name}</div>
-          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Location:</span> {business.location ?? "—"}</div>
-          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Industry:</span> {business.industry ?? "—"}</div>
+          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Location:</span> {(business.location as string | undefined) ?? "—"}</div>
+          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Industry:</span> {(business.industry as string | undefined) ?? "—"}</div>
         </div>
         <button
           className="btn-primary"
