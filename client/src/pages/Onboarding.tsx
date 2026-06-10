@@ -188,6 +188,7 @@ export default function Onboarding() {
         )}
         {step === 1 && businessId && (
           <Step1BusinessDetails
+            key={`step1-${businessId}`}
             businessId={businessId}
             initial={{
               name: bizData?.name ?? scrapeData?.name,
@@ -200,7 +201,14 @@ export default function Onboarding() {
               uniqueValueProposition:
                 bizData?.uniqueValueProposition ?? scrapeData?.uniqueValueProposition,
               keywordExclusions: bizData?.keywordExclusions ?? undefined,
-              audiences: (bizData?.audiences ?? scrapeData?.audiences ?? []).map((a: any) => ({
+              audiences: (
+                // Priority: saved audiences > scrapeCache audiences > scrapeData audiences > empty
+                (bizData?.audiences?.length
+                  ? bizData.audiences
+                  : (((bizData?.scrapeCache as any)?.audiences?.length)
+                    ? (bizData?.scrapeCache as any).audiences
+                    : (scrapeData?.audiences ?? [])))
+              ).map((a: any) => ({
                 label: a.label ?? "",
                 description: a.description ?? "",
               })),
