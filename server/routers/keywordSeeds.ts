@@ -2,17 +2,19 @@
  * Keyword Seeds Router — Stage 1 Business Profile (Step 9)
  *
  * Procedures:
- *   keywordSeeds.suggest         — AI suggests up to 10 seed keywords from business profile
- *   keywordSeeds.getAll          — return all seeds for a business
- *   keywordSeeds.save            — replace full seed list (max 10)
- *   keywordSeeds.searchDataForSEO — for each seed, call DataForSEO keywords_for_keywords
- *                                   and return a ranked pool of real keywords with MSV + competition
+ *   keywordSeeds.suggest              — AI suggests up to 10 seed keywords from business profile
+ *   keywordSeeds.getAll               — return all seeds for a business
+ *   keywordSeeds.save                 — replace full seed list (max 10)
+ *   keywordSeeds.searchDataForSEO     — for each seed, call DataForSEO keywords_for_keywords
+ *                                       and return a ranked pool of real keywords with MSV + competition
+ *   keywordSeeds.saveSelectedKeywords — persist the user's ticked keyword selections (with MSV/competition/CPC)
+ *   keywordSeeds.getSelectedKeywords  — return the saved selected keywords for a business
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
-import { keywordSeeds, businesses, businessServices } from "../../drizzle/schema";
+import { keywordSeeds, businesses, businessServices, selectedKeywords } from "../../drizzle/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { invokeLLMWithCost } from "../apiCostLogger";
 import { getKeywordSuggestions } from "../dataforseo";
@@ -151,6 +153,62 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
       const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content)) as { seeds: string[] };
       const seeds = (parsed.seeds ?? []).slice(0, 10).map((s: string) => s.trim()).filter(Boolean);
       return { seeds };
+    }),
+
+  // -------------------------------------------------------------------------
+  // keywordSeeds.saveSelectedKeywords
+  // Persist the keywords the user ticked in the Step 8 results table.
+  // Replaces any previously saved selections for this business.
+  // -------------------------------------------------------------------------
+  saveSelectedKeywords: protectedProcedure
+    .input(z.object({
+      businessId: z.number().int().positive(),
+      keywords: z.array(z.object({
+        keyword: z.string().min(1).max(255),
+        msv: z.number().int().nullable().optional(),
+        competition: z.string().nullable().optional(),
+        cpc: z.number().nullable().optional(),
+        seedKeyword: z.string().nullable().optional(),
+      })).max(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOwnership(ctx.user.id, input.businessId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      // Delete existing selections for this business
+      await db.delete(selectedKeywords).where(eq(selectedKeywords.businessId, input.businessId));
+      if (input.keywords.length > 0) {
+        await db.insert(selectedKeywords).values(
+          input.keywords.map((kw, idx) => ({
+            businessId: input.businessId,
+            keyword: kw.keyword.trim(),
+            msv: kw.msv ?? null,
+            competitionLevel: kw.competition ?? null,
+            cpc: kw.cpc != null ? String(kw.cpc.toFixed(2)) : null,
+            seedKeyword: kw.seedKeyword ?? null,
+            sortOrder: idx,
+          }))
+        );
+      }
+      return { saved: input.keywords.length };
+    }),
+
+  // -------------------------------------------------------------------------
+  // keywordSeeds.getSelectedKeywords
+  // Return all saved selected keywords for a business, ordered by sortOrder.
+  // Used to pre-populate the Step 8 selection state when the user returns.
+  // -------------------------------------------------------------------------
+  getSelectedKeywords: protectedProcedure
+    .input(z.object({ businessId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertOwnership(ctx.user.id, input.businessId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      return db
+        .select()
+        .from(selectedKeywords)
+        .where(eq(selectedKeywords.businessId, input.businessId))
+        .orderBy(asc(selectedKeywords.sortOrder));
     }),
 
   // -------------------------------------------------------------------------

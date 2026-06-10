@@ -988,3 +988,35 @@ export const keywordSeedsRelations = relations(keywordSeeds, ({ one }) => ({
 }));
 export type KeywordSeed = typeof keywordSeeds.$inferSelect;
 export type InsertKeywordSeed = typeof keywordSeeds.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// SELECTED KEYWORDS
+// The specific keywords the user ticked in the Step 8 DataForSEO results table.
+// Saved when the user clicks "Save & Continue" so Stage 3 assignment can use
+// the exact keywords (with real MSV/competition/CPC data) instead of
+// re-querying DataForSEO from scratch.
+// ---------------------------------------------------------------------------
+export const selectedKeywords = mysqlTable("selected_keywords", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  /** The keyword phrase selected by the user. */
+  keyword: varchar("keyword", { length: 255 }).notNull(),
+  /** Monthly search volume from DataForSEO (null if unavailable). */
+  msv: int("msv"),
+  /** Competition level from DataForSEO: high, medium, low, or null. */
+  competitionLevel: varchar("competitionLevel", { length: 16 }),
+  /** Cost per click from DataForSEO (null if unavailable). */
+  cpc: decimal("cpc", { precision: 10, scale: 2 }),
+  /** Which seed keyword this result came from. */
+  seedKeyword: varchar("seedKeyword", { length: 255 }),
+  /** Display order (0-based). */
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const selectedKeywordsRelations = relations(selectedKeywords, ({ one }) => ({
+  business: one(businesses, { fields: [selectedKeywords.businessId], references: [businesses.id] }),
+}));
+
+export type SelectedKeyword = typeof selectedKeywords.$inferSelect;
+export type InsertSelectedKeyword = typeof selectedKeywords.$inferInsert;

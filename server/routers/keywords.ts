@@ -21,6 +21,7 @@ import {
   brandVoice,
   keywords,
   keywordSeeds,
+  selectedKeywords,
 } from "../../drizzle/schema";
 import { invokeLLMWithCost } from "../apiCostLogger";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -235,51 +236,72 @@ export const keywordsRouter = router({
         .filter(Boolean)
         .join(" | ");
 
-      // ── Step A: Build keyword pool from saved seeds via DataForSEO ──────────
-      // If the user completed the Keyword Seeds step, use real Google Ads data.
-      // Otherwise fall back to Claude-only generation.
-      const seedRows = await db
-        .select({ keyword: keywordSeeds.keyword })
-        .from(keywordSeeds)
-        .where(eq(keywordSeeds.businessId, input.businessId))
-        .orderBy(keywordSeeds.sortOrder);
+      // ── Step A: Build keyword pool ─────────────────────────────────────────
+      // Priority 1: Use the user's saved selected keywords from Step 8 (with real MSV data).
+      // Priority 2: Fall back to re-querying DataForSEO from seed phrases.
+      // Priority 3: Claude-only generation if no seeds or DataForSEO unavailable.
+
+      const savedSelectedRows = await db
+        .select()
+        .from(selectedKeywords)
+        .where(eq(selectedKeywords.businessId, input.businessId))
+        .orderBy(selectedKeywords.sortOrder);
 
       let keywordPool: Array<{ keyword: string; msv: number | null; competition: string | null }> = [];
       let dfsData: Map<string, { msv: number | null; comp: "high" | "medium" | "low" | null }> = new Map();
 
-      if (seedRows.length > 0 && process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
-        // Send ALL seeds in a single combined request — much better results than per-seed calls
-        const seedTerms = seedRows.map((s) => s.keyword);
-        try {
-          const suggestions = await getKeywordSuggestions(seedTerms, 2036, "en", 100);
-          // Add seeds themselves (MSV will be enriched in Step C if not in suggestions)
-          for (const seed of seedTerms) {
-            keywordPool.push({ keyword: seed, msv: null, competition: null });
-          }
-          // Add all suggestions with real MSV data
-          for (const s of suggestions) {
-            if (s.monthlySearchVolume !== null) {
-              keywordPool.push({ keyword: s.keyword, msv: s.monthlySearchVolume, competition: s.competitionLevel });
-              dfsData.set(s.keyword, { msv: s.monthlySearchVolume, comp: s.competitionLevel });
-            }
-          }
-        } catch (err) {
-          console.warn(`[Keywords] Combined pool build failed:`, err);
-          for (const seed of seedTerms) {
-            keywordPool.push({ keyword: seed, msv: null, competition: null });
-          }
+      if (savedSelectedRows.length > 0) {
+        // ── Priority 1: Use the user's saved selections (no DataForSEO re-query needed) ──
+        console.log(`[Keywords] Using ${savedSelectedRows.length} saved selected keywords from Step 8 (no DataForSEO re-query)`);
+        for (const row of savedSelectedRows) {
+          const comp = row.competitionLevel as "high" | "medium" | "low" | null;
+          keywordPool.push({ keyword: row.keyword, msv: row.msv ?? null, competition: comp });
+          dfsData.set(row.keyword, { msv: row.msv ?? null, comp });
         }
-        // Deduplicate
-        const seen = new Set<string>();
-        keywordPool = keywordPool.filter((r) => {
-          const k = r.keyword.toLowerCase().trim();
-          if (seen.has(k)) return false;
-          seen.add(k);
-          return true;
-        });
         // Sort by MSV descending so Claude picks high-value keywords first
         keywordPool.sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
-        console.log(`[Keywords] Built pool of ${keywordPool.length} keywords from ${seedTerms.length} seeds (combined request)`);
+      } else {
+        // ── Priority 2: Fall back to re-querying DataForSEO from saved seed phrases ──
+        const seedRows = await db
+          .select({ keyword: keywordSeeds.keyword })
+          .from(keywordSeeds)
+          .where(eq(keywordSeeds.businessId, input.businessId))
+          .orderBy(keywordSeeds.sortOrder);
+
+        if (seedRows.length > 0 && process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
+          // Send ALL seeds in a single combined request — much better results than per-seed calls
+          const seedTerms = seedRows.map((s) => s.keyword);
+          try {
+            const suggestions = await getKeywordSuggestions(seedTerms, 2036, "en", 100);
+            // Add seeds themselves (MSV will be enriched in Step C if not in suggestions)
+            for (const seed of seedTerms) {
+              keywordPool.push({ keyword: seed, msv: null, competition: null });
+            }
+            // Add all suggestions with real MSV data
+            for (const s of suggestions) {
+              if (s.monthlySearchVolume !== null) {
+                keywordPool.push({ keyword: s.keyword, msv: s.monthlySearchVolume, competition: s.competitionLevel });
+                dfsData.set(s.keyword, { msv: s.monthlySearchVolume, comp: s.competitionLevel });
+              }
+            }
+          } catch (err) {
+            console.warn(`[Keywords] Combined pool build failed:`, err);
+            for (const seed of seedTerms) {
+              keywordPool.push({ keyword: seed, msv: null, competition: null });
+            }
+          }
+          // Deduplicate
+          const seen = new Set<string>();
+          keywordPool = keywordPool.filter((r) => {
+            const k = r.keyword.toLowerCase().trim();
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+          // Sort by MSV descending so Claude picks high-value keywords first
+          keywordPool.sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
+          console.log(`[Keywords] Built pool of ${keywordPool.length} keywords from ${seedTerms.length} seeds via DataForSEO (fallback — no saved selections found)`);
+        }
       }
 
       // ── Step B: Claude assigns one keyword per article slot ───────────────────

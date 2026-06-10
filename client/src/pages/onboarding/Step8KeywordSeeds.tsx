@@ -12,6 +12,8 @@
  * - Selections PERSIST across searches — adding a new seed and regenerating
  *   keeps previously selected keywords ticked
  * - A flat "Selected keywords" panel shows all ticked keywords at a glance
+ * - Selections (with MSV/competition/CPC) are saved to the DB on Save & Continue
+ * - On page load, previously saved selections are restored from the DB
  */
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,17 +69,48 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // All keywords ever seen across all searches, keyed by keyword string
   const [kwMeta, setKwMeta] = useState<Map<string, SeedKeyword>>(new Map());
+  // Whether we have loaded the saved selections from DB (prevents overwriting on first load)
+  const [savedSelectionsLoaded, setSavedSelectionsLoaded] = useState(false);
 
   const { data: existingSeeds, isLoading: seedsLoading } = trpc.keywordSeeds.getAll.useQuery(
     { businessId },
     { enabled: !!businessId }
   );
 
+  const { data: savedSelections, isLoading: selectionsLoading } = trpc.keywordSeeds.getSelectedKeywords.useQuery(
+    { businessId },
+    { enabled: !!businessId }
+  );
+
+  // Load saved seed phrases
   useEffect(() => {
     if (existingSeeds && existingSeeds.length > 0) {
       setSeeds(existingSeeds.map((s) => s.keyword));
     }
   }, [existingSeeds]);
+
+  // Restore previously saved keyword selections from DB (with their MSV/competition/CPC data)
+  useEffect(() => {
+    if (savedSelections && !savedSelectionsLoaded) {
+      setSavedSelectionsLoaded(true);
+      if (savedSelections.length > 0) {
+        const restoredSelected = new Set<string>(savedSelections.map((s) => s.keyword));
+        const restoredMeta = new Map<string, SeedKeyword>(
+          savedSelections.map((s) => [
+            s.keyword,
+            {
+              keyword: s.keyword,
+              msv: s.msv ?? null,
+              competition: s.competitionLevel ?? null,
+              cpc: s.cpc != null ? parseFloat(String(s.cpc)) : null,
+            },
+          ])
+        );
+        setSelected(restoredSelected);
+        setKwMeta(restoredMeta);
+      }
+    }
+  }, [savedSelections, savedSelectionsLoaded]);
 
   const suggestMutation = trpc.keywordSeeds.suggest.useMutation({
     onSuccess: (data) => {
@@ -88,6 +121,10 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
   });
 
   const saveMutation = trpc.keywordSeeds.save.useMutation({
+    onError: (err) => toast.error(err.message),
+  });
+
+  const saveSelectedMutation = trpc.keywordSeeds.saveSelectedKeywords.useMutation({
     onError: (err) => toast.error(err.message),
   });
 
@@ -168,7 +205,33 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
 
   const handleSaveAndContinue = async () => {
     const validSeeds = seeds.map((s) => s.trim()).filter(Boolean);
+    // Save seed phrases
     await saveMutation.mutateAsync({ businessId, seeds: validSeeds });
+
+    // Build the full selected keyword objects (with MSV/competition/CPC) from kwMeta
+    // Also track which seed group each keyword came from
+    const selectedKwObjects = Array.from(selected).map((kwStr, idx) => {
+      const meta = kwMeta.get(kwStr) ?? { keyword: kwStr, msv: null, competition: null, cpc: null };
+      // Find which seed group this keyword belongs to
+      let seedKeyword: string | null = null;
+      for (const group of groups) {
+        if (group.keywords.some((k) => k.keyword === kwStr)) {
+          seedKeyword = group.seed;
+          break;
+        }
+      }
+      return {
+        keyword: meta.keyword,
+        msv: meta.msv,
+        competition: meta.competition,
+        cpc: meta.cpc,
+        seedKeyword,
+      };
+    });
+
+    // Save selected keywords with their full metadata to DB
+    await saveSelectedMutation.mutateAsync({ businessId, keywords: selectedKwObjects });
+
     onNext();
   };
 
@@ -214,6 +277,9 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
     .map((kw) => kwMeta.get(kw) ?? { keyword: kw, msv: null, competition: null, cpc: null })
     .sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
 
+  const isSaving = saveMutation.isPending || saveSelectedMutation.isPending;
+  const isLoading = seedsLoading || selectionsLoading;
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
       {/* Header */}
@@ -231,7 +297,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
         <div className="mt-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800">
           <strong>Tip:</strong> Keep seeds short and broad for the best results.
           {" "}<span className="text-green-700 font-medium">✓ Good:</span> "workplace wellbeing", "mental health", "employee assistance"
-          {"  "}<span className="text-red-600 font-medium">✗ Too long:</span> "workplace mental health compliance documentation"
+          {"  "}<span className="text-red-600 font-medium">✗ Too long:</span> "workplace mental health compliance documentation"
         </div>
       </div>
 
@@ -256,9 +322,9 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
           </Button>
         </div>
 
-        {seedsLoading ? (
+        {isLoading ? (
           <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
-            <Loader2 size={14} className="animate-spin" /> Loading saved seeds…
+            <Loader2 size={14} className="animate-spin" /> Loading saved data…
           </div>
         ) : (
           <div className="space-y-2">
@@ -506,7 +572,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            These keywords will be used as the pool for Stage 3 keyword assignment. You can add more seeds and search again — your selections above are preserved.
+            These keywords will be used as the pool for Stage 3 keyword assignment. Your selections are saved automatically when you continue.
           </p>
         </div>
       )}
@@ -516,9 +582,9 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
         <Button variant="ghost" onClick={onBack}>← Back</Button>
         <Button
           onClick={handleSaveAndContinue}
-          disabled={saveMutation.isPending}
+          disabled={isSaving}
         >
-          {saveMutation.isPending ? (
+          {isSaving ? (
             <><Loader2 size={14} className="animate-spin mr-1" /> Saving…</>
           ) : (
             "Save & Continue →"

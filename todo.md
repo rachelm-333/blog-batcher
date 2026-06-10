@@ -915,3 +915,15 @@
 - [ ] Fix article count mismatch — keyword assignment generating more articles than architecture config
 - [ ] Fix missing MSV/Competition metrics in keyword list (showing dashes instead of real data)
 - [ ] Add ability to revisit and change keyword selections after initial assignment
+
+## Keyword Selection Persistence Fix (Jun 11 2026)
+- [x] Add selected_keywords table to schema (keyword, msv, competitionLevel, cpc, seedKeyword, sortOrder)
+- [x] Run Drizzle migration and apply to DB
+- [x] Add keywordSeeds.saveSelectedKeywords procedure — persists ticked keywords with full MSV/competition/CPC data
+- [x] Add keywordSeeds.getSelectedKeywords procedure — returns saved selections for pre-populating Step 8 UI
+- [x] Update Step8KeywordSeeds.tsx to load saved selections on page load (restores ticked state + kwMeta)
+- [x] Update Step8KeywordSeeds.tsx handleSaveAndContinue to call saveSelectedKeywords with full metadata
+- [x] Update keywords.assignAll to use saved selected keywords as Priority 1 pool (no DataForSEO re-query)
+- [x] keywords.assignAll falls back to DataForSEO seed re-query only when no saved selections exist
+- [x] Update keywords.test.ts assignAll mock to include new selectedKeywords select call
+- [x] TypeScript clean, 367/374 tests pass (7 pre-existing architecture test failures unrelated to this change)
