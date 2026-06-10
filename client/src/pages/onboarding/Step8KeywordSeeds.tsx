@@ -224,11 +224,15 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
         </div>
         <h1 className="text-2xl font-bold">Build your keyword foundation.</h1>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          Enter seed phrases (your core service terms) and hit <strong>Search DataForSEO</strong> to get
-          real keyword ideas with monthly search volume. Tick the ones you want — your selections are
-          saved even when you add new seeds and search again. Stage 3 will use your selected pool to
-          assign one primary keyword per article.
+          Add <strong>short, broad seed terms</strong> (1–3 words) that describe your core services, then hit{" "}
+          <strong>Search DataForSEO</strong> to get real keyword ideas with monthly search volume, competition, and CPC.
+          Tick the ones most relevant to your business — Stage 3 uses your selections to assign one keyword per article.
         </p>
+        <div className="mt-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800">
+          <strong>Tip:</strong> Keep seeds short and broad for the best results.
+          {" "}<span className="text-green-700 font-medium">✓ Good:</span> "workplace wellbeing", "mental health", "employee assistance"
+          {"  "}<span className="text-red-600 font-medium">✗ Too long:</span> "workplace mental health compliance documentation"
+        </div>
       </div>
 
       {/* Seed list */}
@@ -338,8 +342,21 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
           </div>
         )}
 
+        {/* No-results guidance */}
+        {groups.length > 0 && groups.every((g) => g.keywords.length === 0) && (
+          <div className="px-3 py-3 rounded-md bg-red-50 border border-red-200 text-xs text-red-800 space-y-1">
+            <p className="font-semibold">No keyword data returned.</p>
+            <p>Your seed terms may be too long or too specific for Google Ads to have data. Try shorter seeds:</p>
+            <ul className="list-disc list-inside space-y-0.5 mt-1">
+              <li>Instead of <em>"workplace mental health compliance"</em> → try <em>"workplace wellbeing"</em></li>
+              <li>Instead of <em>"psychosocial hazards compliance"</em> → try <em>"psychosocial hazards"</em></li>
+              <li>Use the <strong>AI Suggest</strong> button to get optimised seed terms automatically</li>
+            </ul>
+          </div>
+        )}
+
         {/* Results grouped by seed */}
-        {groups.length > 0 && (
+        {groups.length > 0 && groups.some((g) => g.keywords.length > 0) && (
           <div className="space-y-2 mt-2">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground pb-1">
               <ArrowUpDown size={11} />

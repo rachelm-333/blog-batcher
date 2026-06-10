@@ -183,7 +183,7 @@ export async function getKeywordData(
 // search_volume endpoint) — NOT nested under keyword_info.
 // ---------------------------------------------------------------------------
 export async function getKeywordSuggestions(
-  seedKeyword: string,
+  seedKeyword: string | string[],
   locationCode = 2036,
   languageCode = "en",
   limit = 10
@@ -198,10 +198,13 @@ export async function getKeywordSuggestions(
     }>;
   };
 
+  // Accept either a single string or an array of seed keywords
+  const seedArray = Array.isArray(seedKeyword) ? seedKeyword : [seedKeyword];
+
   // IMPORTANT: field is "keywords" (array), NOT "keyword" (string)
   const body = [
     {
-      keywords: [seedKeyword],
+      keywords: seedArray,
       location_code: locationCode,
       language_code: languageCode,
       limit,

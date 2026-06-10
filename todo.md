@@ -892,3 +892,13 @@
 - [x] Onboarding.tsx: use business.getById(selectedBizId) in edit mode instead of business.get (which always returned first business)
 - [x] DashboardLayout: Business Profile sidebar link now navigates to /onboarding?edit=1 when stage 1 is complete
 - [x] BusinessContext migration: all pages (Architecture, Keywords, ArticleReview, PublishSchedule, Integrations, ScheduleManagement) use useActiveBusiness() hook
+
+## Keyword Research Fixes (Jun 10 2026)
+- [x] Fix DataForSEO keywords_for_keywords returning null MSV/Competition/CPC data
+- [x] Update getKeywordSuggestions to accept array of seeds for combined request
+- [x] Update searchDataForSEO to send all seeds in one combined API request
+- [x] Filter out keywords with null MSV from results
+- [x] Group results by seed using word-overlap heuristic
+- [x] Update AI suggest prompt to enforce 1-3 word seed terms
+- [x] Add tip banner to Step8 explaining short vs long seeds
+- [x] Add no-results guidance when all groups return empty

@@ -113,11 +113,14 @@ BUSINESS PROFILE:
 - Service area: ${biz.serviceArea ?? "not specified"}
 
 INSTRUCTIONS:
-1. Generate 8–10 short seed keyword phrases (2–4 words each) that represent the CORE topics this business should rank for.
-2. Each seed must be a real phrase people type into Google — not a sentence or question.
-3. Include a mix of: main service terms, location-modified terms (if local), and problem/solution terms.
-4. Do NOT include brand names, competitor names, or overly generic single words.
-5. Seeds will be expanded into a full keyword list via Google Ads data — choose seeds that generate diverse, relevant variations.
+1. Generate 8–10 SHORT seed keyword phrases (1–3 words each) that represent the CORE topics this business should rank for.
+2. CRITICAL: Keep seeds SHORT and BROAD — 1 to 3 words maximum. Google Ads needs broad terms to find related keywords. Long phrases (4+ words) return no data.
+   GOOD examples: "workplace wellbeing", "mental health", "employee assistance", "psychosocial hazards"
+   BAD examples: "workplace mental health compliance documentation", "psychosocial hazard risk assessment"
+3. Each seed must be a real phrase people type into Google — not a sentence or question.
+4. Include a mix of: main service terms, location-modified terms (if local business), and problem/solution terms.
+5. Do NOT include brand names, competitor names, or overly generic single words like "health" alone.
+6. Seeds will be expanded into a full keyword list via Google Ads data — choose seeds that generate diverse, relevant variations.
 
 Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
 
@@ -188,7 +191,9 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
         return { results: mockResults, message: "DataForSEO credentials not configured — showing seed keywords only." };
       }
 
-      // Call DataForSEO for each seed — max 10 results per seed, grouped
+      // ── Combined request: send ALL seeds together for best results ─────────
+      // The keywords_for_keywords endpoint returns far more results when given
+      // multiple seeds at once vs. one seed per request.
       type SeedGroup = {
         seed: string;
         keywords: Array<{
@@ -198,37 +203,96 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
           cpc: number | null;
         }>;
       };
-      const groups: SeedGroup[] = [];
-      let totalFound = 0;
 
-      for (const seed of seeds) {
-        try {
-          // Request 11 so we can always show 10 even if the seed itself is in the list
-          const suggestions = await getKeywordSuggestions(seed.keyword, input.locationCode, "en", 11);
-          // Sort by MSV descending, cap at 10
-          const sorted = suggestions
-            .sort((a, b) => (b.monthlySearchVolume ?? 0) - (a.monthlySearchVolume ?? 0))
-            .slice(0, 10);
-          groups.push({
-            seed: seed.keyword,
-            keywords: sorted.map((s) => ({
-              keyword: s.keyword,
-              msv: s.monthlySearchVolume,
-              competition: s.competitionLevel,
-              cpc: s.cpc,
-            })),
-          });
-          totalFound += sorted.length;
-        } catch (err) {
-          console.warn(`[KeywordSeeds] DataForSEO failed for seed "${seed.keyword}":`, err);
-          groups.push({ seed: seed.keyword, keywords: [] });
+      // Cap at 200 results total to keep response manageable
+      const LIMIT = 200;
+      let allSuggestions: Array<{ keyword: string; msv: number | null; competition: string | null; cpc: number | null }> = [];
+
+      try {
+        const seedTerms = seeds.map((s) => s.keyword);
+        const suggestions = await getKeywordSuggestions(
+          seedTerms, // pass all seeds as an array for a combined request
+          input.locationCode,
+          "en",
+          LIMIT
+        );
+        // Filter: only keep keywords that have real MSV data
+        allSuggestions = suggestions
+          .filter((s) => s.monthlySearchVolume != null && s.monthlySearchVolume > 0)
+          .sort((a, b) => (b.monthlySearchVolume ?? 0) - (a.monthlySearchVolume ?? 0))
+          .map((s) => ({
+            keyword: s.keyword,
+            msv: s.monthlySearchVolume,
+            competition: s.competitionLevel,
+            cpc: s.cpc,
+          }));
+      } catch (err) {
+        console.warn("[KeywordSeeds] Combined DataForSEO request failed:", err);
+      }
+
+      // If combined request returned nothing, try seeds individually
+      if (allSuggestions.length === 0) {
+        for (const seed of seeds) {
+          try {
+            const suggestions = await getKeywordSuggestions(seed.keyword, input.locationCode, "en", 30);
+            const withData = suggestions
+              .filter((s) => s.monthlySearchVolume != null && s.monthlySearchVolume > 0)
+              .map((s) => ({
+                keyword: s.keyword,
+                msv: s.monthlySearchVolume,
+                competition: s.competitionLevel,
+                cpc: s.cpc,
+              }));
+            allSuggestions.push(...withData);
+          } catch (err) {
+            console.warn(`[KeywordSeeds] DataForSEO failed for seed "${seed.keyword}":`, err);
+          }
+        }
+        // Deduplicate and sort
+        const seen = new Set<string>();
+        allSuggestions = allSuggestions
+          .filter((s) => { const k = s.keyword.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+          .sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
+      }
+
+      // ── Group results by seed (assign each keyword to its closest seed) ────
+      // Simple heuristic: a keyword belongs to the seed whose words appear most in it
+      const groups: SeedGroup[] = seeds.map((s) => ({ seed: s.keyword, keywords: [] }));
+      const PER_SEED = Math.max(10, Math.ceil(allSuggestions.length / Math.max(seeds.length, 1)));
+
+      // Score each keyword against each seed and assign to best-matching seed
+      for (const kw of allSuggestions) {
+        let bestSeedIdx = 0;
+        let bestScore = -1;
+        seeds.forEach((seed, idx) => {
+          const seedWords = seed.keyword.toLowerCase().split(/\s+/);
+          const kwLower = kw.keyword.toLowerCase();
+          const score = seedWords.filter((w) => w.length > 2 && kwLower.includes(w)).length;
+          if (score > bestScore) { bestScore = score; bestSeedIdx = idx; }
+        });
+        const group = groups[bestSeedIdx];
+        if (group && group.keywords.length < PER_SEED) {
+          group.keywords.push(kw);
         }
       }
+
+      // Fill any empty groups with top unassigned keywords
+      const assignedKws = new Set(groups.flatMap((g) => g.keywords.map((k) => k.keyword)));
+      const unassigned = allSuggestions.filter((k) => !assignedKws.has(k.keyword));
+      for (const group of groups) {
+        if (group.keywords.length === 0 && unassigned.length > 0) {
+          group.keywords.push(...unassigned.splice(0, 10));
+        }
+      }
+
+      const totalFound = groups.reduce((sum, g) => sum + g.keywords.length, 0);
 
       return {
         groups,
         totalFound,
-        message: `Found ${totalFound} keywords across ${seeds.length} seeds (up to 10 per seed).`,
+        message: totalFound > 0
+          ? `Found ${totalFound} keywords across ${seeds.length} seed${seeds.length !== 1 ? "s" : ""} — select the ones most relevant to your business.`
+          : `No keyword data found. Try shorter, broader seed terms (e.g. "mental health" instead of "workplace mental health compliance").`,
       };
     }),
 });
