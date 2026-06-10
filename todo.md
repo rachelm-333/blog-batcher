@@ -902,3 +902,11 @@
 - [x] Update AI suggest prompt to enforce 1-3 word seed terms
 - [x] Add tip banner to Step8 explaining short vs long seeds
 - [x] Add no-results guidance when all groups return empty
+
+## Architecture Page — Variable Clusters (Jun 10 2026)
+- [x] Remove fixed 20/50 pack selector from Architecture page
+- [x] Add Clusters per Pillar slider (1–6, default 3)
+- [x] Update architectureRules.ts to support variable clusters and no pack-size constraint
+- [x] Update server architecture.ts to use initDefault and pass clustersPerPillar to update
+- [x] Live count cards update as all three sliders are dragged
+- [x] Architecture summary sentence shows full equation

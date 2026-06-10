@@ -1,22 +1,23 @@
 /**
  * Blog Batcher — Architecture Rules Engine
  *
- * Enforces the Cornerstone → Pillar → Cluster hierarchy rules from the Master Scope:
- *  - Clusters per pillar: always exactly 3 (fixed)
- *  - Minimum ratio: 1 Cornerstone : 1 Pillar : 3 Clusters
- *  - Maximum per cornerstone: 1 Cornerstone : 4 Pillars : 12 Clusters
- *  - Total articles must equal packSize (20 or 50)
- *  - Pack is locked once selected
+ * Enforces the Cornerstone → Pillar → Cluster hierarchy rules:
+ *  - Cornerstones: 1–6
+ *  - Pillars per Cornerstone: 1–6
+ *  - Clusters per Pillar: 1–6 (user-configurable, default 3)
+ *  - No fixed pack size — total is determined by the three sliders
  */
 
 export const PACK_SIZES = [20, 50] as const;
 export type PackSize = (typeof PACK_SIZES)[number];
 
-export const CLUSTERS_PER_PILLAR = 3; // fixed — never changes
+export const DEFAULT_CLUSTERS_PER_PILLAR = 3;
+export const MIN_CLUSTERS_PER_PILLAR = 1;
+export const MAX_CLUSTERS_PER_PILLAR = 6;
 export const MIN_PILLARS_PER_CORNERSTONE = 1;
-export const MAX_PILLARS_PER_CORNERSTONE = 4;
+export const MAX_PILLARS_PER_CORNERSTONE = 6;
 export const MIN_CORNERSTONES = 1;
-export const MAX_CORNERSTONES = 4;
+export const MAX_CORNERSTONES = 6;
 
 export const ARTICLE_TYPES = [
   "cornerstone_guide",
@@ -55,25 +56,35 @@ export const WORD_COUNT_TARGETS: Record<"cornerstone" | "pillar" | "cluster", { 
 
 // ─── Default architectures ────────────────────────────────────────────────────
 
-export const DEFAULT_ARCHITECTURE: Record<PackSize, { cornerstones: number; pillarsPerCornerstone: number }> = {
-  20: { cornerstones: 2, pillarsPerCornerstone: 2 },
-  50: { cornerstones: 4, pillarsPerCornerstone: 3 },
+export const DEFAULT_ARCHITECTURE = {
+  cornerstones: 2,
+  pillarsPerCornerstone: 2,
+  clustersPerPillar: DEFAULT_CLUSTERS_PER_PILLAR,
 };
 
 // ─── Calculation helpers ──────────────────────────────────────────────────────
 
-export function calcTotalArticles(cornerstones: number, pillarsPerCornerstone: number): number {
+export function calcTotalArticles(
+  cornerstones: number,
+  pillarsPerCornerstone: number,
+  clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
+): number {
   const totalPillars = cornerstones * pillarsPerCornerstone;
-  const totalClusters = totalPillars * CLUSTERS_PER_PILLAR;
+  const totalClusters = totalPillars * clustersPerPillar;
   return cornerstones + totalPillars + totalClusters;
 }
 
-export function calcBreakdown(cornerstones: number, pillarsPerCornerstone: number) {
+export function calcBreakdown(
+  cornerstones: number,
+  pillarsPerCornerstone: number,
+  clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
+) {
   const totalPillars = cornerstones * pillarsPerCornerstone;
-  const totalClusters = totalPillars * CLUSTERS_PER_PILLAR;
+  const totalClusters = totalPillars * clustersPerPillar;
   return {
     cornerstones,
     pillarsPerCornerstone,
+    clustersPerPillar,
     totalPillars,
     totalClusters,
     total: cornerstones + totalPillars + totalClusters,
@@ -86,88 +97,60 @@ export interface GuardrailResult {
   valid: boolean;
   correctedCornerstones: number;
   correctedPillarsPerCornerstone: number;
+  correctedClustersPerPillar: number;
   warnings: string[];
 }
 
 /**
- * Validates a proposed architecture configuration against all guardrail rules.
- * Returns the (possibly corrected) values and any warning messages to show the user.
+ * Validates a proposed architecture configuration against guardrail rules.
+ * No pack-size constraint — just clamps each dimension to its allowed range.
  */
 export function validateArchitecture(
-  packSize: PackSize,
+  _packSize: PackSize | null,
   proposedCornerstones: number,
-  proposedPillarsPerCornerstone: number
+  proposedPillarsPerCornerstone: number,
+  proposedClustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
 ): GuardrailResult {
   const warnings: string[] = [];
   let cornerstones = proposedCornerstones;
   let pillarsPerCornerstone = proposedPillarsPerCornerstone;
+  let clustersPerPillar = proposedClustersPerPillar;
 
   // ── Clamp cornerstones ────────────────────────────────────────────────────
   if (cornerstones < MIN_CORNERSTONES) {
-    warnings.push(`Minimum 1 cornerstone required. Adjusted to 1.`);
+    warnings.push(`Minimum ${MIN_CORNERSTONES} cornerstone required. Adjusted to ${MIN_CORNERSTONES}.`);
     cornerstones = MIN_CORNERSTONES;
   }
   if (cornerstones > MAX_CORNERSTONES) {
-    warnings.push(
-      `Maximum ${MAX_CORNERSTONES} cornerstones allowed. Adjusted to ${MAX_CORNERSTONES}.`
-    );
+    warnings.push(`Maximum ${MAX_CORNERSTONES} cornerstones allowed. Adjusted to ${MAX_CORNERSTONES}.`);
     cornerstones = MAX_CORNERSTONES;
   }
 
   // ── Clamp pillars per cornerstone ─────────────────────────────────────────
   if (pillarsPerCornerstone < MIN_PILLARS_PER_CORNERSTONE) {
-    warnings.push(`Minimum 1 pillar per cornerstone required. Adjusted to 1.`);
+    warnings.push(`Minimum ${MIN_PILLARS_PER_CORNERSTONE} pillar per cornerstone required. Adjusted to ${MIN_PILLARS_PER_CORNERSTONE}.`);
     pillarsPerCornerstone = MIN_PILLARS_PER_CORNERSTONE;
   }
   if (pillarsPerCornerstone > MAX_PILLARS_PER_CORNERSTONE) {
-    warnings.push(
-      `Maximum ${MAX_PILLARS_PER_CORNERSTONE} pillars per cornerstone allowed. Adjusted to ${MAX_PILLARS_PER_CORNERSTONE}.`
-    );
+    warnings.push(`Maximum ${MAX_PILLARS_PER_CORNERSTONE} pillars per cornerstone allowed. Adjusted to ${MAX_PILLARS_PER_CORNERSTONE}.`);
     pillarsPerCornerstone = MAX_PILLARS_PER_CORNERSTONE;
   }
 
-  // ── Check total article count fits the pack ───────────────────────────────
-  const total = calcTotalArticles(cornerstones, pillarsPerCornerstone);
-
-  if (total > packSize) {
-    // Reduce pillars first, then cornerstones, until we fit
-    let adjusted = false;
-    outer: for (let c = cornerstones; c >= MIN_CORNERSTONES; c--) {
-      for (let p = pillarsPerCornerstone; p >= MIN_PILLARS_PER_CORNERSTONE; p--) {
-        if (calcTotalArticles(c, p) <= packSize) {
-          if (c !== cornerstones || p !== pillarsPerCornerstone) {
-            warnings.push(
-              `With ${packSize} articles, this configuration exceeds the pack size. ` +
-                `Adjusted to ${c} cornerstone${c > 1 ? "s" : ""} × ${p} pillar${p > 1 ? "s" : ""} per cornerstone ` +
-                `(${calcTotalArticles(c, p)} articles).`
-            );
-            cornerstones = c;
-            pillarsPerCornerstone = p;
-          }
-          adjusted = true;
-          break outer;
-        }
-      }
-    }
-    if (!adjusted) {
-      cornerstones = MIN_CORNERSTONES;
-      pillarsPerCornerstone = MIN_PILLARS_PER_CORNERSTONE;
-      warnings.push(
-        `Configuration could not fit within ${packSize} articles. Reset to minimum configuration.`
-      );
-    }
+  // ── Clamp clusters per pillar ─────────────────────────────────────────────
+  if (clustersPerPillar < MIN_CLUSTERS_PER_PILLAR) {
+    warnings.push(`Minimum ${MIN_CLUSTERS_PER_PILLAR} cluster per pillar required. Adjusted to ${MIN_CLUSTERS_PER_PILLAR}.`);
+    clustersPerPillar = MIN_CLUSTERS_PER_PILLAR;
   }
-
-  const finalTotal = calcTotalArticles(cornerstones, pillarsPerCornerstone);
-  const valid =
-    cornerstones === proposedCornerstones &&
-    pillarsPerCornerstone === proposedPillarsPerCornerstone &&
-    finalTotal <= packSize;
+  if (clustersPerPillar > MAX_CLUSTERS_PER_PILLAR) {
+    warnings.push(`Maximum ${MAX_CLUSTERS_PER_PILLAR} clusters per pillar allowed. Adjusted to ${MAX_CLUSTERS_PER_PILLAR}.`);
+    clustersPerPillar = MAX_CLUSTERS_PER_PILLAR;
+  }
 
   return {
     valid: warnings.length === 0,
     correctedCornerstones: cornerstones,
     correctedPillarsPerCornerstone: pillarsPerCornerstone,
+    correctedClustersPerPillar: clustersPerPillar,
     warnings,
   };
 }
@@ -189,7 +172,8 @@ export interface ArchitectureNode {
  */
 export function generateNodes(
   cornerstones: number,
-  pillarsPerCornerstone: number
+  pillarsPerCornerstone: number,
+  clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
 ): ArchitectureNode[] {
   const nodes: ArchitectureNode[] = [];
 
@@ -215,7 +199,7 @@ export function generateNodes(
         label: `Pillar ${c}.${p}`,
       });
 
-      for (let cl = 1; cl <= CLUSTERS_PER_PILLAR; cl++) {
+      for (let cl = 1; cl <= clustersPerPillar; cl++) {
         // Cluster node
         nodes.push({
           level: "cluster",

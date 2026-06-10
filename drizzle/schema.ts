@@ -320,11 +320,10 @@ export const blogArchitectures = mysqlTable("blog_architectures", {
   /** Number of pillar articles per cornerstone. */
   pillarCount: int("pillarCount").notNull(),
   /**
-   * Clusters per pillar — always 3 per the non-negotiable rules.
-   * Stored explicitly for clarity and validation.
+   * Clusters per pillar — user-configurable (1–6), defaults to 3.
    */
   clustersPerPillar: int("clustersPerPillar").default(3).notNull(),
-  /** Total article count calculated from the architecture. Must equal packSize. */
+  /** Total article count calculated from cornerstones × pillars × clusters. */
   totalArticleCount: int("totalArticleCount").notNull(),
   /** Whether the user has confirmed this architecture and advanced to Stage 3. */
   confirmed: boolean("confirmed").default(false).notNull(),

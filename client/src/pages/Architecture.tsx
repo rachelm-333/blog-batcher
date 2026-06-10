@@ -17,11 +17,17 @@ import { trpc } from "@/lib/trpc";
 import {
   ARTICLE_TYPE_LABELS,
   ARTICLE_TYPES,
+  DEFAULT_CLUSTERS_PER_PILLAR,
+  MAX_CLUSTERS_PER_PILLAR,
+  MAX_CORNERSTONES,
+  MAX_PILLARS_PER_CORNERSTONE,
+  MIN_CLUSTERS_PER_PILLAR,
+  MIN_CORNERSTONES,
+  MIN_PILLARS_PER_CORNERSTONE,
   VALID_TYPES_BY_LEVEL,
   calcBreakdown,
   validateArchitecture,
   type ArticleType,
-  type PackSize,
 } from "@shared/architectureRules";
 import {
   AlertTriangle,
@@ -186,6 +192,48 @@ function TreeMap({
   );
 }
 
+// ─── Slider row helper ────────────────────────────────────────────────────────
+
+function SliderRow({
+  label,
+  value,
+  min,
+  max,
+  colour,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  colour: string;
+  disabled: boolean;
+  onChange: (v: number) => void;
+}) {
+  const ticks = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between text-sm">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className={`font-semibold ${colour}`}>{value}</span>
+      </div>
+      <Slider
+        min={min}
+        max={max}
+        step={1}
+        value={[value]}
+        onValueChange={([v]) => onChange(v)}
+        disabled={disabled}
+        className="w-full"
+      />
+      <div className="flex justify-between text-xs text-muted-foreground">
+        {ticks.map((t) => <span key={t}>{t}</span>)}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Architecture() {
@@ -195,6 +243,7 @@ export default function Architecture() {
   // Local slider state (optimistic, before saving)
   const [localCornerstones, setLocalCornerstones] = useState(2);
   const [localPillars, setLocalPillars] = useState(2);
+  const [localClusters, setLocalClusters] = useState(DEFAULT_CLUSTERS_PER_PILLAR);
   const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
 
   // Business query
@@ -214,34 +263,39 @@ export default function Architecture() {
   const arch = archData?.architecture;
   const nodes = (archData?.nodes ?? []) as ArchNode[];
 
-  // Sync sliders with DB values
+  // Auto-init default architecture if none exists
+  const initDefault = trpc.architecture.initDefault.useMutation({
+    onSuccess: () => refetchArch(),
+  });
+
+  useEffect(() => {
+    if (!archLoading && businessId && archData && !archData.architecture) {
+      initDefault.mutate({ businessId });
+    }
+  }, [archLoading, businessId, archData?.architecture]);
+
+  // Sync sliders with DB values when arch loads
   useEffect(() => {
     if (arch) {
       setLocalCornerstones(arch.cornerstoneCount);
       setLocalPillars(arch.pillarCount);
+      setLocalClusters(arch.clustersPerPillar ?? DEFAULT_CLUSTERS_PER_PILLAR);
     }
-  }, [arch?.cornerstoneCount, arch?.pillarCount]);
+  }, [arch?.cornerstoneCount, arch?.pillarCount, arch?.clustersPerPillar]);
 
   // Live guardrail preview (client-side, no network call)
-  const liveGuardrail = useMemo(() => {
-    if (!arch?.packSize) return null;
-    return validateArchitecture(arch.packSize as PackSize, localCornerstones, localPillars);
-  }, [arch?.packSize, localCornerstones, localPillars]);
-
-  // Always show what the user has the sliders set to (raw values), not the guardrail-corrected values
-  const liveBreakdown = useMemo(
-    () => calcBreakdown(localCornerstones, localPillars),
-    [localCornerstones, localPillars]
+  const liveGuardrail = useMemo(
+    () => validateArchitecture(null, localCornerstones, localPillars, localClusters),
+    [localCornerstones, localPillars, localClusters]
   );
 
-  // Is the current slider config over the pack limit?
-  const isOverLimit = arch?.packSize != null && liveBreakdown.total > arch.packSize;
+  // Always show what the user has the sliders set to (raw values)
+  const liveBreakdown = useMemo(
+    () => calcBreakdown(localCornerstones, localPillars, localClusters),
+    [localCornerstones, localPillars, localClusters]
+  );
 
   // Mutations
-  const setPackSize = trpc.architecture.setPackSize.useMutation({
-    onSuccess: () => refetchArch(),
-  });
-
   const updateArch = trpc.architecture.update.useMutation({
     onSuccess: (data) => {
       setGuardrailWarnings(data.guardrailWarnings);
@@ -268,7 +322,7 @@ export default function Architecture() {
     }
   }, [authLoading, user, businessId, businessData]);
 
-  if (authLoading || archLoading) {
+  if (authLoading || archLoading || initDefault.isPending) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600" />
@@ -289,7 +343,7 @@ export default function Architecture() {
           <div>
             <h1 style={{ fontSize:18, fontWeight:700, color:"#1a1a2e", margin:0 }}>Stage 2 — Blog Architecture</h1>
             <p style={{ fontSize:13, color:"#6b7280", marginTop:4, marginBottom:0 }}>
-              Define the structure of your content batch before keyword research begins.
+              Define the structure of your content batch. Drag the sliders to set the number of cornerstones, pillars, and clusters.
             </p>
           </div>
           {locked && (
@@ -301,194 +355,119 @@ export default function Architecture() {
       </div>
 
       <div style={{ maxWidth:900, margin:"0 auto", padding:"32px 24px", display:"flex", flexDirection:"column", gap:24 }}>
-        {/* ── Step 1: Pack Selection ─────────────────────────────────────────── */}
+
+        {/* ── Configure Architecture ─────────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-1.5">
-              <CardTitle className="text-base">1. Select Your Pack</CardTitle>
-              <HelpLink slug="how-many-articles" label="How to choose the right number of articles" />
+              <CardTitle className="text-base">Configure Your Content Architecture</CardTitle>
+              <HelpLink slug="cornerstone-pillar-cluster" label="What are Cornerstone, Pillar, and Cluster articles?" />
             </div>
-            <CardDescription>Choose how many articles you want in this batch. This is locked once selected.</CardDescription>
+            <CardDescription>
+              Use the sliders to set how many cornerstones, pillars per cornerstone, and clusters per pillar you want.
+              The total article count updates live as you drag.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            {arch?.packSize ? (
-              <div className="flex items-center gap-3">
-                <Badge className="bg-violet-500/15 text-violet-300 border-violet-500/30 text-sm px-3 py-1">
-                  {arch.packSize}-Article Pack
-                </Badge>
-                {locked && <Lock className="w-4 h-4 text-muted-foreground" />}
-                {!locked && (
-                  <span className="text-xs text-muted-foreground">
-                    Pack is locked once architecture is confirmed.
-                  </span>
-                )}
+          <CardContent className="space-y-6">
+            {/* Guardrail warnings */}
+            {guardrailWarnings.length > 0 && (
+              <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-sm text-amber-400">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  {guardrailWarnings.map((w, i) => (
+                    <p key={i}>{w}</p>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4 max-w-md">
-                {([20, 50] as PackSize[]).map((size) => (
-                  <button
-                    key={size}
-                    onClick={() =>
-                      businessId &&
-                      setPackSize.mutate({ businessId, packSize: size })
-                    }
-                    disabled={setPackSize.isPending}
-                    className="rounded-xl border-2 border-border hover:border-violet-400 hover:bg-violet-500/10 p-6 text-center transition-all group"
-                  >
-                    <div className="text-3xl font-bold text-foreground group-hover:text-violet-400">
-                      {size}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">Articles</div>
-                    <div className="text-xs text-muted-foreground mt-2">
-                      {size === 20 ? "Citation Starter" : "Citation Authority"}
-                    </div>
-                  </button>
-                ))}
-              </div>
+            )}
+
+            {/* Article count summary — live updating */}
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { label: "Cornerstones", value: liveBreakdown.cornerstones, colour: "text-violet-400" },
+                { label: "Pillars", value: liveBreakdown.totalPillars, colour: "text-primary" },
+                { label: "Clusters", value: liveBreakdown.totalClusters, colour: "text-muted-foreground" },
+                { label: "Total Articles", value: liveBreakdown.total, colour: "text-foreground font-bold" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-lg bg-background border border-border p-3 text-center transition-colors"
+                >
+                  <div className={`text-2xl flex items-center justify-center gap-1 ${item.colour}`}>
+                    {item.value}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{item.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Cornerstones slider */}
+            <SliderRow
+              label="Cornerstones"
+              value={localCornerstones}
+              min={MIN_CORNERSTONES}
+              max={MAX_CORNERSTONES}
+              colour="text-violet-400"
+              disabled={locked}
+              onChange={setLocalCornerstones}
+            />
+
+            {/* Pillars per Cornerstone slider */}
+            <SliderRow
+              label="Pillar Posts per Cornerstone"
+              value={localPillars}
+              min={MIN_PILLARS_PER_CORNERSTONE}
+              max={MAX_PILLARS_PER_CORNERSTONE}
+              colour="text-primary"
+              disabled={locked}
+              onChange={setLocalPillars}
+            />
+
+            {/* Clusters per Pillar slider */}
+            <SliderRow
+              label="Cluster Articles per Pillar"
+              value={localClusters}
+              min={MIN_CLUSTERS_PER_PILLAR}
+              max={MAX_CLUSTERS_PER_PILLAR}
+              colour="text-muted-foreground"
+              disabled={locked}
+              onChange={setLocalClusters}
+            />
+
+            {/* Architecture summary sentence */}
+            <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-4 py-3">
+              <strong>{localCornerstones}</strong> cornerstone{localCornerstones > 1 ? "s" : ""} ×{" "}
+              <strong>{localPillars}</strong> pillar{localPillars > 1 ? "s" : ""} per cornerstone ×{" "}
+              <strong>{localClusters}</strong> cluster{localClusters > 1 ? "s" : ""} per pillar ={" "}
+              <strong>{liveBreakdown.total} articles total</strong>
+            </p>
+
+            {!locked && (
+              <Button
+                onClick={() =>
+                  businessId &&
+                  updateArch.mutate({
+                    businessId,
+                    cornerstones: localCornerstones,
+                    pillarsPerCornerstone: localPillars,
+                    clustersPerPillar: localClusters,
+                  })
+                }
+                disabled={updateArch.isPending}
+                variant="outline"
+                size="sm"
+              >
+                {updateArch.isPending ? "Saving…" : "Apply Changes"}
+              </Button>
             )}
           </CardContent>
         </Card>
 
-        {/* ── Step 2: Architecture Sliders ──────────────────────────────────── */}
-        {arch?.packSize && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-1.5">
-              <CardTitle className="text-base">2. Configure Architecture</CardTitle>
-              <HelpLink slug="cornerstone-pillar-cluster" label="What are Cornerstone, Pillar, and Cluster articles?" />
-            </div>
-              <CardDescription>
-                Adjust the number of cornerstones and pillars. Clusters per pillar are always 3.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Guardrail warnings */}
-              {(guardrailWarnings.length > 0 || (liveGuardrail && !liveGuardrail.valid)) && (
-                <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-sm text-amber-400">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    {(liveGuardrail?.warnings ?? guardrailWarnings).map((w, i) => (
-                      <p key={i}>{w}</p>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Article count summary */}
-              <div className="grid grid-cols-4 gap-3">
-                {[
-                  { label: "Cornerstones", value: liveBreakdown.cornerstones, colour: "text-violet-400", over: false },
-                  { label: "Pillars", value: liveBreakdown.totalPillars, colour: "text-primary", over: false },
-                  { label: "Clusters", value: liveBreakdown.totalClusters, colour: "text-muted-foreground", over: false },
-                  { label: "Total Articles", value: liveBreakdown.total, colour: isOverLimit ? "text-red-500 font-bold" : "text-foreground font-bold", over: isOverLimit },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className={`rounded-lg bg-background border p-3 text-center transition-colors ${
-                      item.over ? "border-red-400 bg-red-50" : "border-border"
-                    }`}
-                  >
-                    <div className={`text-2xl flex items-center justify-center gap-1 ${item.colour}`}>
-                      {item.value}
-                      {item.over && <AlertTriangle className="w-4 h-4 text-red-500" />}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{item.label}</div>
-                    {item.over && arch?.packSize && (
-                      <div className="text-xs text-red-500 mt-0.5 font-medium">Limit: {arch.packSize}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Over-limit warning */}
-              {isOverLimit && arch?.packSize && liveGuardrail && (
-                <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-300 px-4 py-3 text-sm text-red-700">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
-                  <div>
-                    <p className="font-semibold">
-                      {liveBreakdown.total} articles exceeds your {arch.packSize}-article pack by {liveBreakdown.total - arch.packSize}.
-                    </p>
-                    <p className="mt-0.5">
-                      Suggested fix: reduce to{" "}
-                      <strong>{liveGuardrail.correctedCornerstones} cornerstone{liveGuardrail.correctedCornerstones > 1 ? "s" : ""}</strong>{" "}
-                      × <strong>{liveGuardrail.correctedPillarsPerCornerstone} pillar{liveGuardrail.correctedPillarsPerCornerstone > 1 ? "s" : ""} per cornerstone</strong>{" "}
-                      = {calcBreakdown(liveGuardrail.correctedCornerstones, liveGuardrail.correctedPillarsPerCornerstone).total} articles.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Cornerstones slider */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-foreground">Cornerstones</span>
-                  <span className="text-violet-400 font-semibold">{localCornerstones}</span>
-                </div>
-                <Slider
-                  min={1}
-                  max={4}
-                  step={1}
-                  value={[localCornerstones]}
-                  onValueChange={([v]) => setLocalCornerstones(v)}
-                  disabled={locked}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>1</span><span>2</span><span>3</span><span>4</span>
-                </div>
-              </div>
-
-              {/* Pillars slider */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-foreground">Pillars per Cornerstone</span>
-                  <span className="text-primary font-semibold">{localPillars}</span>
-                </div>
-                <Slider
-                  min={1}
-                  max={4}
-                  step={1}
-                  value={[localPillars]}
-                  onValueChange={([v]) => setLocalPillars(v)}
-                  disabled={locked}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>1</span><span>2</span><span>3</span><span>4</span>
-                </div>
-              </div>
-
-              {/* Clusters note */}
-              <p className="text-xs text-muted-foreground">
-                Clusters per pillar are always exactly 3 — this is a fixed rule of the Blog Batcher architecture system.
-              </p>
-
-              {!locked && (
-                <Button
-                  onClick={() =>
-                    businessId &&
-                    updateArch.mutate({
-                      businessId,
-                      cornerstones: localCornerstones,
-                      pillarsPerCornerstone: localPillars,
-                    })
-                  }
-                  disabled={updateArch.isPending || isOverLimit}
-                  variant="outline"
-                  size="sm"
-                >
-                  {updateArch.isPending ? "Saving…" : isOverLimit ? "Over pack limit — adjust sliders" : "Apply Changes"}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ── Step 3: Visual Tree Map ───────────────────────────────────────── */}
+        {/* ── Visual Tree Map ───────────────────────────────────────────────── */}
         {nodes.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">3. Architecture Map</CardTitle>
+              <CardTitle className="text-base">Architecture Map</CardTitle>
               <CardDescription>
                 Select the article type for each Pillar. Cornerstone types are fixed. Cluster types are auto-assigned.
               </CardDescription>
@@ -513,11 +492,7 @@ export default function Architecture() {
               size="lg"
               className="bg-violet-600 hover:bg-violet-700 text-white px-8"
               onClick={() => businessId && confirmArch.mutate({ businessId })}
-              disabled={
-                confirmArch.isPending ||
-                !arch?.packSize ||
-                (liveGuardrail !== null && !liveGuardrail.valid)
-              }
+              disabled={confirmArch.isPending}
             >
               {confirmArch.isPending
                 ? "Confirming…"

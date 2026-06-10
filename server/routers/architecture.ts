@@ -2,11 +2,11 @@
  * Layer 4 — Stage 2: Blog Architecture
  *
  * Procedures:
- *  architecture.getOrCreate  — get existing architecture or create default for the business
- *  architecture.update       — update cornerstones/pillars, validate guardrails server-side
- *  architecture.setPackSize  — select pack size (20 or 50), locked once set
+ *  architecture.getOrCreate    — get existing architecture or return null
+ *  architecture.initDefault    — create the default architecture for a business
+ *  architecture.update         — update cornerstones/pillars/clusters, validate guardrails server-side
  *  architecture.setArticleType — set article type for a specific article_node
- *  architecture.confirm      — lock the architecture, advance stage to 3
+ *  architecture.confirm        — lock the architecture, advance stage to 3
  */
 
 import { TRPCError } from "@trpc/server";
@@ -20,11 +20,16 @@ import {
 import {
   ARTICLE_TYPES,
   DEFAULT_ARCHITECTURE,
-  PACK_SIZES,
+  DEFAULT_CLUSTERS_PER_PILLAR,
+  MAX_CLUSTERS_PER_PILLAR,
+  MAX_CORNERSTONES,
+  MAX_PILLARS_PER_CORNERSTONE,
+  MIN_CLUSTERS_PER_PILLAR,
+  MIN_CORNERSTONES,
+  MIN_PILLARS_PER_CORNERSTONE,
   calcTotalArticles,
   generateNodes,
   validateArchitecture,
-  type PackSize,
 } from "../../shared/architectureRules";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -47,14 +52,15 @@ async function assertBusinessOwnership(userId: number, businessId: number) {
 
 /**
  * Deletes all existing article_nodes for this architecture and regenerates them
- * based on the current cornerstoneCount and pillarCount.
+ * based on the current cornerstoneCount, pillarCount, and clustersPerPillar.
  */
 async function regenerateNodes(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   architectureId: number,
   businessId: number,
   cornerstones: number,
-  pillarsPerCornerstone: number
+  pillarsPerCornerstone: number,
+  clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
 ) {
   // Delete existing nodes
   await db
@@ -62,12 +68,7 @@ async function regenerateNodes(
     .where(eq(articleNodes.architectureId, architectureId));
 
   // Generate new node list
-  const nodes = generateNodes(cornerstones, pillarsPerCornerstone);
-
-  // We need to insert in two passes: cornerstones first (to get their IDs),
-  // then pillars (referencing cornerstone IDs), then clusters.
-  // Because MySQL doesn't support RETURNING, we insert level by level and
-  // re-query IDs after each pass.
+  const nodes = generateNodes(cornerstones, pillarsPerCornerstone, clustersPerPillar);
 
   let sortOrder = 0;
 
@@ -135,7 +136,6 @@ async function regenerateNodes(
     const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
     if (!cornerstoneRow) continue;
 
-    // Find the matching pillar: it belongs to this cornerstone and is the p-th pillar under it
     const pillarsUnderCornerstone = insertedPillars.filter(
       (p) => p.parentCornerstoneId === cornerstoneRow.id
     );
@@ -158,8 +158,7 @@ async function regenerateNodes(
 
 export const architectureRouter = router({
   // -------------------------------------------------------------------------
-  // GET OR CREATE — returns the architecture for this business, creating a
-  // default one if none exists yet.
+  // GET OR CREATE — returns the architecture for this business, or null.
   // -------------------------------------------------------------------------
   getOrCreate: protectedProcedure
     .input(z.object({ businessId: z.number() }))
@@ -169,7 +168,6 @@ export const architectureRouter = router({
 
       await assertBusinessOwnership(ctx.user.id, input.businessId);
 
-      // Check for existing architecture
       const existing = await db
         .select()
         .from(blogArchitectures)
@@ -178,7 +176,6 @@ export const architectureRouter = router({
 
       if (existing.length > 0) {
         const arch = existing[0];
-        // Fetch nodes
         const nodes = await db
           .select()
           .from(articleNodes)
@@ -186,28 +183,21 @@ export const architectureRouter = router({
         return { architecture: arch, nodes };
       }
 
-      // No architecture yet — return null (pack must be selected first)
       return { architecture: null, nodes: [] };
     }),
 
   // -------------------------------------------------------------------------
-  // SET PACK SIZE — creates the architecture row with default config for the
-  // selected pack. Pack is locked once set.
+  // INIT DEFAULT — creates the architecture row with default config.
+  // Called when the user first arrives at the Architecture page.
   // -------------------------------------------------------------------------
-  setPackSize: protectedProcedure
-    .input(
-      z.object({
-        businessId: z.number(),
-        packSize: z.union([z.literal(20), z.literal(50)]),
-      })
-    )
+  initDefault: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       await assertBusinessOwnership(ctx.user.id, input.businessId);
 
-      // Check if architecture already exists
       const existing = await db
         .select()
         .from(blogArchitectures)
@@ -221,46 +211,46 @@ export const architectureRouter = router({
         });
       }
 
-      const packSize = input.packSize as PackSize;
-      const defaults = DEFAULT_ARCHITECTURE[packSize];
-      const total = calcTotalArticles(defaults.cornerstones, defaults.pillarsPerCornerstone);
+      const defaults = DEFAULT_ARCHITECTURE;
+      const total = calcTotalArticles(
+        defaults.cornerstones,
+        defaults.pillarsPerCornerstone,
+        defaults.clustersPerPillar
+      );
 
       let architectureId: number;
 
       if (existing.length > 0) {
-        // Update existing
         await db
           .update(blogArchitectures)
           .set({
-            packSize,
             cornerstoneCount: defaults.cornerstones,
             pillarCount: defaults.pillarsPerCornerstone,
-            clustersPerPillar: 3,
+            clustersPerPillar: defaults.clustersPerPillar,
             totalArticleCount: total,
           })
           .where(eq(blogArchitectures.id, existing[0].id));
         architectureId = existing[0].id;
       } else {
-        // Insert new
         const result = await db.insert(blogArchitectures).values({
           businessId: input.businessId,
-          packSize,
+          packSize: 0, // no fixed pack size — total is free-form
           cornerstoneCount: defaults.cornerstones,
           pillarCount: defaults.pillarsPerCornerstone,
-          clustersPerPillar: 3,
+          clustersPerPillar: defaults.clustersPerPillar,
           totalArticleCount: total,
           confirmed: false,
         });
         architectureId = (result as any)[0]?.insertId ?? (result as any).insertId;
       }
 
-      // Regenerate nodes for the default config
       await regenerateNodes(
         db,
         architectureId,
         input.businessId,
         defaults.cornerstones,
-        defaults.pillarsPerCornerstone
+        defaults.pillarsPerCornerstone,
+        defaults.clustersPerPillar
       );
 
       const arch = await db
@@ -276,16 +266,54 @@ export const architectureRouter = router({
       return { architecture: arch[0], nodes };
     }),
 
+  // Keep setPackSize as a no-op alias for backward compatibility
+  setPackSize: protectedProcedure
+    .input(z.object({ businessId: z.number(), packSize: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      // Delegate to initDefault — pack size is no longer meaningful
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      const existing = await db
+        .select()
+        .from(blogArchitectures)
+        .where(eq(blogArchitectures.businessId, input.businessId))
+        .limit(1);
+
+      if (existing.length > 0) {
+        return { architecture: existing[0], nodes: [] };
+      }
+
+      const defaults = DEFAULT_ARCHITECTURE;
+      const total = calcTotalArticles(defaults.cornerstones, defaults.pillarsPerCornerstone, defaults.clustersPerPillar);
+      const result = await db.insert(blogArchitectures).values({
+        businessId: input.businessId,
+        packSize: 0,
+        cornerstoneCount: defaults.cornerstones,
+        pillarCount: defaults.pillarsPerCornerstone,
+        clustersPerPillar: defaults.clustersPerPillar,
+        totalArticleCount: total,
+        confirmed: false,
+      });
+      const architectureId = (result as any)[0]?.insertId ?? (result as any).insertId;
+      await regenerateNodes(db, architectureId, input.businessId, defaults.cornerstones, defaults.pillarsPerCornerstone, defaults.clustersPerPillar);
+      const arch = await db.select().from(blogArchitectures).where(eq(blogArchitectures.id, architectureId)).limit(1);
+      const nodes = await db.select().from(articleNodes).where(eq(articleNodes.architectureId, architectureId));
+      return { architecture: arch[0], nodes };
+    }),
+
   // -------------------------------------------------------------------------
-  // UPDATE — adjust cornerstones and pillars counts. Guardrails validated
-  // server-side. Regenerates article_nodes on every update.
+  // UPDATE — adjust cornerstones, pillars, and clusters counts.
+  // Guardrails validated server-side. Regenerates article_nodes on every update.
   // -------------------------------------------------------------------------
   update: protectedProcedure
     .input(
       z.object({
         businessId: z.number(),
-        cornerstones: z.number().int().min(1).max(4),
-        pillarsPerCornerstone: z.number().int().min(1).max(4),
+        cornerstones: z.number().int().min(MIN_CORNERSTONES).max(MAX_CORNERSTONES),
+        pillarsPerCornerstone: z.number().int().min(MIN_PILLARS_PER_CORNERSTONE).max(MAX_PILLARS_PER_CORNERSTONE),
+        clustersPerPillar: z.number().int().min(MIN_CLUSTERS_PER_PILLAR).max(MAX_CLUSTERS_PER_PILLAR).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -301,35 +329,40 @@ export const architectureRouter = router({
         .limit(1);
 
       if (!existing.length) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Select a pack size first." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No architecture found. Please initialise first." });
       }
       const arch = existing[0];
       if (arch.confirmed) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Architecture is locked after confirmation." });
       }
 
-      // Run guardrails
+      const proposedClusters = input.clustersPerPillar ?? arch.clustersPerPillar ?? DEFAULT_CLUSTERS_PER_PILLAR;
+
+      // Run guardrails (no pack-size constraint)
       const guardrail = validateArchitecture(
-        arch.packSize as PackSize,
+        null,
         input.cornerstones,
-        input.pillarsPerCornerstone
+        input.pillarsPerCornerstone,
+        proposedClusters
       );
 
       const finalCornerstones = guardrail.correctedCornerstones;
       const finalPillars = guardrail.correctedPillarsPerCornerstone;
-      const total = calcTotalArticles(finalCornerstones, finalPillars);
+      const finalClusters = guardrail.correctedClustersPerPillar;
+      const total = calcTotalArticles(finalCornerstones, finalPillars, finalClusters);
 
       await db
         .update(blogArchitectures)
         .set({
           cornerstoneCount: finalCornerstones,
           pillarCount: finalPillars,
+          clustersPerPillar: finalClusters,
           totalArticleCount: total,
         })
         .where(eq(blogArchitectures.id, arch.id));
 
       // Regenerate nodes
-      await regenerateNodes(db, arch.id, input.businessId, finalCornerstones, finalPillars);
+      await regenerateNodes(db, arch.id, input.businessId, finalCornerstones, finalPillars, finalClusters);
 
       const updatedArch = await db
         .select()
@@ -351,7 +384,6 @@ export const architectureRouter = router({
 
   // -------------------------------------------------------------------------
   // SET ARTICLE TYPE — update the article type for a single pillar node.
-  // Cluster types are auto-assigned and cannot be changed here.
   // -------------------------------------------------------------------------
   setArticleType: protectedProcedure
     .input(
@@ -367,7 +399,6 @@ export const architectureRouter = router({
 
       await assertBusinessOwnership(ctx.user.id, input.businessId);
 
-      // Verify the node belongs to this business
       const node = await db
         .select()
         .from(articleNodes)
@@ -423,11 +454,12 @@ export const architectureRouter = router({
 
       const arch = existing[0];
 
-      // Validate the current config one final time
+      // Validate the current config one final time (no pack-size constraint)
       const guardrail = validateArchitecture(
-        arch.packSize as PackSize,
+        null,
         arch.cornerstoneCount,
-        arch.pillarCount
+        arch.pillarCount,
+        arch.clustersPerPillar ?? DEFAULT_CLUSTERS_PER_PILLAR
       );
       if (!guardrail.valid) {
         throw new TRPCError({
