@@ -94,6 +94,31 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   const currentStage = activeBiz?.currentStage ?? 1;
 
+  // Data-driven stage completion — don't rely solely on DB currentStage number
+  // which can lag behind actual progress
+  const sc = summary?.statusCounts ?? {};
+  const articlesWritten = (sc.generated ?? 0) + (sc.pending_approval ?? 0) + (sc.approved ?? 0) + (sc.scheduled ?? 0) + (sc.published ?? 0);
+  const approvedCount = (sc.approved ?? 0) + (sc.scheduled ?? 0) + (sc.published ?? 0);
+  const publishedOrScheduled = (sc.scheduled ?? 0) + (sc.published ?? 0);
+
+  function isStageComplete(stageNum: number): boolean {
+    if (stageNum === 1) return currentStage > 1;
+    if (stageNum === 2) return currentStage > 2;
+    if (stageNum === 3) return currentStage > 3;
+    if (stageNum === 4) return articlesWritten > 0;
+    if (stageNum === 5) return approvedCount > 0;
+    if (stageNum === 6) return publishedOrScheduled > 0;
+    return false;
+  }
+
+  function isStageLocked(stageNum: number): boolean {
+    if (stageNum <= 3) return currentStage < stageNum;
+    if (stageNum === 4) return currentStage < 4;
+    if (stageNum === 5) return articlesWritten === 0;
+    if (stageNum === 6) return approvedCount === 0;
+    return false;
+  }
+
   /* ── Sidebar ── */
   function SidebarContent() {
     return (
@@ -195,8 +220,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
           {WORKFLOW_ITEMS.map(item => {
             const active = isActive(item.path);
-            const stageComplete = currentStage > item.stage;
-            const stageLocked = currentStage < item.stage;
+            const stageComplete = isStageComplete(item.stage);
+            const stageLocked = isStageLocked(item.stage);
             return (
               <button
                 key={item.path}
