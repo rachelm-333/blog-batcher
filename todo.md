@@ -959,3 +959,19 @@
 - [x] Remove Pass 2 (subjective AI score) from badge determination — badge now based solely on Pass 1 16-point checklist
 - [x] Updated thresholds: Authority Ready = 15–16/16 (≥94), Strong = 13–14/16 (≥81), Needs Review = ≤12/16
 - [x] Updated internalScore display from "Internal score: 77/100" to "SEO checklist: 15/16 points"
+
+## Two-Checkpoint Badge Display (Jun 11 2026)
+- [ ] Ensure pass2Score is returned in articles.get and articles.getAll API responses
+- [ ] Add Checkpoint 1 badge (SEO Structure X/16) to ArticleReview SEO panel
+- [ ] Add Checkpoint 2 badge (Writing Quality X/100, green ≥70) to ArticleReview SEO panel
+- [ ] Add both checkpoint badges to ArticleReview article list sidebar
+- [ ] Add both checkpoint badges to ArticleGeneration article cards
+
+## Dual Checkpoint Badges (Jun 11 2026)
+- [x] Add pass2Score column to articles table schema and run migration
+- [x] Save pass2Score in articles router generateAndSave
+- [x] Return pass2Score in articles.getAll and articles.get API responses
+- [x] Add dual checkpoint mini-badges to ArticleReview sidebar list items (✓1 X/16, ✓2 X/100)
+- [x] Add dual checkpoint panel to ArticleReview SEO panel (Checkpoint 1 SEO Structure / Checkpoint 2 Writing Quality)
+- [x] Add dual checkpoint badges to ArticleGeneration table rows (Checkpoints column)
+- [x] Checkpoint 2 green threshold = 70/100

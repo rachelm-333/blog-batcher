@@ -478,6 +478,12 @@ export const articles = mysqlTable("articles", {
    */
   internalScore: int("internalScore"),
   /**
+   * Pass 2 writing quality score (0–100). Subjective AI assessment of
+   * search intent resolution, human authenticity, E-E-A-T, etc.
+   * Stored separately so it can be displayed as Checkpoint 2 badge.
+   */
+  pass2Score: int("pass2Score"),
+  /**
    * Status badge shown to the user. Derived from internalScore.
    * authority_ready ≥ 90, strong ≥ 80, needs_review < 80.
    */

@@ -321,6 +321,7 @@ interface ArticleListItem {
   title: string | null;
   wordCount: number | null;
   internalScore: number | null;
+  pass2Score: number | null;
   level: "cornerstone" | "pillar" | "cluster";
   articleType: string;
   urlSlug: string | null;
@@ -974,9 +975,34 @@ export default function ArticleReview() {
                   <div className="text-xs font-medium text-foreground mt-1 line-clamp-2">
                     {item.title ?? item.urlSlug ?? `Article ${item.articleNodeId}`}
                   </div>
-                  <div className="mt-1.5">
+                  <div className="mt-1.5 flex flex-wrap gap-1 items-center">
                     <StatusBadgeChip badge={item.statusBadge as StatusBadge} status={item.status as ArticleStatus} />
                   </div>
+                  {/* Dual checkpoint mini-badges */}
+                  {item.internalScore != null && (
+                    <div className="mt-1 flex gap-1">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        Math.round((item.internalScore / 100) * 16) >= 15
+                          ? "bg-emerald-500/15 text-emerald-500"
+                          : Math.round((item.internalScore / 100) * 16) >= 13
+                          ? "bg-blue-500/15 text-blue-400"
+                          : "bg-amber-500/15 text-amber-500"
+                      }`}>
+                        ✓1 {Math.round((item.internalScore / 100) * 16)}/16
+                      </span>
+                      {item.pass2Score != null && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                          item.pass2Score >= 70
+                            ? "bg-emerald-500/15 text-emerald-500"
+                            : item.pass2Score >= 50
+                            ? "bg-amber-500/15 text-amber-500"
+                            : "bg-red-500/15 text-red-400"
+                        }`}>
+                          ✓2 {item.pass2Score}/100
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </button>
               );
             })
@@ -1772,10 +1798,56 @@ export default function ArticleReview() {
                 </div>
               )}
 
-              {/* Internal score — displayed as Pass 1 points out of 16 */}
+              {/* Dual checkpoint badges */}
               {selectedItem.internalScore != null && (
-                <div className="text-xs text-muted-foreground text-center">
-                  SEO checklist: {Math.round((selectedItem.internalScore / 100) * 16)}/16 points
+                <div className="space-y-2 mt-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Quality Checkpoints</div>
+                  <div className="flex gap-2">
+                    {/* Checkpoint 1 — SEO Structure */}
+                    <div className={`flex-1 rounded-lg border p-2 text-center ${
+                      Math.round((selectedItem.internalScore / 100) * 16) >= 15
+                        ? "bg-emerald-500/10 border-emerald-500/30"
+                        : Math.round((selectedItem.internalScore / 100) * 16) >= 13
+                        ? "bg-blue-500/10 border-blue-500/30"
+                        : "bg-amber-500/10 border-amber-500/30"
+                    }`}>
+                      <div className={`text-base font-bold ${
+                        Math.round((selectedItem.internalScore / 100) * 16) >= 15
+                          ? "text-emerald-500"
+                          : Math.round((selectedItem.internalScore / 100) * 16) >= 13
+                          ? "text-blue-400"
+                          : "text-amber-500"
+                      }`}>
+                        {Math.round((selectedItem.internalScore / 100) * 16)}/16
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">SEO Structure</div>
+                      <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 1</div>
+                    </div>
+                    {/* Checkpoint 2 — Writing Quality */}
+                    <div className={`flex-1 rounded-lg border p-2 text-center ${
+                      (selectedItem as any).pass2Score == null
+                        ? "bg-muted/30 border-border"
+                        : (selectedItem as any).pass2Score >= 70
+                        ? "bg-emerald-500/10 border-emerald-500/30"
+                        : (selectedItem as any).pass2Score >= 50
+                        ? "bg-amber-500/10 border-amber-500/30"
+                        : "bg-red-500/10 border-red-500/30"
+                    }`}>
+                      <div className={`text-base font-bold ${
+                        (selectedItem as any).pass2Score == null
+                          ? "text-muted-foreground"
+                          : (selectedItem as any).pass2Score >= 70
+                          ? "text-emerald-500"
+                          : (selectedItem as any).pass2Score >= 50
+                          ? "text-amber-500"
+                          : "text-red-400"
+                      }`}>
+                        {(selectedItem as any).pass2Score != null ? `${(selectedItem as any).pass2Score}/100` : "—"}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
+                      <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
+                    </div>
+                  </div>
                 </div>
               )}
 

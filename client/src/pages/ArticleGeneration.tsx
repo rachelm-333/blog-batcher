@@ -281,7 +281,7 @@ export default function ArticleGeneration() {
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
                 <thead>
                   <tr style={{ background:"#faf9f5" }}>
-                    {["Level", "Article title", "Keyword", "Words", "SEO score", "Status", ""].map(h => (
+                    {["Level", "Article title", "Keyword", "Words", "Checkpoints", "Status", ""].map(h => (
                       <th key={h} style={{ textAlign:"left", padding:"10px 16px", fontSize:11, fontWeight:600, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -319,7 +319,36 @@ export default function ArticleGeneration() {
                           </span>
                         ) : <span style={{ color:"#9ca3af", fontSize:12 }}>—</span>}
                       </td>
-                      <td style={{ padding:"12px 16px" }}><ScoreRing score={article.internalScore ?? null} /></td>
+                      <td style={{ padding:"12px 16px" }}>
+                        {article.internalScore != null ? (
+                          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                            {/* Checkpoint 1 — SEO Structure */}
+                            {(() => {
+                              const pts = Math.round((article.internalScore / 100) * 16);
+                              const color = pts >= 15 ? "#22c55e" : pts >= 13 ? "#3b82f6" : "#f59e0b";
+                              const bg = pts >= 15 ? "#dcfce7" : pts >= 13 ? "#dbeafe" : "#fef9c3";
+                              return (
+                                <span style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:99, fontSize:10, fontWeight:600, background:bg, color, whiteSpace:"nowrap" }}>
+                                  ✓1 {pts}/16
+                                </span>
+                              );
+                            })()}
+                            {/* Checkpoint 2 — Writing Quality */}
+                            {(article as any).pass2Score != null ? (() => {
+                              const s = (article as any).pass2Score as number;
+                              const color = s >= 70 ? "#22c55e" : s >= 50 ? "#f59e0b" : "#ef4444";
+                              const bg = s >= 70 ? "#dcfce7" : s >= 50 ? "#fef9c3" : "#fee2e2";
+                              return (
+                                <span style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:99, fontSize:10, fontWeight:600, background:bg, color, whiteSpace:"nowrap" }}>
+                                  ✓2 {s}/100
+                                </span>
+                              );
+                            })() : (
+                              <span style={{ fontSize:10, color:"#9ca3af" }}>✓2 —</span>
+                            )}
+                          </div>
+                        ) : <span style={{ color:"#9ca3af", fontSize:13 }}>—</span>}
+                      </td>
                       <td style={{ padding:"12px 16px" }}><StatusBadge status={article.status} /></td>
                       <td style={{ padding:"12px 16px" }}>
                         {["generated","pending_approval","approved","published","scheduled"].includes(article.status) && (
