@@ -954,3 +954,8 @@
 ## Generate Page Business Context Bug (Jun 11 2026)
 - [x] Fix Generate page showing articles from wrong business — was using businesses[0] (first ever created), now uses useActiveBusiness() context
 - [x] Fix SEO score ring colour threshold — green now at 80+ (was 85+) to match MIN_DELIVERY_SCORE = 80 in articleEngine
+
+## Article Scoring Fix (Jun 11 2026)
+- [x] Remove Pass 2 (subjective AI score) from badge determination — badge now based solely on Pass 1 16-point checklist
+- [x] Updated thresholds: Authority Ready = 15–16/16 (≥94), Strong = 13–14/16 (≥81), Needs Review = ≤12/16
+- [x] Updated internalScore display from "Internal score: 77/100" to "SEO checklist: 15/16 points"

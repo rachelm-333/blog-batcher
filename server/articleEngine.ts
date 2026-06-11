@@ -54,14 +54,18 @@ export const WORD_COUNT_TOLERANCE = 50;
 // ---------------------------------------------------------------------------
 // Status badge thresholds (from scope Section 6.6)
 // ---------------------------------------------------------------------------
+// Badge thresholds based on Pass 1 (16-point checklist) score only.
+// Pass 1 score = (points_passed / 16) * 100
+// 16/16 = 100, 15/16 ≈ 94, 14/16 ≈ 88, 13/16 ≈ 81
 export const BADGE_THRESHOLDS = {
-  authority_ready: 90,  // all 16 points met
-  strong: 80,           // 14–15 points met
-  // below 80 = needs_review
+  authority_ready: 94,  // 15–16/16 points met (≥94 = 15 or 16 out of 16)
+  strong: 81,           // 13–14/16 points met
+  // below 81 = needs_review (12 or fewer points)
 } as const;
 
-// Minimum score to surface to user (below = auto-regenerate once)
-export const MIN_DELIVERY_SCORE = 80;
+// Minimum Pass 1 score to surface to user without needs_review flag
+// 13/16 = 81.25 → rounds to 81
+export const MIN_DELIVERY_SCORE = 81;
 
 // ---------------------------------------------------------------------------
 // Banned AI fingerprint phrases (from scope Section 6.4)
@@ -762,8 +766,14 @@ export function deriveStatusBadge(pass1Score: number, pass2Score: number): {
   internalScore: number;
   statusBadge: "authority_ready" | "strong" | "needs_review";
 } {
-  // Weight: Pass 1 (objective) = 60%, Pass 2 (subjective) = 40%
-  const internalScore = Math.round(pass1Score * 0.6 + pass2Score * 0.4);
+  // Badge and status are based solely on Pass 1 (the objective 16-point checklist).
+  // Pass 2 (subjective AI quality score) is stored for reference but does NOT affect
+  // the badge or needs_review status — it was causing 15/16 articles to show as
+  // Needs Review when the subjective score was low.
+  const internalScore = pass1Score; // Pass 1 score (0–100, based on 16 points)
+
+  // Keep pass2Score in scope to avoid unused-variable warnings — it's stored in DB
+  void pass2Score;
 
   let statusBadge: "authority_ready" | "strong" | "needs_review";
   if (internalScore >= BADGE_THRESHOLDS.authority_ready) {

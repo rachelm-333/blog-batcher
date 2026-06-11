@@ -1772,10 +1772,10 @@ export default function ArticleReview() {
                 </div>
               )}
 
-              {/* Internal score */}
+              {/* Internal score — displayed as Pass 1 points out of 16 */}
               {selectedItem.internalScore != null && (
                 <div className="text-xs text-muted-foreground text-center">
-                  Internal score: {selectedItem.internalScore}/100
+                  SEO checklist: {Math.round((selectedItem.internalScore / 100) * 16)}/16 points
                 </div>
               )}
 
