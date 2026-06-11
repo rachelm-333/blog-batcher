@@ -4,7 +4,7 @@
  * serif italic heading, table with Level/Title/Keyword/MSV/Competition/Status/Actions
  */
 import { useActiveBusiness } from "@/contexts/BusinessContext";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -116,6 +116,17 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict }: 
 }) {
   const [manualKw, setManualKw] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  // Drag state
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragging = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Reset position when modal opens
+  useEffect(() => {
+    if (open) setPos(null);
+  }, [open]);
+
   const suggestions = trpc.keywords.getSuggestions.useQuery(
     { businessId, keyword: kwRow?.primaryKeyword ?? "" },
     { enabled: open && !!kwRow }
@@ -130,15 +141,89 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict }: 
     if (!kw) { toast.error("Please select or enter a keyword"); return; }
     swapMutation.mutate({ businessId, keywordId: kwRow.id, newKeyword: kw });
   };
+
+  const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only drag on the header bar itself, not on buttons inside it
+    if ((e.target as HTMLElement).closest("button")) return;
+    dragging.current = true;
+    const rect = panelRef.current?.getBoundingClientRect();
+    if (rect) {
+      dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      setPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
+    };
+    const onUp = () => { dragging.current = false; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
+
+  if (!open) return null;
+
+  // Compute panel style: centred by default, dragged position when moved
+  const panelStyle: React.CSSProperties = pos
+    ? { position: "fixed", left: pos.x, top: pos.y, transform: "none", zIndex: 9999 }
+    : { position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 9999 };
+
   return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg" style={{ display:"flex", flexDirection:"column", maxHeight:"90vh", padding:0, overflow:"hidden" }}>
-        {/* Header */}
-        <div style={{ padding:"20px 24px 16px", borderBottom:"1px solid #e5e7eb", flexShrink:0 }}>
-          <DialogHeader>
-            <DialogTitle>Swap Keyword</DialogTitle>
-            <DialogDescription>Replace <strong>{kwRow?.primaryKeyword}</strong> with a different keyword.</DialogDescription>
-          </DialogHeader>
+    <>
+      {/* Backdrop — clicking it closes the modal */}
+      <div
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9998 }}
+        onClick={onClose}
+      />
+      {/* Draggable panel */}
+      <div
+        ref={panelRef}
+        style={{
+          ...panelStyle,
+          width: 520,
+          maxWidth: "calc(100vw - 32px)",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          background: "#fff",
+          borderRadius: 12,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          overflow: "hidden",
+          userSelect: dragging.current ? "none" : "auto",
+        }}
+      >
+        {/* Draggable header */}
+        <div
+          onMouseDown={onMouseDown}
+          style={{
+            padding: "16px 20px 14px",
+            borderBottom: "1px solid #e5e7eb",
+            flexShrink: 0,
+            cursor: "grab",
+            background: "#fafafa",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1a1a2e" }}>Swap Keyword</p>
+              <p style={{ margin: "4px 0 0", fontSize: 13, color: "#6b7280" }}>
+                Replace <strong style={{ color: "#1a1a2e" }}>{kwRow?.primaryKeyword}</strong> with a different keyword.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#9ca3af", lineHeight: 1, fontSize: 18 }}
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <p style={{ margin: "8px 0 0", fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 4 }}>
+            <span>⠿</span> Drag this panel to reposition it
+          </p>
           {isConflict && (
             <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, padding:"8px 12px", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:8, fontSize:12, color:"#92400e" }}>
               <AlertTriangle style={{ width:13, height:13, color:"#d97706", flexShrink:0 }} />
@@ -181,7 +266,7 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict }: 
           </div>
         </div>
 
-        {/* Sticky footer with action buttons */}
+        {/* Sticky footer */}
         <div style={{ padding:"14px 24px", borderTop:"1px solid #e5e7eb", flexShrink:0, display:"flex", gap:8, justifyContent:"flex-end", background:"#fff" }}>
           {selected && (
             <span style={{ fontSize:12, color:"#6b7280", alignSelf:"center", marginRight:"auto" }}>
@@ -193,8 +278,8 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict }: 
             {swapMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Swapping…</> : "Confirm Swap"}
           </button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </>
   );
 }
 
