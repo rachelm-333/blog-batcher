@@ -927,3 +927,11 @@
 - [x] keywords.assignAll falls back to DataForSEO seed re-query only when no saved selections exist
 - [x] Update keywords.test.ts assignAll mock to include new selectedKeywords select call
 - [x] TypeScript clean, 367/374 tests pass (7 pre-existing architecture test failures unrelated to this change)
+
+## Keywords Page UX Improvements (Jun 11 2026)
+- [x] Tighten cannibalization detection — Jaccard similarity >= 0.75 threshold (was: exact token-set match only)
+- [x] Add keywords.getSavedSelections procedure — returns saved Step 8 selected keywords with assigned/unassigned status
+- [x] Update Swap modal to show saved Step 8 selections as first/primary option (with MSV/competition data), DataForSEO suggestions as secondary
+- [x] Add "Your Selected Keywords" panel to Keywords page — shows all saved selections with assigned/unassigned status
+- [x] Keywords panel: show which article each selection is assigned to (or "Unassigned" if not yet used)
+- [x] Keywords panel: clicking an unassigned keyword pre-selects it in the Swap modal

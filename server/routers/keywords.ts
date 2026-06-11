@@ -776,4 +776,87 @@ export const keywordsRouter = router({
         return [];
       }
     }),
+
+  // ---------------------------------------------------------------------------
+  // keywords.getSavedSelections
+  // Returns the user's Step 8 saved selected keywords for a business,
+  // annotated with which article node (if any) each keyword is currently
+  // assigned to. Used in the Keywords page sidebar and Swap modal.
+  // ---------------------------------------------------------------------------
+  getSavedSelections: protectedProcedure
+    .input(z.object({ businessId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const db = await getDb();
+      if (!db) return [];
+
+      // Load saved selections from Step 8
+      const saved = await db
+        .select()
+        .from(selectedKeywords)
+        .where(eq(selectedKeywords.businessId, input.businessId))
+        .orderBy(asc(selectedKeywords.sortOrder));
+
+      if (saved.length === 0) return [];
+
+      // Load all currently assigned keywords for this business
+      const assigned = await db
+        .select({
+          primaryKeyword: keywords.primaryKeyword,
+          articleNodeId: keywords.articleNodeId,
+        })
+        .from(keywords)
+        .where(eq(keywords.businessId, input.businessId));
+
+      // Load article node labels so we can show which article each keyword is assigned to
+      const nodes = await db
+        .select({ id: articleNodes.id, level: articleNodes.level, sortOrder: articleNodes.sortOrder })
+        .from(articleNodes)
+        .where(eq(articleNodes.businessId, input.businessId))
+        .orderBy(asc(articleNodes.sortOrder));
+
+      // Build a map: normalised keyword → assigned node id
+      const normalise = (kw: string) =>
+        kw.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+
+      const assignedMap = new Map<string, number>(); // normKeyword → nodeId
+      for (const row of assigned) {
+        assignedMap.set(normalise(row.primaryKeyword), row.articleNodeId);
+      }
+
+      // Build a map: nodeId → human label (e.g. "Cornerstone 1", "Pillar 1.2")
+      const cornerstoneCount: Record<string, number> = {};
+      const pillarCount: Record<string, number> = {};
+      const clusterCount: Record<string, number> = {};
+      const nodeLabel = new Map<number, string>();
+      for (const node of nodes) {
+        if (node.level === "cornerstone") {
+          cornerstoneCount[node.level] = (cornerstoneCount[node.level] ?? 0) + 1;
+          nodeLabel.set(node.id, `Cornerstone ${cornerstoneCount[node.level]}`);
+        } else if (node.level === "pillar") {
+          pillarCount[node.level] = (pillarCount[node.level] ?? 0) + 1;
+          nodeLabel.set(node.id, `Pillar ${pillarCount[node.level]}`);
+        } else {
+          clusterCount[node.level] = (clusterCount[node.level] ?? 0) + 1;
+          nodeLabel.set(node.id, `Cluster ${clusterCount[node.level]}`);
+        }
+      }
+
+      return saved.map((s) => {
+        const norm = normalise(s.keyword);
+        const assignedNodeId = assignedMap.get(norm) ?? null;
+        const assignedLabel = assignedNodeId ? (nodeLabel.get(assignedNodeId) ?? null) : null;
+        return {
+          id: s.id,
+          keyword: s.keyword,
+          msv: s.msv ?? null,
+          competitionLevel: s.competitionLevel ?? null,
+          cpc: s.cpc != null ? parseFloat(String(s.cpc)) : null,
+          seedKeyword: s.seedKeyword ?? null,
+          assignedNodeId,
+          assignedLabel,
+          isAssigned: assignedNodeId !== null,
+        };
+      });
+    }),
 });

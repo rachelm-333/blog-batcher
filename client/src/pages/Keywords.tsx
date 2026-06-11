@@ -111,8 +111,13 @@ function StatusBadge({ approved }: { approved: boolean }) {
 }
 
 /* ─── Swap Modal ─────────────────────────────────────────── */
-function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict }: {
+type SavedSelection = { id: number; keyword: string; msv: number | null; competitionLevel: string | null; cpc: number | null; seedKeyword: string | null; assignedNodeId: number | null; assignedLabel: string | null; isAssigned: boolean; };
+
+function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict, savedSelections, pendingSwapKw, onClearPendingSwapKw }: {
   open: boolean; onClose: () => void; businessId: number; kwRow: KwRow | null; onSwapped: () => void; isConflict?: boolean;
+  savedSelections?: SavedSelection[];
+  pendingSwapKw?: string | null;
+  onClearPendingSwapKw?: () => void;
 }) {
   const [manualKw, setManualKw] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -124,8 +129,17 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict }: 
 
   // Reset position when modal opens
   useEffect(() => {
-    if (open) setPos(null);
+    if (open) { setPos(null); setSelected(null); setManualKw(""); }
   }, [open]);
+
+  // When a pendingSwapKw is passed in (from the selection panel), pre-select it
+  useEffect(() => {
+    if (pendingSwapKw) {
+      setSelected(pendingSwapKw);
+      setManualKw("");
+      onClearPendingSwapKw?.();
+    }
+  }, [pendingSwapKw, onClearPendingSwapKw]);
 
   const suggestions = trpc.keywords.getSuggestions.useQuery(
     { businessId, keyword: kwRow?.primaryKeyword ?? "" },
@@ -234,9 +248,32 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict }: 
 
         {/* Scrollable body */}
         <div style={{ flex:1, overflowY:"auto", padding:"16px 24px", display:"flex", flexDirection:"column", gap:16 }}>
+          {/* Saved selections from Step 8 — shown first as primary option */}
+          {(savedSelections?.filter(s => s.keyword !== kwRow?.primaryKeyword) ?? []).length > 0 && (
+            <div>
+              <p style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:4 }}>Your saved keywords</p>
+              <p style={{ fontSize:11, color:"#9ca3af", margin:"0 0 8px" }}>From your Step 8 selections — real MSV data included</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                {savedSelections!.filter(s => s.keyword !== kwRow?.primaryKeyword).map(s => (
+                  <button key={s.id} onClick={() => { setSelected(s.keyword); setManualKw(""); }}
+                    style={{ textAlign:"left", padding:"9px 14px", borderRadius:8, border: selected === s.keyword ? "1.5px solid #6e5afe" : "1px solid #e5e7eb", background: selected === s.keyword ? "#ede9ff" : s.isAssigned ? "#f9fafb" : "#fff", cursor:"pointer", transition:"all 160ms", opacity: s.isAssigned ? 0.6 : 1 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", flex:1 }}>{s.keyword}</span>
+                      {s.isAssigned && <span style={{ fontSize:10, color:"#9ca3af", background:"#f3f4f6", padding:"1px 5px", borderRadius:3 }}>Used: {s.assignedLabel}</span>}
+                    </div>
+                    <span style={{ fontSize:11, color:"#9ca3af" }}>
+                      {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
+                      {s.competitionLevel ? ` · ${s.competitionLevel} comp` : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {suggestions.isLoading && (
             <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:"#9ca3af" }}>
-              <Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Fetching suggestions…
+              <Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Fetching DataForSEO suggestions…
             </div>
           )}
           {!suggestions.isLoading && (suggestions.data?.length ?? 0) > 0 && (
@@ -303,6 +340,12 @@ export default function Keywords() {
     { businessId },
     { enabled: !!businessId }
   );
+  const { data: savedSelections, isLoading: savedSelectionsLoading } = trpc.keywords.getSavedSelections.useQuery(
+    { businessId },
+    { enabled: !!businessId }
+  );
+  const [showSelectionPanel, setShowSelectionPanel] = useState(false);
+  const [pendingSwapKw, setPendingSwapKw] = useState<string | null>(null);
 
   // Detect architecture mismatch: article nodes don't match current config
   const expectedArticleCount = archData?.architecture
@@ -388,19 +431,28 @@ export default function Keywords() {
   // ── Client-side cannibalization detection ──────────────────────────────────
   // Re-derive conflicts live from the current kwData so highlighting is always
   // accurate without waiting for a server approveAll round-trip.
+  // Uses Jaccard similarity >= 0.75 to match the server-side threshold.
   const computeConflicts = useCallback((rows: KwRow[] | undefined) => {
     if (!rows || rows.length === 0) return new Set<number>();
     const normalise = (kw: string) => kw.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
-    const STOP = new Set(["a","an","the","and","or","but","in","on","at","to","for","of","with","by","from","is","are","was","were","be","been","being","have","has","had","do","does","did","will","would","could","should","may","might","shall","can","how","what","when","where","why","who","which","that","this","these","those"]);
-    const tokenSet = (kw: string) => normalise(kw).split(" ").filter(t => t.length > 1 && !STOP.has(t)).sort().join("|");
+    const STOP = new Set(["a","an","the","and","or","but","in","on","at","to","for","of","with","by","from","is","are","was","were","be","been","being","have","has","had","do","does","did","will","would","could","should","may","might","shall","can","how","what","when","where","why","who","which","that","this","these","those","your","our","my","their","its","all","any","some","no","not","vs","get","make","use","using","used"]);
+    const tokenArr = (kw: string) => normalise(kw).split(" ").filter(t => t.length > 1 && !STOP.has(t));
+    const jaccard = (a: string[], b: string[]) => {
+      if (a.length === 0 || b.length === 0) return 0;
+      const setA = new Set(a); const setB = new Set(b);
+      let inter = 0;
+      a.forEach(t => { if (setB.has(t)) inter++; });
+      const union = setA.size + setB.size - inter;
+      return union === 0 ? 0 : inter / union;
+    };
     const conflictIds = new Set<number>();
     for (let i = 0; i < rows.length; i++) {
       for (let j = i + 1; j < rows.length; j++) {
         const a = rows[i]!; const b = rows[j]!;
         const nA = normalise(a.primaryKeyword); const nB = normalise(b.primaryKeyword);
         if (nA === nB) { conflictIds.add(a.articleNodeId); conflictIds.add(b.articleNodeId); continue; }
-        const tA = tokenSet(a.primaryKeyword); const tB = tokenSet(b.primaryKeyword);
-        if (tA.length > 0 && tA === tB) { conflictIds.add(a.articleNodeId); conflictIds.add(b.articleNodeId); }
+        const tA = tokenArr(a.primaryKeyword); const tB = tokenArr(b.primaryKeyword);
+        if (jaccard(tA, tB) >= 0.75) { conflictIds.add(a.articleNodeId); conflictIds.add(b.articleNodeId); }
       }
     }
     return conflictIds;
@@ -452,6 +504,86 @@ export default function Keywords() {
       </div>
     </div>
   );
+
+  /* ── Selected Keywords Panel ── */
+  const renderSelectionPanel = () => {
+    const unassigned = (savedSelections ?? []).filter(s => !s.isAssigned);
+    const assigned = (savedSelections ?? []).filter(s => s.isAssigned);
+    return (
+      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden", marginBottom:16 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid #e5e7eb", background:"#faf9f5" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <BarChart2 style={{ width:16, height:16, color:"#6e5afe" }} />
+            <h3 style={{ fontSize:14, fontWeight:700, color:"#1a1a2e", margin:0 }}>Your Selected Keywords</h3>
+            <span style={{ fontSize:11, background:"#ede9ff", color:"#6e5afe", padding:"2px 8px", borderRadius:20, fontWeight:600 }}>
+              {(savedSelections ?? []).length} total
+            </span>
+          </div>
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            <span style={{ fontSize:12, color:"#9ca3af" }}>
+              <span style={{ color:"#22c55e", fontWeight:600 }}>{assigned.length}</span> assigned · <span style={{ color:"#f59e0b", fontWeight:600 }}>{unassigned.length}</span> unassigned
+            </span>
+            <button
+              onClick={() => setShowSelectionPanel(false)}
+              style={{ background:"none", border:"none", cursor:"pointer", fontSize:16, color:"#9ca3af", lineHeight:1, padding:4 }}
+            >✕</button>
+          </div>
+        </div>
+        {savedSelectionsLoading ? (
+          <div style={{ padding:24, textAlign:"center" }}><Loader2 style={{ width:18, height:18, color:"#6e5afe" }} className="animate-spin" /></div>
+        ) : (savedSelections ?? []).length === 0 ? (
+          <div style={{ padding:"20px 24px", fontSize:13, color:"#9ca3af" }}>
+            No keywords saved from Step 8 yet. Go back to Keyword Research (Stage 1 → Step 8) to select and save keywords.
+          </div>
+        ) : (
+          <div style={{ padding:"12px 20px", display:"flex", flexDirection:"column", gap:4, maxHeight:320, overflowY:"auto" }}>
+            {unassigned.length > 0 && (
+              <>
+                <p style={{ fontSize:11, fontWeight:600, color:"#f59e0b", textTransform:"uppercase", letterSpacing:"0.06em", margin:"4px 0 6px" }}>Unassigned — click to swap onto an article</p>
+                {unassigned.map(s => (
+                  <div key={s.id}
+                    style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:8, border:"1px solid #fde68a", background:"#fffbeb", cursor:"pointer" }}
+                    onClick={() => {
+                      // Pre-fill swap modal with this keyword
+                      setSwapTarget(null); // clear first
+                      setPendingSwapKw(s.keyword);
+                    }}
+                    title="Click to use this keyword in a swap"
+                  >
+                    <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", flex:1 }}>{s.keyword}</span>
+                    <span style={{ fontSize:11, color:"#9ca3af", whiteSpace:"nowrap" }}>
+                      {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
+                      {s.competitionLevel ? ` · ${s.competitionLevel} comp` : ""}
+                    </span>
+                    <span style={{ fontSize:11, color:"#f59e0b", fontWeight:600, background:"#fef3c7", padding:"2px 6px", borderRadius:4 }}>Unassigned</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {assigned.length > 0 && (
+              <>
+                <p style={{ fontSize:11, fontWeight:600, color:"#22c55e", textTransform:"uppercase", letterSpacing:"0.06em", margin:"8px 0 6px" }}>Assigned</p>
+                {assigned.map(s => (
+                  <div key={s.id}
+                    style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:8, border:"1px solid #d1fae5", background:"#f0fdf4" }}
+                  >
+                    <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", flex:1 }}>{s.keyword}</span>
+                    <span style={{ fontSize:11, color:"#9ca3af", whiteSpace:"nowrap" }}>
+                      {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
+                      {s.competitionLevel ? ` · ${s.competitionLevel} comp` : ""}
+                    </span>
+                    <span style={{ fontSize:11, color:"#15803d", fontWeight:600, background:"#dcfce7", padding:"2px 6px", borderRadius:4 }}>
+                      {s.assignedLabel ?? "Assigned"}
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   /* ── Keyword Review sub-stage ── */
   const renderKeywordReview = () => (
@@ -738,7 +870,22 @@ export default function Keywords() {
 
           {/* Sub-stage content */}
           {subStage === "assign" && renderAssign()}
-          {subStage === "keyword-review" && renderKeywordReview()}
+          {subStage === "keyword-review" && (
+            <>
+              {/* Selection panel toggle */}
+              {!showSelectionPanel && (savedSelections?.length ?? 0) > 0 && (
+                <button
+                  onClick={() => setShowSelectionPanel(true)}
+                  style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"1px solid #c4b5fd", background:"#ede9ff", color:"#6e5afe", fontSize:12, fontWeight:600, cursor:"pointer", alignSelf:"flex-start" }}
+                >
+                  <BarChart2 style={{ width:13, height:13 }} />
+                  View my selected keywords ({savedSelections?.length})
+                </button>
+              )}
+              {showSelectionPanel && renderSelectionPanel()}
+              {renderKeywordReview()}
+            </>
+          )}
           {subStage === "paa-review" && renderPAAReview()}
           {subStage === "complete" && renderComplete()}
         </div>
@@ -751,7 +898,10 @@ export default function Keywords() {
         businessId={businessId}
         kwRow={swapTarget}
         isConflict={swapTarget ? liveConflictNodeIds.has(swapTarget.articleNodeId) : false}
-        onSwapped={async () => { await refetchKw(); }}
+        onSwapped={async () => { await refetchKw(); await utils.keywords.getSavedSelections.invalidate({ businessId }); }}
+        savedSelections={savedSelections}
+        pendingSwapKw={pendingSwapKw}
+        onClearPendingSwapKw={() => setPendingSwapKw(null)}
       />
     </DashboardLayout>
   );
