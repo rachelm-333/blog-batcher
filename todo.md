@@ -935,3 +935,10 @@
 - [x] Add "Your Selected Keywords" panel to Keywords page — shows all saved selections with assigned/unassigned status
 - [x] Keywords panel: show which article each selection is assigned to (or "Unassigned" if not yet used)
 - [x] Keywords panel: clicking an unassigned keyword pre-selects it in the Swap modal
+
+## Competition Display & Panel Fixes (Jun 11 2026)
+- [x] Add 'low' to competitionLevel ENUM in keywords table schema (was only 'high'/'medium')
+- [x] Apply ALTER TABLE migration to add 'low' to the DB ENUM
+- [x] Fix assignAll and swap procedures to store 'low' instead of null for low-competition keywords
+- [x] Update CompBadge to show "Low" (green) for null competition (Claude-assigned or low-comp keywords)
+- [x] Make Selected Keywords panel always visible on keyword-review sub-stage (no longer hidden behind a button)

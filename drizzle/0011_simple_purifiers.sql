@@ -1,0 +1,1 @@
+ALTER TABLE `keywords` MODIFY COLUMN `competitionLevel` enum('high','medium','low');

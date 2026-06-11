@@ -79,7 +79,6 @@ function LevelBadge({ level }: { level: string }) {
 }
 
 function CompBadge({ comp }: { comp: string | null }) {
-  if (!comp) return <span style={{ color:"#9ca3af" }}>—</span>;
   if (comp === "high") return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#dc2626", fontWeight:600 }}>
       <BarChart2 style={{ width:13, height:13 }} /> High
@@ -90,6 +89,7 @@ function CompBadge({ comp }: { comp: string | null }) {
       <BarChart2 style={{ width:13, height:13 }} /> Medium
     </span>
   );
+  // null means either 'low' from DataForSEO or Claude-assigned (no data) — show Low
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#16a34a", fontWeight:600 }}>
       <BarChart2 style={{ width:13, height:13 }} /> Low
@@ -519,15 +519,9 @@ export default function Keywords() {
               {(savedSelections ?? []).length} total
             </span>
           </div>
-          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-            <span style={{ fontSize:12, color:"#9ca3af" }}>
-              <span style={{ color:"#22c55e", fontWeight:600 }}>{assigned.length}</span> assigned · <span style={{ color:"#f59e0b", fontWeight:600 }}>{unassigned.length}</span> unassigned
-            </span>
-            <button
-              onClick={() => setShowSelectionPanel(false)}
-              style={{ background:"none", border:"none", cursor:"pointer", fontSize:16, color:"#9ca3af", lineHeight:1, padding:4 }}
-            >✕</button>
-          </div>
+          <span style={{ fontSize:12, color:"#9ca3af" }}>
+            <span style={{ color:"#22c55e", fontWeight:600 }}>{assigned.length}</span> assigned · <span style={{ color:"#f59e0b", fontWeight:600 }}>{unassigned.length}</span> unassigned
+          </span>
         </div>
         {savedSelectionsLoading ? (
           <div style={{ padding:24, textAlign:"center" }}><Loader2 style={{ width:18, height:18, color:"#6e5afe" }} className="animate-spin" /></div>
@@ -872,17 +866,8 @@ export default function Keywords() {
           {subStage === "assign" && renderAssign()}
           {subStage === "keyword-review" && (
             <>
-              {/* Selection panel toggle */}
-              {!showSelectionPanel && (savedSelections?.length ?? 0) > 0 && (
-                <button
-                  onClick={() => setShowSelectionPanel(true)}
-                  style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"1px solid #c4b5fd", background:"#ede9ff", color:"#6e5afe", fontSize:12, fontWeight:600, cursor:"pointer", alignSelf:"flex-start" }}
-                >
-                  <BarChart2 style={{ width:13, height:13 }} />
-                  View my selected keywords ({savedSelections?.length})
-                </button>
-              )}
-              {showSelectionPanel && renderSelectionPanel()}
+              {/* Selection panel — always visible when there are saved selections */}
+              {(savedSelections !== undefined) && renderSelectionPanel()}
               {renderKeywordReview()}
             </>
           )}

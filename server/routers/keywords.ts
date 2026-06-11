@@ -345,7 +345,7 @@ export const keywordsRouter = router({
           businessId: input.businessId,
           primaryKeyword: kw,
           monthlySearchVolume: enriched?.msv ?? null,
-          competitionLevel: enriched?.comp === "low" ? null : (enriched?.comp ?? null),
+          competitionLevel: enriched?.comp ?? null,
           keywordApproved: false,
           paaApproved: false,
           cannibalizationWarning: false,
@@ -445,7 +445,7 @@ export const keywordsRouter = router({
           .set({
             primaryKeyword: input.newKeyword,
             monthlySearchVolume: msv,
-            competitionLevel: comp === "low" ? null : comp,
+            competitionLevel: comp ?? null,
             keywordApproved: false,
             paaApproved: false,
             paaQuestions: null,

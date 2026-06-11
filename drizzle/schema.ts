@@ -409,7 +409,7 @@ export const keywords = mysqlTable("keywords", {
   /** Monthly search volume from DataForSEO. */
   monthlySearchVolume: int("monthlySearchVolume"),
   /** Competition level returned from DataForSEO. */
-  competitionLevel: mysqlEnum("competitionLevel", ["high", "medium"]),
+  competitionLevel: mysqlEnum("competitionLevel", ["high", "medium", "low"]),
   /** Secondary/LSI keywords stored as JSON array of strings. */
   secondaryKeywords: json("secondaryKeywords"),
   /**
