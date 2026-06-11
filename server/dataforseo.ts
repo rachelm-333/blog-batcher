@@ -303,6 +303,11 @@ export async function getPAAQuestions(
     const kw = task.data?.keyword ?? "";
     const questions: string[] = [];
 
+    // Diagnostic: log task status and item types found
+    const taskStatus = task.status_code;
+    const itemTypes = (task.result ?? []).flatMap(r => (r.items ?? []).map(i => i.type)).filter(Boolean);
+    console.log(`[DataForSEO] PAA task for "${kw}": status=${taskStatus}, item types=[${Array.from(new Set(itemTypes)).join(", ")}]`);
+
     for (const resultSet of task.result ?? []) {
       for (const item of resultSet.items ?? []) {
         if (item.type === "people_also_ask") {
@@ -313,6 +318,7 @@ export async function getPAAQuestions(
       }
     }
 
+    console.log(`[DataForSEO] PAA for "${kw}": found ${questions.length} questions`);
     results.push({ keyword: kw, questions: questions.slice(0, 8) });
   }
 

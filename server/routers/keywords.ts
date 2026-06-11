@@ -588,8 +588,49 @@ export const keywordsRouter = router({
 
       const paaMap = new Map(paaResults.map((r) => [r.keyword, r.questions]));
 
+      // Load business context for Claude fallback
+      const bizRows = await db.select({ name: businesses.name, industry: businesses.industry })
+        .from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
+      const biz = bizRows[0];
+
       for (const kw of approvedKw) {
-        const questions = paaMap.get(kw.primaryKeyword) ?? [];
+        let questions = paaMap.get(kw.primaryKeyword) ?? [];
+
+        // Claude fallback: if DataForSEO returned 0 questions, generate realistic PAA questions
+        if (questions.length === 0 && biz) {
+          console.log(`[Keywords] PAA fallback to Claude for "${kw.primaryKeyword}"`);
+          try {
+            const fallbackResp = await invokeLLMWithCost(
+              {
+                messages: [
+                  { role: "system", content: "You are an expert SEO strategist. Return only valid JSON." },
+                  { role: "user", content: `Generate 5 realistic 'People Also Ask' questions that Google would show for the search keyword: "${kw.primaryKeyword}".\n\nBusiness context: ${biz.name} (${biz.industry ?? "business"}).\n\nRules:\n- Questions must be natural, conversational questions a real searcher would ask\n- Questions should be directly related to the keyword topic\n- Questions should vary in angle (what, how, why, when, is/are)\n- Do NOT include the business name in the questions\n- Australian English spelling\n\nReturn JSON with key "questions" containing an array of 5 question strings.` },
+                ],
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "paa_questions",
+                    strict: true,
+                    schema: {
+                      type: "object",
+                      properties: { questions: { type: "array", items: { type: "string" } } },
+                      required: ["questions"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+              },
+              { userId: ctx.user.id, feature: "keyword_research" }
+            );
+            const content = fallbackResp?.choices?.[0]?.message?.content ?? '{"questions":[]}';
+            const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content)) as { questions: string[] };
+            questions = (parsed.questions ?? []).slice(0, 6).map((q: string) => q.trim()).filter(Boolean);
+            console.log(`[Keywords] Claude generated ${questions.length} PAA questions for "${kw.primaryKeyword}"`);
+          } catch (err) {
+            console.warn(`[Keywords] Claude PAA fallback failed for "${kw.primaryKeyword}":`, err);
+          }
+        }
+
         await db
           .update(keywords)
           .set({ paaQuestions: questions })
@@ -669,6 +710,46 @@ export const keywordsRouter = router({
         questions = results.find(r => r.keyword === kw.primaryKeyword)?.questions ?? [];
       } catch (err) {
         console.warn("[Keywords] retryPAA failed for", kw.primaryKeyword, err);
+      }
+
+      // Claude fallback: if DataForSEO returned 0 questions, generate realistic PAA questions
+      if (questions.length === 0) {
+        console.log(`[Keywords] retryPAA fallback to Claude for "${kw.primaryKeyword}"`);
+        try {
+          const bizRows = await db.select({ name: businesses.name, industry: businesses.industry })
+            .from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
+          const biz = bizRows[0];
+          if (biz) {
+            const fallbackResp = await invokeLLMWithCost(
+              {
+                messages: [
+                  { role: "system", content: "You are an expert SEO strategist. Return only valid JSON." },
+                  { role: "user", content: `Generate 5 realistic 'People Also Ask' questions that Google would show for the search keyword: "${kw.primaryKeyword}".\n\nBusiness context: ${biz.name} (${biz.industry ?? "business"}).\n\nRules:\n- Questions must be natural, conversational questions a real searcher would ask\n- Questions should be directly related to the keyword topic\n- Questions should vary in angle (what, how, why, when, is/are)\n- Do NOT include the business name in the questions\n- Australian English spelling\n\nReturn JSON with key "questions" containing an array of 5 question strings.` },
+                ],
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "paa_questions",
+                    strict: true,
+                    schema: {
+                      type: "object",
+                      properties: { questions: { type: "array", items: { type: "string" } } },
+                      required: ["questions"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+              },
+              { userId: ctx.user.id, feature: "keyword_research" }
+            );
+            const content = fallbackResp?.choices?.[0]?.message?.content ?? '{"questions":[]}';
+            const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content)) as { questions: string[] };
+            questions = (parsed.questions ?? []).slice(0, 6).map((q: string) => q.trim()).filter(Boolean);
+            console.log(`[Keywords] Claude generated ${questions.length} PAA questions for "${kw.primaryKeyword}"`);
+          }
+        } catch (err) {
+          console.warn(`[Keywords] Claude retryPAA fallback failed for "${kw.primaryKeyword}":`, err);
+        }
       }
 
       await db

@@ -942,3 +942,11 @@
 - [x] Fix assignAll and swap procedures to store 'low' instead of null for low-competition keywords
 - [x] Update CompBadge to show "Low" (green) for null competition (Claude-assigned or low-comp keywords)
 - [x] Make Selected Keywords panel always visible on keyword-review sub-stage (no longer hidden behind a button)
+
+## PAA Questions Fix (Jun 11 2026)
+- [x] Add diagnostic logging to DataForSEO SERP calls (item types, question count per keyword)
+- [x] Add Claude fallback to fetchPAA — when DataForSEO returns 0 questions, generate 5 realistic PAA questions via Claude using keyword + business context
+- [x] Add Claude fallback to retryPAA — same fallback logic for per-keyword retry
+- [x] Update PAA review UI: pre-select first question in dropdown, show "Top suggestion pre-selected" badge
+- [x] Add "Lock in top suggestion" quick-approve button below the dropdown
+- [x] Update empty state message: "Generating PAA questions — click Retry to fetch from DataForSEO or generate with AI"

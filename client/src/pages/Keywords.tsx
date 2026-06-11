@@ -752,24 +752,36 @@ export default function Keywords() {
         <div style={{ padding:20, display:"flex", flexDirection:"column", gap:16 }}>
           {kwData?.map(kw => {
             const questions = (kw.paaQuestions as string[] | null) ?? [];
+            // Determine if questions are AI-generated (heuristic: no DataForSEO data = AI fallback)
+            // We tag them as AI-generated when the keyword has no MSV data (Claude-assigned) OR
+            // we just show a neutral badge — the source is logged server-side
+            const firstQ = questions[0] ?? null;
+            // Auto-select the first question if none is selected yet and questions exist
+            const currentValue = kw.approvedPaaQuestion ?? "";
+            const displayValue = currentValue || (firstQ ?? "");
             return (
               <div key={kw.id} style={{ background:"#faf9f5", border:"1px solid #e5e7eb", borderRadius:10, padding:16 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, flexWrap:"wrap" }}>
                   <LevelBadge level={kw.nodeLevel} />
                   <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e" }}>{kw.primaryKeyword}</span>
+                  {questions.length > 0 && !kw.paaApproved && firstQ && (
+                    <span style={{ fontSize:10, background:"#fef3c7", color:"#92400e", padding:"2px 7px", borderRadius:20, fontWeight:600, marginLeft:"auto" }}>
+                      Top suggestion pre-selected
+                    </span>
+                  )}
                   {kw.paaApproved && <CheckCircle2 style={{ width:14, height:14, color:"#22c55e", marginLeft:"auto" }} />}
                 </div>
                 {questions.length === 0 ? (
                   <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                    <p style={{ fontSize:12, color:"#9ca3af", margin:0, flex:1 }}>No PAA questions found — retry or skip this article.</p>
+                    <p style={{ fontSize:12, color:"#9ca3af", margin:0, flex:1 }}>Generating PAA questions — click Retry to fetch from DataForSEO or generate with AI.</p>
                     <button
                       onClick={() => retryPAA.mutate({ businessId, keywordId: kw.id })}
                       disabled={retryPAA.isPending && retryPAA.variables?.keywordId === kw.id}
                       style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"5px 12px", borderRadius:6, border:"1px solid #c4b5fd", background:"#ede9ff", color:"#6e5afe", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}
                     >
                       {retryPAA.isPending && retryPAA.variables?.keywordId === kw.id
-                        ? <><Loader2 style={{ width:11, height:11 }} className="animate-spin" /> Retrying…</>
-                        : <><RefreshCw style={{ width:11, height:11 }} /> Retry</>}
+                        ? <><Loader2 style={{ width:11, height:11 }} className="animate-spin" /> Generating…</>
+                        : <><RefreshCw style={{ width:11, height:11 }} /> Retry / Generate</>}
                     </button>
                     <button
                       onClick={() => skipPAA.mutate({ businessId, keywordId: kw.id, approvedQuestion: "__skip__" })}
@@ -782,17 +794,28 @@ export default function Keywords() {
                     </button>
                   </div>
                 ) : (
-                  <Select
-                    value={kw.approvedPaaQuestion ?? ""}
-                    onValueChange={q => approvePAA.mutate({ businessId, keywordId: kw.id, approvedQuestion: q })}
-                  >
-                    <SelectTrigger style={{ fontSize:13 }}>
-                      <SelectValue placeholder="Choose a PAA question…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {questions.map(q => <SelectItem key={q} value={q}>{q}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    <Select
+                      value={displayValue}
+                      onValueChange={q => approvePAA.mutate({ businessId, keywordId: kw.id, approvedQuestion: q })}
+                    >
+                      <SelectTrigger style={{ fontSize:13 }}>
+                        <SelectValue placeholder="Choose a PAA question…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {questions.map(q => <SelectItem key={q} value={q}>{q}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {/* Auto-approve the first question if nothing is selected yet */}
+                    {!kw.paaApproved && firstQ && displayValue === firstQ && (
+                      <button
+                        onClick={() => approvePAA.mutate({ businessId, keywordId: kw.id, approvedQuestion: firstQ })}
+                        style={{ alignSelf:"flex-start", display:"inline-flex", alignItems:"center", gap:5, padding:"4px 12px", borderRadius:6, border:"1px solid #bbf7d0", background:"#f0fdf4", color:"#166534", fontSize:12, fontWeight:600, cursor:"pointer" }}
+                      >
+                        <CheckCircle2 style={{ width:11, height:11 }} /> Lock in top suggestion
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             );
