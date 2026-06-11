@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
 import { Loader2, Zap, CheckCircle2, Clock, AlertTriangle, BarChart2, RefreshCw } from "lucide-react";
@@ -61,7 +62,7 @@ function StatusBadge({ status }: { status: string }) {
 /* ─── SEO Score ring ─────────────────────────────────────── */
 function ScoreRing({ score }: { score: number | null }) {
   if (!score) return <span style={{ color:"#9ca3af", fontSize:13 }}>—</span>;
-  const color = score >= 85 ? "#22c55e" : score >= 70 ? "#6e5afe" : "#f59e0b";
+  const color = score >= 80 ? "#22c55e" : score >= 65 ? "#6e5afe" : "#f59e0b";
   return (
     <div style={{ display:"inline-flex", alignItems:"center", gap:6 }}>
       <div style={{ width:28, height:28, borderRadius:"50%", border:`2.5px solid ${color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color }}>
@@ -78,10 +79,9 @@ export default function ArticleGeneration() {
   const [generating, setGenerating] = useState(false);
   const [regenAllRunning, setRegenAllRunning] = useState(false);
 
-  const { data: businesses, isLoading: bizLoading } = trpc.business.listAll.useQuery(undefined, { retry: false });
-  const business = businesses?.[0];
+  const { activeBusiness: business, isLoading: bizLoading } = useActiveBusiness();
   const businessId = business?.id ?? 0;
-  const currentStage = business?.currentStage ?? 1;
+  const currentStage = (business?.currentStage as number | undefined) ?? 1;
 
   const { data: articles, isLoading: articlesLoading } = trpc.articles.getAll.useQuery(
     { businessId },

@@ -950,3 +950,7 @@
 - [x] Update PAA review UI: pre-select first question in dropdown, show "Top suggestion pre-selected" badge
 - [x] Add "Lock in top suggestion" quick-approve button below the dropdown
 - [x] Update empty state message: "Generating PAA questions — click Retry to fetch from DataForSEO or generate with AI"
+
+## Generate Page Business Context Bug (Jun 11 2026)
+- [x] Fix Generate page showing articles from wrong business — was using businesses[0] (first ever created), now uses useActiveBusiness() context
+- [x] Fix SEO score ring colour threshold — green now at 80+ (was 85+) to match MIN_DELIVERY_SCORE = 80 in articleEngine
