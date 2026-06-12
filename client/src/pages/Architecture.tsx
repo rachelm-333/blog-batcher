@@ -30,12 +30,21 @@ import {
 } from "@shared/architectureRules";
 import { useActiveBusiness } from "@/contexts/BusinessContext";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertTriangle,
   CheckCircle,
   Edit2,
+  Info,
   Layers,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
 
@@ -331,6 +340,13 @@ export default function Architecture() {
   const [localPillars, setLocalPillars] = useState(2);
   const [localClusters, setLocalClusters] = useState(DEFAULT_CLUSTERS_PER_PILLAR);
   const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
+  // Advisory popup: shown when user sets any type to exactly 1
+  const [advisoryOpen, setAdvisoryOpen] = useState(false);
+  const [advisoryType, setAdvisoryType] = useState<"cornerstone" | "pillar" | "cluster">("cornerstone");
+  // Track previous values to detect transitions to 1
+  const prevCornerstones = useRef(localCornerstones);
+  const prevPillars = useRef(localPillars);
+  const prevClusters = useRef(localClusters);
 
   // Business query
   const { activeBusiness: businessData } = useActiveBusiness();
@@ -373,13 +389,28 @@ export default function Architecture() {
   const handleCornerstonesChange = (v: number) => {
     setLocalCornerstones(v);
     if (v === 0) { setLocalPillars(0); setLocalClusters(0); }
+    if (v === 1 && prevCornerstones.current !== 1) {
+      setAdvisoryType("cornerstone");
+      setAdvisoryOpen(true);
+    }
+    prevCornerstones.current = v;
   };
   const handlePillarsChange = (v: number) => {
     setLocalPillars(v);
     if (v === 0) setLocalClusters(0);
+    if (v === 1 && prevPillars.current !== 1) {
+      setAdvisoryType("pillar");
+      setAdvisoryOpen(true);
+    }
+    prevPillars.current = v;
   };
   const handleClustersChange = (v: number) => {
     setLocalClusters(v);
+    if (v === 1 && prevClusters.current !== 1) {
+      setAdvisoryType("cluster");
+      setAdvisoryOpen(true);
+    }
+    prevClusters.current = v;
   };
 
   // Live breakdown (raw slider values, no guardrail correction)
@@ -644,6 +675,51 @@ export default function Architecture() {
         )}
       </div>
     </div>
+
+    {/* ── Advisory popup: shown when any type is set to 1 ─────────────────── */}
+    <Dialog open={advisoryOpen} onOpenChange={setAdvisoryOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <Info className="w-5 h-5 text-sky-500 shrink-0" />
+            <DialogTitle>Just a helpful tip</DialogTitle>
+          </div>
+          <DialogDescription className="pt-2 text-sm leading-relaxed">
+            You've set your{" "}
+            <strong>
+              {advisoryType === "cornerstone" && "cornerstone"}
+              {advisoryType === "pillar" && "pillar post"}
+              {advisoryType === "cluster" && "cluster article"}
+            </strong>{" "}
+            count to <strong>1</strong>. That's totally fine — one great article is a great start!
+            <br /><br />
+            To help support that article and build topical authority around it, it's worth adding{" "}
+            <strong>1–2 supporting posts</strong> that speak specifically to that same topic and link back to it.
+            This helps search engines understand the depth of your content on that subject.
+            <br /><br />
+            You can always come back and add more later.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex gap-2 sm:justify-end">
+          <Button variant="outline" onClick={() => setAdvisoryOpen(false)}>
+            Keep it at 1 for now
+          </Button>
+          <Button
+            className="bg-violet-600 hover:bg-violet-700 text-white"
+            onClick={() => {
+              // Bump the relevant slider up to 2 as a suggestion
+              if (advisoryType === "cornerstone") setLocalCornerstones(2);
+              if (advisoryType === "pillar") setLocalPillars(2);
+              if (advisoryType === "cluster") setLocalClusters(2);
+              setAdvisoryOpen(false);
+            }}
+          >
+            Add a supporting post (set to 2)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     </DashboardLayout>
   );
 }

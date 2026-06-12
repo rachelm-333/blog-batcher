@@ -1021,3 +1021,8 @@
 - [ ] Show current batch number in pipeline header
 - [ ] Show batch history selector on dashboard to view past batches (read-only)
 - [ ] Test: start new batch, run through full pipeline, confirm old batch articles preserved
+
+## Blog Architecture Min-Count = 1 (Jun 12 2026)
+- [x] Lower minimum count for cluster, pillar, and cornerstone article types to 1 (was 2 or 3)
+- [x] Show advisory popup when any article type count is set to 1, suggesting 1-2 supporting posts
+- [x] Popup should be dismissable (user can proceed without adding more)
