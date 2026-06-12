@@ -995,18 +995,26 @@ export default function ArticleReview() {
                   <div className="mt-1.5 flex flex-wrap gap-1 items-center">
                     <StatusBadgeChip badge={item.statusBadge as StatusBadge} status={item.status as ArticleStatus} />
                   </div>
-                  {/* Dual checkpoint mini-badges */}
-                  {item.internalScore != null && (
+                  {/* Dual checkpoint mini-badges — use live score for selected article, DB score for others */}
+                  {(item.internalScore != null || (isSelected && livePassCount != null)) && (
                     <div className="mt-1 flex gap-1">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                        Math.round((item.internalScore / 100) * 16) >= 15
-                          ? "bg-emerald-500/15 text-emerald-500"
-                          : Math.round((item.internalScore / 100) * 16) >= 13
-                          ? "bg-blue-500/15 text-blue-400"
-                          : "bg-amber-500/15 text-amber-500"
-                      }`}>
-                        ✓1 {Math.round((item.internalScore / 100) * 16)}/16
-                      </span>
+                      {(() => {
+                        const displayScore = isSelected && livePassCount != null
+                          ? livePassCount
+                          : item.internalScore != null ? Math.round((item.internalScore / 100) * 16) : null;
+                        if (displayScore == null) return null;
+                        return (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                            displayScore >= 15
+                              ? "bg-emerald-500/15 text-emerald-500"
+                              : displayScore >= 13
+                              ? "bg-blue-500/15 text-blue-400"
+                              : "bg-amber-500/15 text-amber-500"
+                          }`}>
+                            ✓1 {displayScore}/16
+                          </span>
+                        );
+                      })()}
                       {item.pass2Score != null && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                           item.pass2Score >= 70
