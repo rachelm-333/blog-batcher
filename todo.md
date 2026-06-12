@@ -991,3 +991,13 @@
 - [ ] Update articleEngine.ts to use Claude 3.5 Sonnet for article generation
 - [ ] Tighten article generation prompt with 16-point SEO checklist as hard requirements
 - [ ] Ensure articles consistently score 14+/16 on Checkpoint 1
+
+## Scoring Contradiction Fix (Jun 12 2026)
+- [x] Add pass1Details JSON column to articles table to persist per-criterion pass/fail results
+- [x] Apply DB migration for pass1Details column
+- [x] Save pass1Points into pass1Details in generateAndSave router
+- [x] Fix badge/score contradiction: derive statusBadge from live liveChecks in ArticleReview (not stale DB value)
+- [x] Show failing checklist items inline under Checkpoint 1 box in SEO panel
+- [x] Tighten Claude prompts: explicitly list all 16 checklist criteria as hard requirements in outline and section prompts
+- [x] Add enforcement passes E/F/G/H for P9/P10/P11/P12 in articleEngine.ts (mechanical fallback)
+- [x] Update test assertions to match current Pass-1-only badge constants (94/81 thresholds)

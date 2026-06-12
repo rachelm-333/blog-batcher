@@ -484,6 +484,13 @@ export const articles = mysqlTable("articles", {
    */
   pass2Score: int("pass2Score"),
   /**
+   * Pass 1 checklist details — JSON object mapping each of the 16 check IDs
+   * (p1_keyword_density … p16_word_count) to a boolean pass/fail result.
+   * Persisted at generation time so the Review page can show exactly which
+   * criteria failed without recomputing from the stored HTML.
+   */
+  pass1Details: json("pass1Details"),
+  /**
    * Status badge shown to the user. Derived from internalScore.
    * authority_ready ≥ 90, strong ≥ 80, needs_review < 80.
    */

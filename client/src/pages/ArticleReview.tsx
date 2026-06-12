@@ -322,6 +322,7 @@ interface ArticleListItem {
   wordCount: number | null;
   internalScore: number | null;
   pass2Score: number | null;
+  pass1Details: Record<string, boolean> | null | unknown;
   level: "cornerstone" | "pillar" | "cluster";
   articleType: string;
   urlSlug: string | null;
@@ -1799,57 +1800,93 @@ export default function ArticleReview() {
               )}
 
               {/* Dual checkpoint badges */}
-              {selectedItem.internalScore != null && (
-                <div className="space-y-2 mt-1">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Quality Checkpoints</div>
-                  <div className="flex gap-2">
-                    {/* Checkpoint 1 — SEO Structure */}
-                    <div className={`flex-1 rounded-lg border p-2 text-center ${
-                      Math.round((selectedItem.internalScore / 100) * 16) >= 15
-                        ? "bg-emerald-500/10 border-emerald-500/30"
-                        : Math.round((selectedItem.internalScore / 100) * 16) >= 13
-                        ? "bg-blue-500/10 border-blue-500/30"
-                        : "bg-amber-500/10 border-amber-500/30"
-                    }`}>
-                      <div className={`text-base font-bold ${
-                        Math.round((selectedItem.internalScore / 100) * 16) >= 15
-                          ? "text-emerald-500"
-                          : Math.round((selectedItem.internalScore / 100) * 16) >= 13
-                          ? "text-blue-400"
-                          : "text-amber-500"
-                      }`}>
-                        {Math.round((selectedItem.internalScore / 100) * 16)}/16
+              {(() => {
+                // Use live-computed score (from current article content) as the
+                // single source of truth — avoids stale DB badge contradictions.
+                const liveScore = livePassCount ?? (selectedItem.internalScore != null ? Math.round((selectedItem.internalScore / 100) * 16) : null);
+                if (liveScore == null) return null;
+
+                // Failing checks: prefer live computation, fall back to stored pass1Details
+                const storedDetails = (selectedItem as any).pass1Details as Record<string, boolean> | null;
+                const failingKeys = liveChecks
+                  ? (Object.keys(liveChecks) as (keyof Pass1Checks)[]).filter(k => !liveChecks[k])
+                  : storedDetails
+                  ? (Object.keys(storedDetails) as string[]).filter(k => !storedDetails[k])
+                  : [];
+
+                const cp1Color = liveScore >= 15
+                  ? { bg: "bg-emerald-500/10 border-emerald-500/30", text: "text-emerald-500" }
+                  : liveScore >= 13
+                  ? { bg: "bg-blue-500/10 border-blue-500/30", text: "text-blue-400" }
+                  : { bg: "bg-amber-500/10 border-amber-500/30", text: "text-amber-500" };
+
+                return (
+                  <div className="space-y-2 mt-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Quality Checkpoints</div>
+                    <div className="flex gap-2">
+                      {/* Checkpoint 1 — SEO Structure */}
+                      <div className={`flex-1 rounded-lg border p-2 text-center ${cp1Color.bg}`}>
+                        <div className={`text-base font-bold ${cp1Color.text}`}>{liveScore}/16</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">SEO Structure</div>
+                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 1</div>
                       </div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">SEO Structure</div>
-                      <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 1</div>
-                    </div>
-                    {/* Checkpoint 2 — Writing Quality */}
-                    <div className={`flex-1 rounded-lg border p-2 text-center ${
-                      (selectedItem as any).pass2Score == null
-                        ? "bg-muted/30 border-border"
-                        : (selectedItem as any).pass2Score >= 70
-                        ? "bg-emerald-500/10 border-emerald-500/30"
-                        : (selectedItem as any).pass2Score >= 50
-                        ? "bg-amber-500/10 border-amber-500/30"
-                        : "bg-red-500/10 border-red-500/30"
-                    }`}>
-                      <div className={`text-base font-bold ${
+                      {/* Checkpoint 2 — Writing Quality */}
+                      <div className={`flex-1 rounded-lg border p-2 text-center ${
                         (selectedItem as any).pass2Score == null
-                          ? "text-muted-foreground"
+                          ? "bg-muted/30 border-border"
                           : (selectedItem as any).pass2Score >= 70
-                          ? "text-emerald-500"
+                          ? "bg-emerald-500/10 border-emerald-500/30"
                           : (selectedItem as any).pass2Score >= 50
-                          ? "text-amber-500"
-                          : "text-red-400"
+                          ? "bg-amber-500/10 border-amber-500/30"
+                          : "bg-red-500/10 border-red-500/30"
                       }`}>
-                        {(selectedItem as any).pass2Score != null ? `${(selectedItem as any).pass2Score}/100` : "—"}
+                        <div className={`text-base font-bold ${
+                          (selectedItem as any).pass2Score == null
+                            ? "text-muted-foreground"
+                            : (selectedItem as any).pass2Score >= 70
+                            ? "text-emerald-500"
+                            : (selectedItem as any).pass2Score >= 50
+                            ? "text-amber-500"
+                            : "text-red-400"
+                        }`}>
+                          {(selectedItem as any).pass2Score != null ? `${(selectedItem as any).pass2Score}/100` : "—"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
+                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
                       </div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
-                      <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
                     </div>
+
+                    {/* Failing checklist breakdown — shown whenever score < 15 */}
+                    {liveScore < 15 && failingKeys.length > 0 && (
+                      <div className={`rounded-lg border p-2.5 ${
+                        liveScore >= 13
+                          ? "bg-blue-500/5 border-blue-500/20"
+                          : "bg-amber-500/5 border-amber-500/20"
+                      }`}>
+                        <div className={`text-[10px] font-semibold mb-1.5 ${
+                          liveScore >= 13 ? "text-blue-400" : "text-amber-500"
+                        }`}>
+                          {liveScore >= 13 ? "Optional improvements:" : "Points to fix:"}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {failingKeys.map(k => (
+                            <div key={k} className="flex items-start gap-1.5">
+                              <span className={`mt-0.5 shrink-0 text-[10px] ${
+                                liveScore >= 13 ? "text-blue-400/70" : "text-amber-500"
+                              }`}>{liveScore >= 13 ? "◦" : "✗"}</span>
+                              <span className={`text-[10px] leading-tight ${
+                                liveScore >= 13 ? "text-muted-foreground" : "text-amber-600"
+                              }`}>
+                                {PASS1_CHECK_LABELS[k as keyof Pass1Checks] ?? k}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* ── Copy to Clipboard Export Panel ─────────────────── */}
               {fullArticle && (

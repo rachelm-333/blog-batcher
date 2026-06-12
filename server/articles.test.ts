@@ -386,9 +386,10 @@ describe("Status badge derivation", () => {
     expect(internalScore).toBeLessThan(BADGE_THRESHOLDS.strong);
   });
 
-  it("Combined score weights Pass 1 at 60% and Pass 2 at 40%", () => {
+  it("Combined score is Pass 1 only (Pass 2 is advisory)", () => {
+    // Badge is now based solely on Pass 1 score — Pass 2 is stored but does not affect badge
     const { internalScore } = deriveStatusBadge(100, 0);
-    expect(internalScore).toBe(60);
+    expect(internalScore).toBe(100);
   });
 
   it("Combined score is 100 when both passes are 100", () => {
@@ -396,16 +397,19 @@ describe("Status badge derivation", () => {
     expect(internalScore).toBe(100);
   });
 
-  it("MIN_DELIVERY_SCORE is 80 (auto-regenerate threshold)", () => {
-    expect(MIN_DELIVERY_SCORE).toBe(80);
+  it("MIN_DELIVERY_SCORE is 81 (13/16 points = auto-regenerate threshold)", () => {
+    // 13/16 * 100 = 81.25, rounded to 81
+    expect(MIN_DELIVERY_SCORE).toBe(81);
   });
 
-  it("BADGE_THRESHOLDS.authority_ready is 90", () => {
-    expect(BADGE_THRESHOLDS.authority_ready).toBe(90);
+  it("BADGE_THRESHOLDS.authority_ready is 94 (15/16 points)", () => {
+    // 15/16 * 100 = 93.75, rounded to 94
+    expect(BADGE_THRESHOLDS.authority_ready).toBe(94);
   });
 
-  it("BADGE_THRESHOLDS.strong is 80", () => {
-    expect(BADGE_THRESHOLDS.strong).toBe(80);
+  it("BADGE_THRESHOLDS.strong is 81 (13/16 points)", () => {
+    // 13/16 * 100 = 81.25, rounded to 81
+    expect(BADGE_THRESHOLDS.strong).toBe(81);
   });
 });
 

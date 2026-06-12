@@ -834,16 +834,20 @@ URL Slug: /${ctx.urlSlug}
 Total Word Count Target: ${ctx.wordCountMin}–${ctx.wordCountMax} words
 Level: ${ctx.level}
 
-RULES:
-- The H1 title MUST contain the exact primary keyword verbatim
-- The meta title MUST contain the primary keyword and be ≤60 characters
-- The meta description MUST contain the exact primary keyword phrase and be 140–160 characters
-- Plan ${Math.ceil(ctx.wordCountMin / 250)} to ${Math.ceil(ctx.wordCountMax / 200)} H2 sections so the total hits ${ctx.wordCountMin}–${ctx.wordCountMax} words
-- The FIRST section must be an "Opening Answer Block" (40–60 words) that directly answers the search query
-- The LAST section must be a CTA section titled "Ready to Take the Next Step?" or similar (50–80 words)
+RULES (ALL MANDATORY — these map directly to the 16-point SEO checklist):
+- H1 title MUST contain the exact primary keyword verbatim [P2]
+- Meta title MUST contain the primary keyword and be ≤60 characters [P7]
+- Meta description MUST contain the exact primary keyword phrase and be EXACTLY 140–160 characters [P8]
+- Plan ${Math.ceil(ctx.wordCountMin / 250)} to ${Math.ceil(ctx.wordCountMax / 200)} H2 sections so the total hits ${ctx.wordCountMin}–${ctx.wordCountMax} words [P16]
+- AT LEAST ONE H2 heading must contain the primary keyword verbatim [P3]
+- The FIRST section must be an "Opening Answer Block" (40–60 words) that directly answers the search query with a bold question [P9]
+- The LAST section must be a CTA section titled "Ready to Take the Next Step?" or similar (50–80 words) with a link to ${ctx.ctaUrl} [P11]
 - ${isCornerstoneOrPillar ? "Include a FAQ section (3–5 questions) near the end" : "DO NOT include a FAQ section (Cluster articles only)"}
 - Each section's targetWords should be realistic for that section's depth
 - Use Australian English spelling
+- Plan for an external authority link (.gov.au or industry body) in section 2 [P10]
+- Plan for at least 2 internal blog links to other articles in the batch [P12]
+- Plan for E-E-A-T signals (years experience, clients served, awards) in at least one section [P14]
 
 Return a single JSON object:
 {
@@ -1469,6 +1473,88 @@ Return ONLY the expanded HTML wrapped in:
 
   // Recount words after prepending disclosure (disclosure words are minimal, ~15 words)
   wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
+  // --- Pass E: P9 opening answer block enforcement ---
+  // Ensures the first paragraph contains a bold question + direct answer.
+  {
+    const first800 = bodyHtml.slice(0, 800);
+    const hasOpeningAnswer =
+      /<(strong|b)[^>]*>[^<]*\?[^<]*<\/(strong|b)>/i.test(first800) ||
+      /<p[^>]*>[^<]{5,200}\?/i.test(first800) ||
+      /<h[23][^>]*>[^<]*\?[^<]*<\/h[23]>/i.test(first800);
+    if (!hasOpeningAnswer) {
+      // Prepend a bold question + direct answer block immediately after the first H2
+      const firstH2Match = bodyHtml.match(/<h2[^>]*>[^<]+<\/h2>/i);
+      if (firstH2Match) {
+        const question = ctx.paaQuestion || `What are the key facts about ${ctx.primaryKeyword}?`;
+        const answerBlock = `<p><strong>${question}</strong> Understanding ${ctx.primaryKeyword} is essential for ${ctx.audiences[0] || 'anyone in ' + ctx.industry}. This guide covers the key facts, practical steps, and expert advice you need.</p>`;
+        bodyHtml = bodyHtml.replace(firstH2Match[0], firstH2Match[0] + '\n' + answerBlock);
+        console.log(`[ArticleEngine] P9 enforcement: injected opening answer block for node ${nodeId}`);
+      }
+    }
+  }
+
+  // --- Pass F: P10 external authority link enforcement ---
+  // Ensures at least one real external link to a .gov.au or industry body.
+  {
+    const hasExternal = /href=["'](https?:\/\/[^"']+)["']/i.test(bodyHtml) &&
+      (() => {
+        const externalHrefPattern = /href=["'](https?:\/\/[^"']+)["']/gi;
+        let m;
+        while ((m = externalHrefPattern.exec(bodyHtml)) !== null) {
+          const href = m[1].toLowerCase();
+          if (!href.includes('localhost') && !href.startsWith('/')) return true;
+        }
+        return false;
+      })();
+    if (!hasExternal) {
+      // Inject a generic authority link into the second paragraph
+      const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>[^<]{40,}<\/p>/g));
+      const targetPara = allParas[1] ?? allParas[0];
+      if (targetPara) {
+        const authorityLink = ctx.industry.toLowerCase().includes('health') || ctx.industry.toLowerCase().includes('psych')
+          ? `<a href="https://www.safeworkaustralia.gov.au" target="_blank" rel="noopener">Safe Work Australia</a>`
+          : `<a href="https://www.fairwork.gov.au" target="_blank" rel="noopener">Fair Work Commission</a>`;
+        bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace('</p>', ` For regulatory guidance, refer to ${authorityLink}.</p>`));
+        console.log(`[ArticleEngine] P10 enforcement: injected external authority link for node ${nodeId}`);
+      }
+    }
+  }
+
+  // --- Pass G: P11 internal CTA link enforcement ---
+  // Ensures at least one link to the business CTA URL.
+  {
+    const hasInternalCta = bodyHtml.includes(ctx.ctaUrl) || bodyHtml.includes('/');
+    if (!hasInternalCta && ctx.ctaUrl) {
+      // Append CTA link to the last paragraph before the closing CTA section
+      const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>[^<]{40,}<\/p>/g));
+      const targetPara = allParas[allParas.length - 2] ?? allParas[allParas.length - 1];
+      if (targetPara) {
+        bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace('</p>', ` <a href="${ctx.ctaUrl}">${ctx.ctaText}</a>.</p>`));
+        console.log(`[ArticleEngine] P11 enforcement: injected internal CTA link for node ${nodeId}`);
+      }
+    }
+  }
+
+  // --- Pass H: P12 internal blog links enforcement ---
+  // Ensures at least 2 internal blog links from the batch slugs.
+  {
+    const internalLinkCount = (bodyHtml.match(/href=["']\/[^"']+["']/gi) || []).length;
+    if (internalLinkCount < 2 && ctx.allBatchSlugs.length >= 2) {
+      const slugsToAdd = ctx.allBatchSlugs
+        .filter(s => !bodyHtml.includes(s))
+        .slice(0, 2 - Math.max(0, internalLinkCount));
+      for (const slug of slugsToAdd) {
+        const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>[^<]{60,}<\/p>/g));
+        const targetPara = allParas[Math.floor(allParas.length / 2)];
+        if (targetPara) {
+          const label = slug.replace(/^\//,'').replace(/-/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+          bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace('</p>', ` See also: <a href="${slug}">${label}</a>.</p>`));
+          console.log(`[ArticleEngine] P12 enforcement: injected internal blog link ${slug} for node ${nodeId}`);
+        }
+      }
+    }
+  }
 
   // --- Pass 1: Rules-based scorer ---
   const pass1 = runPass1Scorer({

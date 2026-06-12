@@ -165,6 +165,7 @@ async function generateAndSave(
         focusKeyword: null, // will be set from keyword row
         internalScore: result.internalScore,
         pass2Score: result.pass2Score,
+        pass1Details: result.pass1Points as unknown,
         statusBadge: result.statusBadge,
         status: "generated",
         approvedAt: null,
@@ -434,6 +435,7 @@ export const articlesRouter = router({
           wordCount: articles.wordCount,
           internalScore: articles.internalScore,
           pass2Score: articles.pass2Score,
+          pass1Details: articles.pass1Details,
           statusBadge: articles.statusBadge,
           status: articles.status,
           generationAttempts: articles.generationAttempts,
@@ -484,6 +486,7 @@ export const articlesRouter = router({
           wordCount: articles.wordCount,
           internalScore: articles.internalScore,
           pass2Score: articles.pass2Score,
+          pass1Details: articles.pass1Details,
           statusBadge: articles.statusBadge,
           status: articles.status,
           generationAttempts: articles.generationAttempts,
