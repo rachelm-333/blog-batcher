@@ -212,7 +212,7 @@ function TreeMap({
                             Pillar {csIdx + 1}.{pIdx + 1}
                           </span>
                           <span style={{ fontSize: 10, color: "#0369a1", opacity: 0.7 }}>
-                            1,500–2,000 w
+                            1,500–2,200 w
                           </span>
                         </div>
                         <ArticleTypeSelect
@@ -257,7 +257,7 @@ function TreeMap({
                                 Cluster {csIdx + 1}.{pIdx + 1}.{clIdx + 1}
                               </span>
                               <span style={{ fontSize: 10, color: "#9ca3af" }}>
-                                800–1,200 w · Specialist Post
+                                800–1,300 w · Specialist Post
                               </span>
                             </div>
                           ))}
@@ -534,7 +534,7 @@ export default function Architecture() {
 
             <SliderRow
               label="Pillar Posts per Cornerstone"
-              subtitle="In-depth topic posts — 1,500–2,000 words. Branches off each cornerstone."
+              subtitle="In-depth topic posts — 1,500–2,200 words. Branches off each cornerstone."
               value={localPillars}
               min={MIN_PILLARS_PER_CORNERSTONE}
               max={MAX_PILLARS_PER_CORNERSTONE}

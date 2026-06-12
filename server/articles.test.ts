@@ -89,19 +89,19 @@ describe("Generation order", () => {
     expect(WORD_COUNT_RULES.cluster).toBeDefined();
   });
 
-  it("Cornerstone word count range is 2000–3000", () => {
+  it("Cornerstone word count range is 2000–3200", () => {
     expect(WORD_COUNT_RULES.cornerstone.min).toBe(2000);
-    expect(WORD_COUNT_RULES.cornerstone.max).toBe(3000);
+    expect(WORD_COUNT_RULES.cornerstone.max).toBe(3200);
   });
 
-  it("Pillar word count range is 1500–1800", () => {
+  it("Pillar word count range is 1500–2200", () => {
     expect(WORD_COUNT_RULES.pillar.min).toBe(1500);
-    expect(WORD_COUNT_RULES.pillar.max).toBe(1800);
+    expect(WORD_COUNT_RULES.pillar.max).toBe(2200);
   });
 
-  it("Cluster word count range is 800–1200", () => {
+  it("Cluster word count range is 800–1300", () => {
     expect(WORD_COUNT_RULES.cluster.min).toBe(800);
-    expect(WORD_COUNT_RULES.cluster.max).toBe(1200);
+    expect(WORD_COUNT_RULES.cluster.max).toBe(1300);
   });
 
   it("getOrderedNodes sorts cornerstones before pillars before clusters (logic test)", () => {
@@ -129,18 +129,18 @@ describe("Generation order", () => {
 
 describe("Word count enforcement", () => {
   it("Pass 1 scorer fails p16 when word count is well below minimum for cornerstone", () => {
-    // 1900 words is 100 below the 2000 minimum, exceeding the 50-word tolerance
-    const result = runPass1Scorer(makePass1Params({ wordCount: 1900, level: "cornerstone" }));
+    // 1800 words is 200 below the 2000 minimum, exceeding the 100-word tolerance
+    const result = runPass1Scorer(makePass1Params({ wordCount: 1800, level: "cornerstone" }));
     expect(result.points.p16_word_count).toBe(false);
   });
 
-  it("Pass 1 scorer passes p16 when word count is within 50-word tolerance of minimum", () => {
-    // 1960 words is 40 below the 2000 minimum, within the 50-word tolerance
-    const result = runPass1Scorer(makePass1Params({ wordCount: 1960, level: "cornerstone" }));
+  it("Pass 1 scorer passes p16 when word count is within 100-word tolerance of minimum", () => {
+    // 1920 words is 80 below the 2000 minimum, within the 100-word tolerance
+    const result = runPass1Scorer(makePass1Params({ wordCount: 1920, level: "cornerstone" }));
     expect(result.points.p16_word_count).toBe(true);
   });
 
-  it("Pass 1 scorer fails p16 when word count exceeds maximum for cornerstone", () => {
+  it("Pass 1 scorer fails p16 when word count exceeds maximum for cornerstone (3200)", () => {
     const result = runPass1Scorer(makePass1Params({ wordCount: 3500, level: "cornerstone" }));
     expect(result.points.p16_word_count).toBe(false);
   });
@@ -150,8 +150,13 @@ describe("Word count enforcement", () => {
     expect(result.points.p16_word_count).toBe(true);
   });
 
-  it("Pass 1 scorer passes p16 for pillar within 1500–1800", () => {
-    const result = runPass1Scorer(makePass1Params({ wordCount: 1600, level: "pillar" }));
+  it("Pass 1 scorer passes p16 for pillar within 1500–2200", () => {
+    const result = runPass1Scorer(makePass1Params({ wordCount: 2000, level: "pillar" }));
+    expect(result.points.p16_word_count).toBe(true);
+  });
+
+  it("Pass 1 scorer passes p16 for pillar at 2206 words (previously failing)", () => {
+    const result = runPass1Scorer(makePass1Params({ wordCount: 2206, level: "pillar" }));
     expect(result.points.p16_word_count).toBe(true);
   });
 
@@ -160,12 +165,12 @@ describe("Word count enforcement", () => {
     expect(result.points.p16_word_count).toBe(false);
   });
 
-  it("Pass 1 scorer passes p16 for cluster within 1000–1200", () => {
+  it("Pass 1 scorer passes p16 for cluster within 800–1300", () => {
     const result = runPass1Scorer(makePass1Params({ wordCount: 1100, level: "cluster" }));
     expect(result.points.p16_word_count).toBe(true);
   });
 
-  it("Pass 1 scorer fails p16 for cluster above 1200", () => {
+  it("Pass 1 scorer fails p16 for cluster above 1300", () => {
     const result = runPass1Scorer(makePass1Params({ wordCount: 1500, level: "cluster" }));
     expect(result.points.p16_word_count).toBe(false);
   });
