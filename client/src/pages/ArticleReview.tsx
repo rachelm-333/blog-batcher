@@ -49,7 +49,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
@@ -727,25 +727,6 @@ export default function ArticleReview() {
     onError: (err) => toast.error(err.message),
   });
 
-  // Sync score to DB when article is selected so sidebar shows consistent value
-  const syncScore = trpc.articles.syncScore.useMutation({
-    onSuccess: () => {
-      // Invalidate the list so all sidebar cards reflect the updated score
-      utils.articles.getAll.invalidate({ businessId: business?.id ?? 0 });
-    },
-  });
-
-  // Fire syncScore whenever the selected article's full content is loaded
-  const lastSyncedArticleId = useRef<number | null>(null);
-  useEffect(() => {
-    if (!fullArticle) return;
-    const fa = fullArticle as any;
-    if (!fa.id || fa.id === lastSyncedArticleId.current) return;
-    if (!fa.bodyHtml) return; // don't sync empty articles
-    lastSyncedArticleId.current = fa.id;
-    syncScore.mutate({ articleId: fa.id });
-  }, [(fullArticle as any)?.id]);
-
   // AI instruction panel state
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiInstruction, setAiInstruction] = useState("");
@@ -1014,13 +995,11 @@ export default function ArticleReview() {
                   <div className="mt-1.5 flex flex-wrap gap-1 items-center">
                     <StatusBadgeChip badge={item.statusBadge as StatusBadge} status={item.status as ArticleStatus} />
                   </div>
-                  {/* Dual checkpoint mini-badges — use live score for selected article, DB score for others */}
-                  {(item.internalScore != null || (isSelected && livePassCount != null)) && (
+                  {/* Checkpoint 1 mini-badge — always shows the DB-stored score, stable on click */}
+                  {item.internalScore != null && (
                     <div className="mt-1 flex gap-1">
                       {(() => {
-                        const displayScore = isSelected && livePassCount != null
-                          ? livePassCount
-                          : item.internalScore != null ? Math.round((item.internalScore / 100) * 16) : null;
+                        const displayScore = Math.round((item.internalScore / 100) * 16);
                         if (displayScore == null) return null;
                         return (
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
