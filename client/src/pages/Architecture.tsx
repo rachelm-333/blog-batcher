@@ -343,6 +343,8 @@ export default function Architecture() {
   // Advisory popup: shown when user sets any type to exactly 1
   const [advisoryOpen, setAdvisoryOpen] = useState(false);
   const [advisoryType, setAdvisoryType] = useState<"cornerstone" | "pillar" | "cluster">("cornerstone");
+  // Only show the advisory tip once per page session, regardless of which slider triggers it
+  const hasShownAdvisory = useRef(false);
   // Track previous values to detect transitions to 1
   const prevCornerstones = useRef(localCornerstones);
   const prevPillars = useRef(localPillars);
@@ -389,7 +391,8 @@ export default function Architecture() {
   const handleCornerstonesChange = (v: number) => {
     setLocalCornerstones(v);
     if (v === 0) { setLocalPillars(0); setLocalClusters(0); }
-    if (v === 1 && prevCornerstones.current !== 1) {
+    if (v === 1 && prevCornerstones.current !== 1 && !hasShownAdvisory.current) {
+      hasShownAdvisory.current = true;
       setAdvisoryType("cornerstone");
       setAdvisoryOpen(true);
     }
@@ -398,7 +401,8 @@ export default function Architecture() {
   const handlePillarsChange = (v: number) => {
     setLocalPillars(v);
     if (v === 0) setLocalClusters(0);
-    if (v === 1 && prevPillars.current !== 1) {
+    if (v === 1 && prevPillars.current !== 1 && !hasShownAdvisory.current) {
+      hasShownAdvisory.current = true;
       setAdvisoryType("pillar");
       setAdvisoryOpen(true);
     }
@@ -406,7 +410,8 @@ export default function Architecture() {
   };
   const handleClustersChange = (v: number) => {
     setLocalClusters(v);
-    if (v === 1 && prevClusters.current !== 1) {
+    if (v === 1 && prevClusters.current !== 1 && !hasShownAdvisory.current) {
+      hasShownAdvisory.current = true;
       setAdvisoryType("cluster");
       setAdvisoryOpen(true);
     }
