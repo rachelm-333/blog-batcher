@@ -277,10 +277,18 @@ export const architectureRouter = router({
           .where(eq(blogArchitectures.id, existing[0].id));
         architectureId = existing[0].id;
       } else {
+        // Carry forward packSize from any previous batch row, defaulting to 20
+        const prevBatch = await db
+          .select({ packSize: blogArchitectures.packSize })
+          .from(blogArchitectures)
+          .where(eq(blogArchitectures.businessId, input.businessId))
+          .orderBy(blogArchitectures.batchNumber)
+          .limit(1);
+        const inheritedPackSize = prevBatch[0]?.packSize ?? 20;
         const result = await db.insert(blogArchitectures).values({
           businessId: input.businessId,
           batchNumber: activeBatch2,
-          packSize: 0, // no fixed pack size — total is free-form
+          packSize: inheritedPackSize,
           cornerstoneCount: defaults.cornerstones,
           pillarCount: defaults.pillarsPerCornerstone,
           clustersPerPillar: defaults.clustersPerPillar,
@@ -334,10 +342,18 @@ export const architectureRouter = router({
 
       const defaults = DEFAULT_ARCHITECTURE;
       const total = calcTotalArticles(defaults.cornerstones, defaults.pillarsPerCornerstone, defaults.clustersPerPillar);
+      // Carry forward packSize from any previous batch row, defaulting to 20
+      const prevBatchSP = await db
+        .select({ packSize: blogArchitectures.packSize })
+        .from(blogArchitectures)
+        .where(eq(blogArchitectures.businessId, input.businessId))
+        .orderBy(blogArchitectures.batchNumber)
+        .limit(1);
+      const inheritedPackSizeSP = prevBatchSP[0]?.packSize ?? 20;
       const result = await db.insert(blogArchitectures).values({
         businessId: input.businessId,
         batchNumber: activeBatchSP,
-        packSize: 0,
+        packSize: inheritedPackSizeSP,
         cornerstoneCount: defaults.cornerstones,
         pillarCount: defaults.pillarsPerCornerstone,
         clustersPerPillar: defaults.clustersPerPillar,
@@ -378,7 +394,27 @@ export const architectureRouter = router({
         .limit(1);
 
       if (!existing.length) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "No architecture found. Please initialise first." });
+        // Auto-initialise for this batch — carry packSize from previous batch
+        const prevBatchU = await db
+          .select({ packSize: blogArchitectures.packSize })
+          .from(blogArchitectures)
+          .where(eq(blogArchitectures.businessId, input.businessId))
+          .orderBy(blogArchitectures.batchNumber)
+          .limit(1);
+        const inheritedPackSizeU = prevBatchU[0]?.packSize ?? 20;
+        const insertResult = await db.insert(blogArchitectures).values({
+          businessId: input.businessId,
+          batchNumber: activeBatchU,
+          packSize: inheritedPackSizeU,
+          cornerstoneCount: input.cornerstones,
+          pillarCount: input.pillarsPerCornerstone,
+          clustersPerPillar: input.clustersPerPillar ?? 3,
+          totalArticleCount: 0,
+          confirmed: false,
+        });
+        const newArchId = (insertResult as any)[0]?.insertId ?? (insertResult as any).insertId;
+        const newArch = await db.select().from(blogArchitectures).where(eq(blogArchitectures.id, newArchId)).limit(1);
+        existing.push(newArch[0]);
       }
       const arch = existing[0];
       if (arch.confirmed) {
