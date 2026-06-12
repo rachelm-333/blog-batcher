@@ -936,7 +936,15 @@
 - [x] Keywords panel: show which article each selection is assigned to (or "Unassigned" if not yet used)
 - [x] Keywords panel: clicking an unassigned keyword pre-selects it in the Swap modal
 
-## Competition Display & Panel Fixes (Jun 11 2026)
+## Claude 3.5 Sonnet Switch (Jun 11 2026)
+- [x] Add ANTHROPIC_API_KEY secret
+- [x] Install @anthropic-ai/sdk package
+- [x] Create claudeLLM.ts with invokeClaudeWithCost (drop-in replacement for invokeLLMWithCost)
+- [x] Replace all invokeLLMWithCost calls in articleEngine.ts with invokeClaudeWithCost
+- [x] Cost logging updated to use Claude 3.5 Sonnet pricing ($3/M input, $15/M output)
+- [x] TypeScript clean - 0 errors
+
+## Competition Display & Panel Visibility Fix(Jun 11 2026)
 - [x] Add 'low' to competitionLevel ENUM in keywords table schema (was only 'high'/'medium')
 - [x] Apply ALTER TABLE migration to add 'low' to the DB ENUM
 - [x] Fix assignAll and swap procedures to store 'low' instead of null for low-competition keywords
@@ -975,3 +983,11 @@
 - [x] Add dual checkpoint panel to ArticleReview SEO panel (Checkpoint 1 SEO Structure / Checkpoint 2 Writing Quality)
 - [x] Add dual checkpoint badges to ArticleGeneration table rows (Checkpoints column)
 - [x] Checkpoint 2 green threshold = 70/100
+
+## Switch to Claude 3.5 Sonnet for Article Generation (Jun 11 2026)
+- [ ] Add ANTHROPIC_API_KEY secret
+- [ ] Install @anthropic-ai/sdk package
+- [ ] Create server/claudeLLM.ts helper wrapping Anthropic SDK
+- [ ] Update articleEngine.ts to use Claude 3.5 Sonnet for article generation
+- [ ] Tighten article generation prompt with 16-point SEO checklist as hard requirements
+- [ ] Ensure articles consistently score 14+/16 on Checkpoint 1

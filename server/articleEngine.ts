@@ -33,7 +33,7 @@ import {
   keywords,
 } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
-import { invokeLLMWithCost } from "./apiCostLogger";
+import { invokeClaudeWithCost as invokeLLMWithCost } from "./claudeLLM";
 import { getDb } from "./db";
 
 // ---------------------------------------------------------------------------
