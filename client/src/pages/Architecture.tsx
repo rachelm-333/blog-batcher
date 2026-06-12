@@ -25,26 +25,16 @@ import {
   MIN_PILLARS_PER_CORNERSTONE,
   VALID_TYPES_BY_LEVEL,
   calcBreakdown,
-  enforceDependencies,
   type ArticleType,
 } from "@shared/architectureRules";
 import { useActiveBusiness } from "@/contexts/BusinessContext";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   AlertTriangle,
   CheckCircle,
   Edit2,
-  Info,
   Layers,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
 
@@ -336,19 +326,11 @@ export default function Architecture() {
   const [, navigate] = useLocation();
 
   // Local slider state (optimistic, before saving)
-  const [localCornerstones, setLocalCornerstones] = useState(2);
-  const [localPillars, setLocalPillars] = useState(2);
+  // Defaults match the minimum valid architecture: 1 cornerstone, 1 pillar, 3 clusters
+  const [localCornerstones, setLocalCornerstones] = useState(MIN_CORNERSTONES);
+  const [localPillars, setLocalPillars] = useState(MIN_PILLARS_PER_CORNERSTONE);
   const [localClusters, setLocalClusters] = useState(DEFAULT_CLUSTERS_PER_PILLAR);
   const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
-  // Advisory popup: shown when user sets any type to exactly 1
-  const [advisoryOpen, setAdvisoryOpen] = useState(false);
-  const [advisoryType, setAdvisoryType] = useState<"cornerstone" | "pillar" | "cluster">("cornerstone");
-  // Only show the advisory tip once per page session, regardless of which slider triggers it
-  const hasShownAdvisory = useRef(false);
-  // Track previous values to detect transitions to 1
-  const prevCornerstones = useRef(localCornerstones);
-  const prevPillars = useRef(localPillars);
-  const prevClusters = useRef(localClusters);
 
   // Business query
   const { activeBusiness: businessData } = useActiveBusiness();
@@ -387,36 +369,10 @@ export default function Architecture() {
     }
   }, [arch?.cornerstoneCount, arch?.pillarCount, arch?.clustersPerPillar]);
 
-  // Enforce dependencies as user drags sliders
-  const handleCornerstonesChange = (v: number) => {
-    setLocalCornerstones(v);
-    if (v === 0) { setLocalPillars(0); setLocalClusters(0); }
-    if (v === 1 && prevCornerstones.current !== 1 && !hasShownAdvisory.current) {
-      hasShownAdvisory.current = true;
-      setAdvisoryType("cornerstone");
-      setAdvisoryOpen(true);
-    }
-    prevCornerstones.current = v;
-  };
-  const handlePillarsChange = (v: number) => {
-    setLocalPillars(v);
-    if (v === 0) setLocalClusters(0);
-    if (v === 1 && prevPillars.current !== 1 && !hasShownAdvisory.current) {
-      hasShownAdvisory.current = true;
-      setAdvisoryType("pillar");
-      setAdvisoryOpen(true);
-    }
-    prevPillars.current = v;
-  };
-  const handleClustersChange = (v: number) => {
-    setLocalClusters(v);
-    if (v === 1 && prevClusters.current !== 1 && !hasShownAdvisory.current) {
-      hasShownAdvisory.current = true;
-      setAdvisoryType("cluster");
-      setAdvisoryOpen(true);
-    }
-    prevClusters.current = v;
-  };
+  // Slider handlers — strict hierarchy, no standalone modes
+  const handleCornerstonesChange = (v: number) => setLocalCornerstones(v);
+  const handlePillarsChange = (v: number) => setLocalPillars(v);
+  const handleClustersChange = (v: number) => setLocalClusters(v);
 
   // Live breakdown (raw slider values, no guardrail correction)
   const liveBreakdown = useMemo(
@@ -424,11 +380,8 @@ export default function Architecture() {
     [localCornerstones, localPillars, localClusters]
   );
 
-  // Dependency warnings for live display
-  const depWarnings = useMemo(() => {
-    const result = enforceDependencies(localCornerstones, localPillars, localClusters);
-    return result.warnings;
-  }, [localCornerstones, localPillars, localClusters]);
+  // No dependency warnings needed — strict hierarchy enforced by slider min values
+  const depWarnings: string[] = [];
 
   // Mutations
   const updateArch = trpc.architecture.update.useMutation({
@@ -488,7 +441,9 @@ export default function Architecture() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Two-column layout: sliders (centre) + SEO explainer (right sidebar) */}
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px", display: "grid", gridTemplateColumns: "1fr 320px", gap: 28, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
         {/* ── Configure Architecture ─────────────────────────────────────────── */}
         <Card>
@@ -569,11 +524,8 @@ export default function Architecture() {
             />
 
             <SliderRow
-              label={localCornerstones === 0 ? "Standalone Pillar Posts" : "Pillar Posts per Cornerstone"}
-              subtitle={localCornerstones === 0
-                ? "In-depth posts — 1,500–2,200 words. Independent articles not attached to a cornerstone."
-                : "In-depth topic posts — 1,500–2,200 words. Branches off each cornerstone."
-              }
+              label="Pillar Posts"
+              subtitle="In-depth topic posts — 1,500–2,200 words. Each pillar links back to its cornerstone."
               value={localPillars}
               min={MIN_PILLARS_PER_CORNERSTONE}
               max={MAX_PILLARS_PER_CORNERSTONE}
@@ -583,11 +535,8 @@ export default function Architecture() {
             />
 
             <SliderRow
-              label={localCornerstones === 0 && localPillars === 0 ? "Standalone Cluster Posts" : "Cluster Articles per Pillar"}
-              subtitle={localCornerstones === 0 && localPillars === 0
-                ? "Focused posts — 800–1,200 words. Independent articles targeting a single keyword."
-                : "Specific, focused posts — 800–1,200 words. Leaves of the tree, one precise question each."
-              }
+              label="Cluster Articles"
+              subtitle="Specific, focused posts — 800–1,200 words. Each cluster links back to its pillar and cornerstone."
               value={localClusters}
               min={MIN_CLUSTERS_PER_PILLAR}
               max={MAX_CLUSTERS_PER_PILLAR}
@@ -598,27 +547,10 @@ export default function Architecture() {
 
             {/* Architecture summary sentence */}
             <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-4 py-3">
-              {liveBreakdown.total === 0 ? (
-                "No articles configured yet — drag the sliders above to build your architecture."
-              ) : localCornerstones > 0 ? (
-                <>
-                  <strong>{localCornerstones}</strong> cornerstone{localCornerstones !== 1 ? "s" : ""}
-                  {localPillars > 0 && <> × <strong>{localPillars}</strong> pillar{localPillars !== 1 ? "s" : ""} per cornerstone</>}
-                  {localClusters > 0 && <> × <strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} per pillar</>}
-                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
-                </>
-              ) : localPillars > 0 ? (
-                <>
-                  <strong>{localPillars}</strong> standalone pillar post{localPillars !== 1 ? "s" : ""}
-                  {localClusters > 0 && <> + <strong>{localPillars * localClusters}</strong> cluster{localPillars * localClusters !== 1 ? "s" : ""} ({localClusters} per pillar)</>}
-                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
-                </>
-              ) : (
-                <>
-                  <strong>{localClusters}</strong> standalone post{localClusters !== 1 ? "s" : ""}
-                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
-                </>
-              )}
+              <strong>{localCornerstones}</strong> cornerstone{localCornerstones !== 1 ? "s" : ""}
+              {" × "}<strong>{localPillars}</strong> pillar{localPillars !== 1 ? "s" : ""} per cornerstone
+              {" × "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} per pillar
+              {" = "}<strong>{liveBreakdown.total} articles total</strong>
             </p>
 
             {!locked && (
@@ -695,52 +627,80 @@ export default function Architecture() {
             </Button>
           </div>
         )}
+        </div>{/* end left column */}
+
+        {/* ── Right-hand SEO explainer column ─────────────────────────────── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, position: "sticky", top: 24 }}>
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Layers style={{ width: 16, height: 16, color: "#fff" }} />
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>Why Architecture Matters</span>
+            </div>
+            <p style={{ fontSize: 13, color: "#4b5563", lineHeight: 1.6, margin: "0 0 14px" }}>
+              Blog Batcher builds your content as a <strong>structured hierarchy</strong> — not just a list of posts.
+              This is the proven SEO strategy that helps search engines see your site as an <strong>authority in your niche</strong>.
+            </p>
+
+            {/* Visual hierarchy diagram */}
+            <div style={{ background: "#faf9f5", borderRadius: 8, padding: "14px 12px", marginBottom: 14 }}>
+              {/* Cornerstone */}
+              <div style={{ background: "#7c3aed", color: "#fff", borderRadius: 6, padding: "8px 12px", textAlign: "center", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+                🏛 Cornerstone Article
+                <div style={{ fontSize: 10, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Long-form authority post (2,800–3,200 words)</div>
+              </div>
+              {/* Arrow down */}
+              <div style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", marginBottom: 6 }}>↑ Pillar posts link to this</div>
+              {/* Pillars */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+                {["Pillar Post A", "Pillar Post B"].map((label) => (
+                  <div key={label} style={{ background: "#dbeafe", borderRadius: 5, padding: "6px 8px", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#1e40af" }}>
+                    📄 {label}
+                    <div style={{ fontSize: 10, fontWeight: 400, color: "#3b82f6", marginTop: 1 }}>1,500–2,200 words</div>
+                  </div>
+                ))}
+              </div>
+              {/* Arrow down */}
+              <div style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", marginBottom: 6 }}>↑ Cluster posts link to these</div>
+              {/* Clusters */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+                {["Cluster 1", "Cluster 2", "Cluster 3"].map((label) => (
+                  <div key={label} style={{ background: "#f3f4f6", borderRadius: 4, padding: "5px 6px", textAlign: "center", fontSize: 10, fontWeight: 500, color: "#6b7280" }}>
+                    📝 {label}
+                    <div style={{ fontSize: 9, marginTop: 1 }}>800–1,200 words</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.6 }}>
+              <p style={{ margin: "0 0 8px" }}>
+                <strong style={{ color: "#7c3aed" }}>Cornerstone</strong> — your big, authoritative guide on a broad topic.
+                All other posts point back to it with anchor text links.
+              </p>
+              <p style={{ margin: "0 0 8px" }}>
+                <strong style={{ color: "#1e40af" }}>Pillar Posts</strong> — in-depth articles on specific sub-topics.
+                They link to the cornerstone and are supported by cluster posts.
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong style={{ color: "#6b7280" }}>Cluster Posts</strong> — short, focused articles targeting one precise keyword.
+                They link up to their pillar and cornerstone, signalling topical depth.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "14px 16px" }}>
+            <p style={{ fontSize: 12, color: "#166534", lineHeight: 1.6, margin: 0 }}>
+              <strong>This is ideal for SEO.</strong> When smaller, specific posts reference your larger posts with anchor text links,
+              search engines understand the depth of your content and are more likely to rank your site as an authority in your niche.
+              Blog Batcher SEO-optimises every article in this structure for you automatically.
+            </p>
+          </div>
+        </div>{/* end right column */}
+
       </div>
     </div>
-
-    {/* ── Advisory popup: shown when any type is set to 1 ─────────────────── */}
-    <Dialog open={advisoryOpen} onOpenChange={setAdvisoryOpen}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <Info className="w-5 h-5 text-sky-500 shrink-0" />
-            <DialogTitle>Just a helpful tip</DialogTitle>
-          </div>
-          <DialogDescription className="pt-2 text-sm leading-relaxed">
-            You've set your{" "}
-            <strong>
-              {advisoryType === "cornerstone" && "cornerstone"}
-              {advisoryType === "pillar" && "pillar post"}
-              {advisoryType === "cluster" && "cluster article"}
-            </strong>{" "}
-            count to <strong>1</strong>. That's totally fine — one great article is a great start!
-            <br /><br />
-            To help support that article and build topical authority around it, it's worth adding{" "}
-            <strong>1–2 supporting posts</strong> that speak specifically to that same topic and link back to it.
-            This helps search engines understand the depth of your content on that subject.
-            <br /><br />
-            You can always come back and add more later.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex gap-2 sm:justify-end">
-          <Button variant="outline" onClick={() => setAdvisoryOpen(false)}>
-            Keep it at 1 for now
-          </Button>
-          <Button
-            className="bg-violet-600 hover:bg-violet-700 text-white"
-            onClick={() => {
-              // Bump the relevant slider up to 2 as a suggestion
-              if (advisoryType === "cornerstone") setLocalCornerstones(2);
-              if (advisoryType === "pillar") setLocalPillars(2);
-              if (advisoryType === "cluster") setLocalClusters(2);
-              setAdvisoryOpen(false);
-            }}
-          >
-            Add a supporting post (set to 2)
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
 
     </DashboardLayout>
   );

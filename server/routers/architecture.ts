@@ -62,7 +62,8 @@ async function regenerateNodes(
   businessId: number,
   cornerstones: number,
   pillarsPerCornerstone: number,
-  clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
+  clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR,
+  batchNumber: number = 1
 ) {
   // Delete child rows first (foreign key constraints: articles → keywords → article_nodes)
   const existingNodes = await db
@@ -96,6 +97,7 @@ async function regenerateNodes(
     await db.insert(articleNodes).values({
       architectureId,
       businessId,
+      batchNumber,
       level: "cornerstone",
       articleType: n.defaultArticleType,
       parentCornerstoneId: null,
@@ -116,14 +118,14 @@ async function regenerateNodes(
     );
   insertedCornerstones.sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Pass 2: Pillars (hierarchy or standalone)
+  // Pass 2: Pillars (strict hierarchy — always parented to a cornerstone)
   const pillarNodes = nodes.filter((n) => n.level === "pillar");
   for (const n of pillarNodes) {
-    // cornerstoneIndex === 0 means standalone pillar (no parent cornerstone)
-    const cornerstoneRow = n.cornerstoneIndex > 0 ? insertedCornerstones[n.cornerstoneIndex - 1] : null;
+    const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
     await db.insert(articleNodes).values({
       architectureId,
       businessId,
+      batchNumber,
       level: "pillar",
       articleType: n.defaultArticleType,
       parentCornerstoneId: cornerstoneRow?.id ?? null,
@@ -148,51 +150,26 @@ async function regenerateNodes(
     );
   insertedPillars.sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Pass 3: Clusters (hierarchy, pillar-parented standalone, or fully standalone)
+  // Pass 3: Clusters (strict hierarchy — always parented to a cornerstone and pillar)
   const clusterNodes = nodes.filter((n) => n.level === "cluster");
   for (const n of clusterNodes) {
-    if (n.cornerstoneIndex > 0) {
-      // Full hierarchy cluster
-      const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
-      if (!cornerstoneRow) continue;
-      const pillarsUnderCornerstone = insertedPillars.filter(
-        (p) => p.parentCornerstoneId === cornerstoneRow.id
-      );
-      const pillarRow = pillarsUnderCornerstone[n.pillarIndex! - 1];
-      if (!pillarRow) continue;
-      await db.insert(articleNodes).values({
-        architectureId,
-        businessId,
-        level: "cluster",
-        articleType: n.defaultArticleType,
-        parentCornerstoneId: cornerstoneRow.id,
-        parentPillarId: pillarRow.id,
-        sortOrder: sortOrder++,
-      });
-    } else if (n.pillarIndex !== null) {
-      // Standalone cluster under a standalone pillar
-      const pillarRow = insertedPillars[n.pillarIndex - 1];
-      await db.insert(articleNodes).values({
-        architectureId,
-        businessId,
-        level: "cluster",
-        articleType: n.defaultArticleType,
-        parentCornerstoneId: null,
-        parentPillarId: pillarRow?.id ?? null,
-        sortOrder: sortOrder++,
-      });
-    } else {
-      // Fully standalone cluster (no cornerstone, no pillar)
-      await db.insert(articleNodes).values({
-        architectureId,
-        businessId,
-        level: "cluster",
-        articleType: n.defaultArticleType,
-        parentCornerstoneId: null,
-        parentPillarId: null,
-        sortOrder: sortOrder++,
-      });
-    }
+    const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
+    if (!cornerstoneRow) continue;
+    const pillarsUnderCornerstone = insertedPillars.filter(
+      (p) => p.parentCornerstoneId === cornerstoneRow.id
+    );
+    const pillarRow = pillarsUnderCornerstone[n.pillarIndex! - 1];
+    if (!pillarRow) continue;
+    await db.insert(articleNodes).values({
+      architectureId,
+      businessId,
+      batchNumber,
+      level: "cluster",
+      articleType: n.defaultArticleType,
+      parentCornerstoneId: cornerstoneRow.id,
+      parentPillarId: pillarRow.id,
+      sortOrder: sortOrder++,
+    });
   }
 }
 
@@ -304,7 +281,8 @@ export const architectureRouter = router({
         input.businessId,
         defaults.cornerstones,
         defaults.pillarsPerCornerstone,
-        defaults.clustersPerPillar
+        defaults.clustersPerPillar,
+        activeBatch2
       );
 
       const arch = await db
@@ -361,7 +339,7 @@ export const architectureRouter = router({
         confirmed: false,
       });
       const architectureId = (result as any)[0]?.insertId ?? (result as any).insertId;
-      await regenerateNodes(db, architectureId, input.businessId, defaults.cornerstones, defaults.pillarsPerCornerstone, defaults.clustersPerPillar);
+      await regenerateNodes(db, architectureId, input.businessId, defaults.cornerstones, defaults.pillarsPerCornerstone, defaults.clustersPerPillar, activeBatchSP);
       const arch = await db.select().from(blogArchitectures).where(eq(blogArchitectures.id, architectureId)).limit(1);
       const nodes = await db.select().from(articleNodes).where(eq(articleNodes.architectureId, architectureId));
       return { architecture: arch[0], nodes };
@@ -447,7 +425,7 @@ export const architectureRouter = router({
         .where(eq(blogArchitectures.id, arch.id));
 
       // Regenerate nodes
-      await regenerateNodes(db, arch.id, input.businessId, finalCornerstones, finalPillars, finalClusters);
+      await regenerateNodes(db, arch.id, input.businessId, finalCornerstones, finalPillars, finalClusters, activeBatchU);
 
       const updatedArch = await db
         .select()

@@ -1026,3 +1026,12 @@
 - [x] Lower minimum count for cluster, pillar, and cornerstone article types to 1 (was 2 or 3)
 - [x] Show advisory popup when any article type count is set to 1, suggesting 1-2 supporting posts
 - [x] Popup should be dismissable (user can proceed without adding more)
+
+## Architecture Page Overhaul (Jun 13 2026)
+- [ ] Fix DB insert error: use INSERT ... ON DUPLICATE KEY UPDATE to avoid duplicate batch rows
+- [ ] Set minimum: 1 cornerstone, 1 pillar, 3 clusters (total 5 articles minimum)
+- [ ] Remove standalone pillar/cluster mode (revert to strict hierarchy, min 1 each)
+- [ ] Update pillar slider label from "Pillar Posts per Cornerstone" to "Pillar Posts"
+- [ ] Redesign Architecture page layout: sliders centred, right-hand SEO explainer column
+- [ ] Right-hand column: blurb about content architecture importance for SEO authority
+- [ ] Right-hand column: visual diagram showing Cornerstone <- Pillar(s) <- Cluster(s) with link arrows
