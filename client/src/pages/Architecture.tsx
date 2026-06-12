@@ -564,36 +564,53 @@ export default function Architecture() {
             />
 
             <SliderRow
-              label="Pillar Posts per Cornerstone"
-              subtitle="In-depth topic posts — 1,500–2,200 words. Branches off each cornerstone."
+              label={localCornerstones === 0 ? "Standalone Pillar Posts" : "Pillar Posts per Cornerstone"}
+              subtitle={localCornerstones === 0
+                ? "In-depth posts — 1,500–2,200 words. Independent articles not attached to a cornerstone."
+                : "In-depth topic posts — 1,500–2,200 words. Branches off each cornerstone."
+              }
               value={localPillars}
               min={MIN_PILLARS_PER_CORNERSTONE}
               max={MAX_PILLARS_PER_CORNERSTONE}
               colour="text-sky-600"
-              disabled={locked || localCornerstones === 0}
+              disabled={locked}
               onChange={handlePillarsChange}
             />
 
             <SliderRow
-              label="Cluster Articles per Pillar"
-              subtitle="Specific, focused posts — 800–1,200 words. Leaves of the tree, one precise question each."
+              label={localCornerstones === 0 && localPillars === 0 ? "Standalone Cluster Posts" : "Cluster Articles per Pillar"}
+              subtitle={localCornerstones === 0 && localPillars === 0
+                ? "Focused posts — 800–1,200 words. Independent articles targeting a single keyword."
+                : "Specific, focused posts — 800–1,200 words. Leaves of the tree, one precise question each."
+              }
               value={localClusters}
               min={MIN_CLUSTERS_PER_PILLAR}
               max={MAX_CLUSTERS_PER_PILLAR}
               colour="text-gray-500"
-              disabled={locked || localPillars === 0}
+              disabled={locked}
               onChange={handleClustersChange}
             />
 
             {/* Architecture summary sentence */}
             <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-4 py-3">
-              {localCornerstones === 0 ? (
+              {liveBreakdown.total === 0 ? (
                 "No articles configured yet — drag the sliders above to build your architecture."
-              ) : (
+              ) : localCornerstones > 0 ? (
                 <>
                   <strong>{localCornerstones}</strong> cornerstone{localCornerstones !== 1 ? "s" : ""}
                   {localPillars > 0 && <> × <strong>{localPillars}</strong> pillar{localPillars !== 1 ? "s" : ""} per cornerstone</>}
                   {localClusters > 0 && <> × <strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} per pillar</>}
+                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
+                </>
+              ) : localPillars > 0 ? (
+                <>
+                  <strong>{localPillars}</strong> standalone pillar post{localPillars !== 1 ? "s" : ""}
+                  {localClusters > 0 && <> + <strong>{localPillars * localClusters}</strong> cluster{localPillars * localClusters !== 1 ? "s" : ""} ({localClusters} per pillar)</>}
+                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
+                </>
+              ) : (
+                <>
+                  <strong>{localClusters}</strong> standalone post{localClusters !== 1 ? "s" : ""}
                   {" = "}<strong>{liveBreakdown.total} articles total</strong>
                 </>
               )}
@@ -610,7 +627,7 @@ export default function Architecture() {
                     clustersPerPillar: localClusters,
                   })
                 }
-                disabled={updateArch.isPending || localCornerstones === 0}
+                disabled={updateArch.isPending || liveBreakdown.total === 0}
                 variant="outline"
                 size="sm"
               >

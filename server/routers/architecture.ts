@@ -90,7 +90,7 @@ async function regenerateNodes(
 
   let sortOrder = 0;
 
-  // Pass 1: Cornerstones
+  // Pass 1: Cornerstones (only in full hierarchy mode)
   const cornerstoneNodes = nodes.filter((n) => n.level === "cornerstone");
   for (const n of cornerstoneNodes) {
     await db.insert(articleNodes).values({
@@ -116,17 +116,17 @@ async function regenerateNodes(
     );
   insertedCornerstones.sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Pass 2: Pillars
+  // Pass 2: Pillars (hierarchy or standalone)
   const pillarNodes = nodes.filter((n) => n.level === "pillar");
   for (const n of pillarNodes) {
-    const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
-    if (!cornerstoneRow) continue;
+    // cornerstoneIndex === 0 means standalone pillar (no parent cornerstone)
+    const cornerstoneRow = n.cornerstoneIndex > 0 ? insertedCornerstones[n.cornerstoneIndex - 1] : null;
     await db.insert(articleNodes).values({
       architectureId,
       businessId,
       level: "pillar",
       articleType: n.defaultArticleType,
-      parentCornerstoneId: cornerstoneRow.id,
+      parentCornerstoneId: cornerstoneRow?.id ?? null,
       parentPillarId: null,
       sortOrder: sortOrder++,
     });
@@ -148,27 +148,51 @@ async function regenerateNodes(
     );
   insertedPillars.sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Pass 3: Clusters
+  // Pass 3: Clusters (hierarchy, pillar-parented standalone, or fully standalone)
   const clusterNodes = nodes.filter((n) => n.level === "cluster");
   for (const n of clusterNodes) {
-    const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
-    if (!cornerstoneRow) continue;
-
-    const pillarsUnderCornerstone = insertedPillars.filter(
-      (p) => p.parentCornerstoneId === cornerstoneRow.id
-    );
-    const pillarRow = pillarsUnderCornerstone[n.pillarIndex! - 1];
-    if (!pillarRow) continue;
-
-    await db.insert(articleNodes).values({
-      architectureId,
-      businessId,
-      level: "cluster",
-      articleType: n.defaultArticleType,
-      parentCornerstoneId: cornerstoneRow.id,
-      parentPillarId: pillarRow.id,
-      sortOrder: sortOrder++,
-    });
+    if (n.cornerstoneIndex > 0) {
+      // Full hierarchy cluster
+      const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
+      if (!cornerstoneRow) continue;
+      const pillarsUnderCornerstone = insertedPillars.filter(
+        (p) => p.parentCornerstoneId === cornerstoneRow.id
+      );
+      const pillarRow = pillarsUnderCornerstone[n.pillarIndex! - 1];
+      if (!pillarRow) continue;
+      await db.insert(articleNodes).values({
+        architectureId,
+        businessId,
+        level: "cluster",
+        articleType: n.defaultArticleType,
+        parentCornerstoneId: cornerstoneRow.id,
+        parentPillarId: pillarRow.id,
+        sortOrder: sortOrder++,
+      });
+    } else if (n.pillarIndex !== null) {
+      // Standalone cluster under a standalone pillar
+      const pillarRow = insertedPillars[n.pillarIndex - 1];
+      await db.insert(articleNodes).values({
+        architectureId,
+        businessId,
+        level: "cluster",
+        articleType: n.defaultArticleType,
+        parentCornerstoneId: null,
+        parentPillarId: pillarRow?.id ?? null,
+        sortOrder: sortOrder++,
+      });
+    } else {
+      // Fully standalone cluster (no cornerstone, no pillar)
+      await db.insert(articleNodes).values({
+        architectureId,
+        businessId,
+        level: "cluster",
+        articleType: n.defaultArticleType,
+        parentCornerstoneId: null,
+        parentPillarId: null,
+        sortOrder: sortOrder++,
+      });
+    }
   }
 }
 

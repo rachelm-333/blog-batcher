@@ -47,11 +47,28 @@ function deriveNodeLabel(rows: KwRow[], row: KwRow): string {
     return `Cornerstone ${cs.findIndex(r => r.articleNodeId === row.articleNodeId) + 1}`;
   }
   if (row.nodeLevel === "pillar") {
+    const ps = rows.filter(r => r.nodeLevel === "pillar").sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+    const pNum = ps.findIndex(r => r.articleNodeId === row.articleNodeId) + 1;
+    // Standalone pillar (no parent cornerstone)
+    if (!row.nodeParentCornerstoneId) return `Pillar ${pNum}`;
     const cs = rows.filter(r => r.nodeLevel === "cornerstone").sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
     const cIdx = cs.findIndex(r => r.articleNodeId === row.nodeParentCornerstoneId);
-    const ps = rows.filter(r => r.nodeLevel === "pillar" && r.nodeParentCornerstoneId === row.nodeParentCornerstoneId).sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
-    return `Pillar ${cIdx + 1}.${ps.findIndex(r => r.articleNodeId === row.articleNodeId) + 1}`;
+    const psUnderC = rows.filter(r => r.nodeLevel === "pillar" && r.nodeParentCornerstoneId === row.nodeParentCornerstoneId).sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+    return `Pillar ${cIdx + 1}.${psUnderC.findIndex(r => r.articleNodeId === row.articleNodeId) + 1}`;
   }
+  // Cluster
+  const allClusters = rows.filter(r => r.nodeLevel === "cluster").sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+  const clNum = allClusters.findIndex(r => r.articleNodeId === row.articleNodeId) + 1;
+  // Fully standalone cluster (no cornerstone, no pillar)
+  if (!row.nodeParentCornerstoneId && !row.nodeParentPillarId) return `Post ${clNum}`;
+  // Standalone cluster under a standalone pillar
+  if (!row.nodeParentCornerstoneId) {
+    const ps = rows.filter(r => r.nodeLevel === "pillar").sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+    const pIdx = ps.findIndex(r => r.articleNodeId === row.nodeParentPillarId);
+    const cl = rows.filter(r => r.nodeLevel === "cluster" && r.nodeParentPillarId === row.nodeParentPillarId).sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
+    return `Cluster ${pIdx + 1}.${cl.findIndex(r => r.articleNodeId === row.articleNodeId) + 1}`;
+  }
+  // Full hierarchy cluster
   const cs = rows.filter(r => r.nodeLevel === "cornerstone").sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);
   const cIdx = cs.findIndex(r => r.articleNodeId === row.nodeParentCornerstoneId);
   const ps = rows.filter(r => r.nodeLevel === "pillar" && r.nodeParentCornerstoneId === row.nodeParentCornerstoneId).sort((a,b) => a.nodeSortOrder - b.nodeSortOrder);

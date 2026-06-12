@@ -92,9 +92,13 @@ export function calcTotalArticles(
   pillarsPerCornerstone: number,
   clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
 ): number {
-  const totalPillars = cornerstones * pillarsPerCornerstone;
-  const totalClusters = totalPillars * clustersPerPillar;
-  return cornerstones + totalPillars + totalClusters;
+  // Hierarchy articles: cornerstones + (cornerstones × pillars) + (cornerstones × pillars × clusters)
+  const hierarchyPillars = cornerstones * pillarsPerCornerstone;
+  const hierarchyClusters = hierarchyPillars * clustersPerPillar;
+  // Standalone articles: pillars with no cornerstone, clusters with no pillar
+  const standalonePillars = cornerstones === 0 ? pillarsPerCornerstone : 0;
+  const standaloneClusters = (cornerstones === 0 && pillarsPerCornerstone === 0) ? clustersPerPillar : 0;
+  return cornerstones + hierarchyPillars + hierarchyClusters + standalonePillars + standaloneClusters;
 }
 
 export function calcBreakdown(
@@ -102,8 +106,12 @@ export function calcBreakdown(
   pillarsPerCornerstone: number,
   clustersPerPillar: number = DEFAULT_CLUSTERS_PER_PILLAR
 ) {
-  const totalPillars = cornerstones * pillarsPerCornerstone;
-  const totalClusters = totalPillars * clustersPerPillar;
+  const hierarchyPillars = cornerstones * pillarsPerCornerstone;
+  const hierarchyClusters = hierarchyPillars * clustersPerPillar;
+  const standalonePillars = cornerstones === 0 ? pillarsPerCornerstone : 0;
+  const standaloneClusters = (cornerstones === 0 && pillarsPerCornerstone === 0) ? clustersPerPillar : 0;
+  const totalPillars = hierarchyPillars + standalonePillars;
+  const totalClusters = hierarchyClusters + standaloneClusters;
   return {
     cornerstones,
     pillarsPerCornerstone,
@@ -117,35 +125,18 @@ export function calcBreakdown(
 // ─── Dependency enforcement ───────────────────────────────────────────────────
 
 /**
- * Enforces hierarchy dependencies:
- *  - If cornerstones = 0, pillars and clusters must also be 0
- *  - If pillars = 0, clusters must also be 0
- * Returns the corrected values.
+ * Enforces hierarchy dependencies.
+ * Standalone pillars (no cornerstone) and standalone clusters (no pillar) are now allowed.
+ * The only hard rule: if cornerstones = 0 AND pillars = 0, clusters can still exist as standalone.
+ * No forced zeroing — just informational warnings.
  */
 export function enforceDependencies(
   cornerstones: number,
   pillarsPerCornerstone: number,
   clustersPerPillar: number
 ): { cornerstones: number; pillarsPerCornerstone: number; clustersPerPillar: number; warnings: string[] } {
-  const warnings: string[] = [];
-  let c = cornerstones;
-  let p = pillarsPerCornerstone;
-  let cl = clustersPerPillar;
-
-  if (c === 0 && p > 0) {
-    warnings.push("Pillars require at least 1 cornerstone. Pillars set to 0.");
-    p = 0;
-  }
-  if (p === 0 && cl > 0) {
-    warnings.push("Clusters require at least 1 pillar. Clusters set to 0.");
-    cl = 0;
-  }
-  if (c === 0 && cl > 0) {
-    warnings.push("Clusters require at least 1 cornerstone. Clusters set to 0.");
-    cl = 0;
-  }
-
-  return { cornerstones: c, pillarsPerCornerstone: p, clustersPerPillar: cl, warnings };
+  // No hard dependencies enforced — standalone pillars and clusters are valid.
+  return { cornerstones, pillarsPerCornerstone, clustersPerPillar, warnings: [] };
 }
 
 // ─── Guardrails validation ────────────────────────────────────────────────────
@@ -230,7 +221,10 @@ export interface ArchitectureNode {
 
 /**
  * Generates the full flat list of article nodes for a given architecture config.
- * This is used to populate the article_nodes table.
+ * Supports:
+ *  - Full hierarchy: cornerstones > 0 && pillarsPerCornerstone > 0
+ *  - Standalone pillars: cornerstones = 0, pillarsPerCornerstone > 0 (no parent cornerstone)
+ *  - Standalone clusters: cornerstones = 0 && pillarsPerCornerstone = 0, clustersPerPillar > 0
  */
 export function generateNodes(
   cornerstones: number,
@@ -239,39 +233,71 @@ export function generateNodes(
 ): ArchitectureNode[] {
   const nodes: ArchitectureNode[] = [];
 
-  for (let c = 1; c <= cornerstones; c++) {
-    // Cornerstone node
-    nodes.push({
-      level: "cornerstone",
-      cornerstoneIndex: c,
-      pillarIndex: null,
-      clusterIndex: null,
-      defaultArticleType: "cornerstone_guide",
-      label: `Cornerstone ${c}`,
-    });
-
+  if (cornerstones > 0) {
+    // ── Full hierarchy mode ──────────────────────────────────────────────────
+    for (let c = 1; c <= cornerstones; c++) {
+      nodes.push({
+        level: "cornerstone",
+        cornerstoneIndex: c,
+        pillarIndex: null,
+        clusterIndex: null,
+        defaultArticleType: "cornerstone_guide",
+        label: `Cornerstone ${c}`,
+      });
+      for (let p = 1; p <= pillarsPerCornerstone; p++) {
+        nodes.push({
+          level: "pillar",
+          cornerstoneIndex: c,
+          pillarIndex: p,
+          clusterIndex: null,
+          defaultArticleType: "how_to",
+          label: `Pillar ${c}.${p}`,
+        });
+        for (let cl = 1; cl <= clustersPerPillar; cl++) {
+          nodes.push({
+            level: "cluster",
+            cornerstoneIndex: c,
+            pillarIndex: p,
+            clusterIndex: cl,
+            defaultArticleType: "specialist_post",
+            label: `Cluster ${c}.${p}.${cl}`,
+          });
+        }
+      }
+    }
+  } else if (pillarsPerCornerstone > 0) {
+    // ── Standalone pillar mode (no cornerstone) ──────────────────────────────
     for (let p = 1; p <= pillarsPerCornerstone; p++) {
-      // Pillar node
       nodes.push({
         level: "pillar",
-        cornerstoneIndex: c,
+        cornerstoneIndex: 0, // no parent cornerstone
         pillarIndex: p,
         clusterIndex: null,
         defaultArticleType: "how_to",
-        label: `Pillar ${c}.${p}`,
+        label: `Pillar ${p}`,
       });
-
       for (let cl = 1; cl <= clustersPerPillar; cl++) {
-        // Cluster node
         nodes.push({
           level: "cluster",
-          cornerstoneIndex: c,
+          cornerstoneIndex: 0,
           pillarIndex: p,
           clusterIndex: cl,
           defaultArticleType: "specialist_post",
-          label: `Cluster ${c}.${p}.${cl}`,
+          label: `Cluster ${p}.${cl}`,
         });
       }
+    }
+  } else if (clustersPerPillar > 0) {
+    // ── Standalone cluster mode (no cornerstone, no pillar) ──────────────────
+    for (let cl = 1; cl <= clustersPerPillar; cl++) {
+      nodes.push({
+        level: "cluster",
+        cornerstoneIndex: 0,
+        pillarIndex: null,
+        clusterIndex: cl,
+        defaultArticleType: "specialist_post",
+        label: `Post ${cl}`,
+      });
     }
   }
 
