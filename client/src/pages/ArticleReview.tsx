@@ -49,7 +49,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
@@ -813,6 +813,24 @@ export default function ArticleReview() {
 
   const livePassCount = liveChecks ? Object.values(liveChecks).filter(Boolean).length : null;
   const liveTotalChecks = 16;
+
+  // Silently write the live score back to the DB so the sidebar stays in sync.
+  // Fires once per article open (tracked by ref). No visible flash — the list
+  // invalidates in the background and the sidebar card updates quietly.
+  const syncScore = trpc.articles.syncScore.useMutation({
+    onSuccess: () => {
+      utils.articles.getAll.invalidate({ businessId: business?.id ?? 0 });
+    },
+  });
+  const lastSyncedId = useRef<number | null>(null);
+  useEffect(() => {
+    if (livePassCount == null) return;
+    const fa = fullArticle as any;
+    if (!fa?.id) return;
+    if (fa.id === lastSyncedId.current) return; // already synced this article
+    lastSyncedId.current = fa.id;
+    syncScore.mutate({ articleId: fa.id });
+  }, [livePassCount, (fullArticle as any)?.id]);
 
   // Helper: does a field have a failing check AND the overall score is below the publish threshold?
   // Only triggers amber/warning styling when the article genuinely needs attention (score < 14).
