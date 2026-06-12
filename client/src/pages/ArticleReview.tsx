@@ -441,22 +441,38 @@ function ScoreBadgePanel({ liveChecks }: { badge?: StatusBadge; liveChecks?: Pas
     ? (Object.keys(liveChecks) as (keyof Pass1Checks)[]).filter(k => !liveChecks[k])
     : [];
 
-  // 14+ = Ready to Publish (green) — no warnings, no list of failing checks
+  // 14+ = Ready to Publish (green) — show any failing checks as optional info
   if (score >= PUBLISH_READY_THRESHOLD) {
     const label = score === 16 ? "Perfect Score" : score === 15 ? "Authority Ready" : "Ready to Publish";
     const emoji = score === 16 ? "✨" : "✅";
     return (
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
-        <div className="text-xl">{emoji}</div>
-        <div>
-          <div className="text-sm font-bold text-emerald-400">{label} — {score}/16</div>
-          <div className="text-xs text-emerald-600">
-            {score === 16
-              ? "All 16 SEO checks passed. Publish with confidence."
-              : "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards."
-            }
+      <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3">
+        <div className="flex items-center gap-3">
+          <div className="text-xl">{emoji}</div>
+          <div>
+            <div className="text-sm font-bold text-emerald-400">{label} — {score}/16</div>
+            <div className="text-xs text-emerald-600">
+              {score === 16
+                ? "All 16 SEO checks passed. Publish with confidence."
+                : "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards."
+              }
+            </div>
           </div>
         </div>
+        {/* Show the 1–2 failing checks even at 15/16 so the user knows exactly what was missed */}
+        {score < 16 && failingChecks.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-emerald-500/20">
+            <div className="text-[10px] font-semibold text-emerald-600 mb-1">Missed point{failingChecks.length > 1 ? 's' : ''} (optional to fix):</div>
+            <div className="flex flex-col gap-1">
+              {failingChecks.map(k => (
+                <div key={k} className="flex items-start gap-1.5 text-xs text-emerald-700">
+                  <span className="mt-0.5 shrink-0">◦</span>
+                  <span>{PASS1_CHECK_LABELS[k]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1856,26 +1872,28 @@ export default function ArticleReview() {
                       </div>
                     </div>
 
-                    {/* Failing checklist breakdown — shown whenever score < 15 */}
-                    {liveScore < 15 && failingKeys.length > 0 && (
+                    {/* Failing checklist breakdown — shown whenever score < 16 (even Authority Ready 15/16 shows the 1 missed point) */}
+                    {liveScore < 16 && failingKeys.length > 0 && (
                       <div className={`rounded-lg border p-2.5 ${
-                        liveScore >= 13
+                        liveScore >= 15
+                          ? "bg-emerald-500/5 border-emerald-500/20"
+                          : liveScore >= 13
                           ? "bg-blue-500/5 border-blue-500/20"
                           : "bg-amber-500/5 border-amber-500/20"
                       }`}>
                         <div className={`text-[10px] font-semibold mb-1.5 ${
-                          liveScore >= 13 ? "text-blue-400" : "text-amber-500"
+                          liveScore >= 15 ? "text-emerald-600" : liveScore >= 13 ? "text-blue-400" : "text-amber-500"
                         }`}>
-                          {liveScore >= 13 ? "Optional improvements:" : "Points to fix:"}
+                          {liveScore >= 15 ? `Missed point${failingKeys.length > 1 ? 's' : ''} (optional to fix):` : liveScore >= 13 ? "Optional improvements:" : "Points to fix:"}
                         </div>
                         <div className="flex flex-col gap-1">
                           {failingKeys.map(k => (
                             <div key={k} className="flex items-start gap-1.5">
                               <span className={`mt-0.5 shrink-0 text-[10px] ${
-                                liveScore >= 13 ? "text-blue-400/70" : "text-amber-500"
+                                liveScore >= 15 ? "text-emerald-600" : liveScore >= 13 ? "text-blue-400/70" : "text-amber-500"
                               }`}>{liveScore >= 13 ? "◦" : "✗"}</span>
                               <span className={`text-[10px] leading-tight ${
-                                liveScore >= 13 ? "text-muted-foreground" : "text-amber-600"
+                                liveScore >= 15 ? "text-emerald-700" : liveScore >= 13 ? "text-muted-foreground" : "text-amber-600"
                               }`}>
                                 {PASS1_CHECK_LABELS[k as keyof Pass1Checks] ?? k}
                               </span>
