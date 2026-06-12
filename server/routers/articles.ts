@@ -43,6 +43,8 @@ import {
   getOrderedNodes,
   preGenerateSlugs,
   MIN_DELIVERY_SCORE,
+  runPass1Scorer,
+  deriveStatusBadge,
 } from "../articleEngine";
 import {
   publishToWordPress,
@@ -1683,6 +1685,101 @@ ${row.bodyHtml ?? ""}
           .where(eq(articles.id, input.articleId));
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Publish failed" });
       }
+    }),
+
+  /**
+   * Sync the stored internalScore, pass1Details, and statusBadge for an article
+   * by re-running the Pass 1 scorer against the current article content.
+   * Called from the review UI whenever an article is opened, so the sidebar
+   * list always shows the same score as the right panel.
+   */
+  syncScore: protectedProcedure
+    .input(z.object({ articleId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [row] = await db
+        .select({
+          businessId: articles.businessId,
+          bodyHtml: articles.bodyHtml,
+          title: articles.title,
+          metaTitle: articles.metaTitle,
+          metaDescription: articles.metaDescription,
+          focusKeyword: articles.focusKeyword,
+          urlSlug: articles.urlSlug,
+          wordCount: articles.wordCount,
+          level: articleNodes.level,
+          websiteUrl: businesses.websiteUrl,
+        })
+        .from(articles)
+        .innerJoin(articleNodes, eq(articleNodes.id, articles.articleNodeId))
+        .innerJoin(businesses, eq(businesses.id, articles.businessId))
+        .where(eq(articles.id, input.articleId))
+        .limit(1);
+
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      await assertBusinessOwnership(ctx.user.id, row.businessId);
+
+      const bodyHtml = row.bodyHtml ?? "";
+      const bodyMarkdown = "";
+      const wordCount = row.wordCount ?? bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+      const kw = (row.focusKeyword ?? "").toLowerCase().trim();
+      const urlSlug = row.urlSlug ?? "";
+      const metaTitle = row.metaTitle ?? row.title ?? "";
+      const metaDescription = row.metaDescription ?? "";
+      const level = (row.level ?? "cluster") as "cornerstone" | "pillar" | "cluster";
+
+      // Detect external link
+      const externalHrefPattern = /href=["'](https?:\/\/[^"']+)["']/gi;
+      let externalLinkPresent = false;
+      let match;
+      while ((match = externalHrefPattern.exec(bodyHtml)) !== null) {
+        const href = match[1].toLowerCase();
+        if (!href.includes("localhost") && !href.startsWith("/")) { externalLinkPresent = true; break; }
+      }
+
+      // Detect internal CTA link using websiteUrl
+      const websiteUrl = row.websiteUrl ?? "";
+      const websiteDomain = websiteUrl ? websiteUrl.replace(/^https?:\/\//, "").split("/")[0] : "";
+      const internalCtaLinkPresent = websiteDomain ? bodyHtml.toLowerCase().includes(websiteDomain.toLowerCase()) : false;
+
+      // Detect 2+ internal blog links (relative links)
+      const internalBlogLinkMatches = bodyHtml.match(/href=["']\/[^"']+["']/gi) ?? [];
+      const internalBlogLinksPresent = internalBlogLinkMatches.length >= 2;
+
+      // Schema present
+      const schemaPresent = bodyHtml.includes('application/ld+json');
+
+      const pass1Result = runPass1Scorer({
+        bodyHtml,
+        bodyMarkdown,
+        title: row.title ?? "",
+        wordCount,
+        primaryKeyword: kw,
+        urlSlug,
+        metaTitle,
+        metaDescription,
+        level,
+        externalLinkPresent,
+        internalCtaLinkPresent,
+        internalBlogLinksPresent,
+        schemaPresent,
+      });
+
+      const passedCount = Object.values(pass1Result.points).filter(Boolean).length;
+      const badgeResult = deriveStatusBadge(pass1Result.score, 0);
+
+      await db
+        .update(articles)
+        .set({
+          internalScore: badgeResult.internalScore,
+          pass1Details: pass1Result.points as unknown,
+          statusBadge: badgeResult.statusBadge,
+        })
+        .where(eq(articles.id, input.articleId));
+
+      return { internalScore: badgeResult.internalScore, statusBadge: badgeResult.statusBadge, passedCount };
     }),
 
   /**

@@ -49,7 +49,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
@@ -726,6 +726,25 @@ export default function ArticleReview() {
     },
     onError: (err) => toast.error(err.message),
   });
+
+  // Sync score to DB when article is selected so sidebar shows consistent value
+  const syncScore = trpc.articles.syncScore.useMutation({
+    onSuccess: () => {
+      // Invalidate the list so all sidebar cards reflect the updated score
+      utils.articles.getAll.invalidate({ businessId: business?.id ?? 0 });
+    },
+  });
+
+  // Fire syncScore whenever the selected article's full content is loaded
+  const lastSyncedArticleId = useRef<number | null>(null);
+  useEffect(() => {
+    if (!fullArticle) return;
+    const fa = fullArticle as any;
+    if (!fa.id || fa.id === lastSyncedArticleId.current) return;
+    if (!fa.bodyHtml) return; // don't sync empty articles
+    lastSyncedArticleId.current = fa.id;
+    syncScore.mutate({ articleId: fa.id });
+  }, [(fullArticle as any)?.id]);
 
   // AI instruction panel state
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
