@@ -1001,3 +1001,23 @@
 - [x] Tighten Claude prompts: explicitly list all 16 checklist criteria as hard requirements in outline and section prompts
 - [x] Add enforcement passes E/F/G/H for P9/P10/P11/P12 in articleEngine.ts (mechanical fallback)
 - [x] Update test assertions to match current Pass-1-only badge constants (94/81 thresholds)
+
+## Multi-Batch Support (Jun 12 2026)
+- [x] Add activeBatch int column to businesses table (default 1)
+- [x] Add batchNumber int column to blog_architectures table
+- [x] Add batchNumber int column to article_nodes table
+- [x] Add batchNumber int column to keywords table
+- [x] Add batchNumber int column to articles table
+- [x] Add batchNumber int column to schedules table
+- [x] Generate and apply Drizzle migration for all batchNumber columns
+- [x] Update architecture router to scope queries by activeBatch
+- [x] Update keywords router to scope queries by activeBatch
+- [x] Update articles router to scope queries by activeBatch
+- [x] Update schedule router to scope queries by activeBatch
+- [x] Update dashboard router getSummary/getRecentActivity/listBusinesses to scope by activeBatch
+- [x] Update scheduler router getSchedule/getAuditLog to scope by activeBatch
+- [x] Add startNewBatch mutation: increments activeBatch, resets currentStage to 2
+- [x] Add "Start Batch N+1" button to dashboard (visible when currentStage >= 5)
+- [ ] Show current batch number in pipeline header
+- [ ] Show batch history selector on dashboard to view past batches (read-only)
+- [ ] Test: start new batch, run through full pipeline, confirm old batch articles preserved

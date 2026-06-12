@@ -42,7 +42,7 @@ async function assertBusinessOwnership(userId: number, businessId: number) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
   const rows = await db
-    .select({ id: businesses.id, currentStage: businesses.currentStage })
+    .select({ id: businesses.id, currentStage: businesses.currentStage, activeBatch: businesses.activeBatch })
     .from(businesses)
     .where(and(eq(businesses.id, businessId), eq(businesses.userId, userId)))
     .limit(1);
@@ -184,12 +184,13 @@ export const architectureRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
 
       const existing = await db
         .select()
         .from(blogArchitectures)
-        .where(eq(blogArchitectures.businessId, input.businessId))
+        .where(and(eq(blogArchitectures.businessId, input.businessId), eq(blogArchitectures.batchNumber, activeBatch)))
         .limit(1);
 
       if (existing.length > 0) {
@@ -197,7 +198,8 @@ export const architectureRouter = router({
         const nodes = await db
           .select()
           .from(articleNodes)
-          .where(eq(articleNodes.architectureId, arch.id));
+          .where(and(eq(articleNodes.architectureId, arch.id), eq(articleNodes.batchNumber, activeBatch)));
+
         return { architecture: arch, nodes };
       }
 
@@ -214,12 +216,13 @@ export const architectureRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const biz2 = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch2 = biz2.activeBatch ?? 1;
 
       const existing = await db
         .select()
         .from(blogArchitectures)
-        .where(eq(blogArchitectures.businessId, input.businessId))
+        .where(and(eq(blogArchitectures.businessId, input.businessId), eq(blogArchitectures.batchNumber, activeBatch2)))
         .limit(1);
 
       if (existing.length > 0 && existing[0].confirmed) {
@@ -252,6 +255,7 @@ export const architectureRouter = router({
       } else {
         const result = await db.insert(blogArchitectures).values({
           businessId: input.businessId,
+          batchNumber: activeBatch2,
           packSize: 0, // no fixed pack size — total is free-form
           cornerstoneCount: defaults.cornerstones,
           pillarCount: defaults.pillarsPerCornerstone,
@@ -291,12 +295,13 @@ export const architectureRouter = router({
       // Delegate to initDefault — pack size is no longer meaningful
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizSP = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchSP = bizSP.activeBatch ?? 1;
 
       const existing = await db
         .select()
         .from(blogArchitectures)
-        .where(eq(blogArchitectures.businessId, input.businessId))
+        .where(and(eq(blogArchitectures.businessId, input.businessId), eq(blogArchitectures.batchNumber, activeBatchSP)))
         .limit(1);
 
       if (existing.length > 0) {
@@ -307,6 +312,7 @@ export const architectureRouter = router({
       const total = calcTotalArticles(defaults.cornerstones, defaults.pillarsPerCornerstone, defaults.clustersPerPillar);
       const result = await db.insert(blogArchitectures).values({
         businessId: input.businessId,
+        batchNumber: activeBatchSP,
         packSize: 0,
         cornerstoneCount: defaults.cornerstones,
         pillarCount: defaults.pillarsPerCornerstone,
@@ -338,12 +344,13 @@ export const architectureRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizU = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchU = bizU.activeBatch ?? 1;
 
       const existing = await db
         .select()
         .from(blogArchitectures)
-        .where(eq(blogArchitectures.businessId, input.businessId))
+        .where(and(eq(blogArchitectures.businessId, input.businessId), eq(blogArchitectures.batchNumber, activeBatchU)))
         .limit(1);
 
       if (!existing.length) {
@@ -410,11 +417,12 @@ export const architectureRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizUL = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchUL = bizUL.activeBatch ?? 1;
       const existing = await db
         .select()
         .from(blogArchitectures)
-        .where(eq(blogArchitectures.businessId, input.businessId))
+        .where(and(eq(blogArchitectures.businessId, input.businessId), eq(blogArchitectures.batchNumber, activeBatchUL)))
         .limit(1);
       if (!existing.length) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "No architecture found." });
@@ -436,11 +444,12 @@ export const architectureRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizRB = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchRB = bizRB.activeBatch ?? 1;
       const existing = await db
         .select()
         .from(blogArchitectures)
-        .where(eq(blogArchitectures.businessId, input.businessId))
+        .where(and(eq(blogArchitectures.businessId, input.businessId), eq(blogArchitectures.batchNumber, activeBatchRB)))
         .limit(1);
       if (!existing.length) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "No architecture found." });
@@ -520,12 +529,13 @@ export const architectureRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizC = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchC = bizC.activeBatch ?? 1;
 
       const existing = await db
         .select()
         .from(blogArchitectures)
-        .where(eq(blogArchitectures.businessId, input.businessId))
+        .where(and(eq(blogArchitectures.businessId, input.businessId), eq(blogArchitectures.batchNumber, activeBatchC)))
         .limit(1);
 
       if (!existing.length) {

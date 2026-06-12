@@ -2,32 +2,31 @@
  * Schedule router — Layer 7 publishing schedule management.
  *
  * Procedures:
- *  schedule.save    — upsert the publishing cadence + startDate + publishHour for a business
- *  schedule.get     — return current schedule with calculated publish dates per article
- *  schedule.confirm — lock schedule, set scheduledPublishAt on each article
+ *  schedule.save    — upsert the publishing cadence + startDate + publishHour for a business/batch
+ *  schedule.get     — return current schedule with calculated publish dates per article (active batch)
+ *  schedule.confirm — lock schedule, set scheduledPublishAt on each article (active batch)
  */
 
 import { TRPCError } from "@trpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { articles, articleNodes, schedules } from "../../drizzle/schema";
+import { articles, articleNodes, businesses, schedules } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 
 // ---------------------------------------------------------------------------
-// Helper: assert business ownership
+// Helper: assert business ownership — returns activeBatch
 // ---------------------------------------------------------------------------
 async function assertOwnership(userId: number, businessId: number) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
   const [biz] = await db
-    .select({ id: articles.businessId })
-    .from(articles)
-    .where(eq(articles.businessId, businessId))
+    .select({ id: businesses.id, activeBatch: businesses.activeBatch })
+    .from(businesses)
+    .where(and(eq(businesses.id, businessId), eq(businesses.userId, userId)))
     .limit(1);
-  // If no articles yet, just trust the user (they own the business if they can access it)
-  // The business ownership check is done in the business router; here we just proceed.
-  return db;
+  if (!biz) throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+  return { db, activeBatch: biz.activeBatch ?? 1 };
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +72,8 @@ export function calculatePublishDates(
 
 export const scheduleRouter = router({
   /**
-   * Upsert the publishing cadence + startDate + publishHour for a business.
+   * Upsert the publishing cadence + startDate + publishHour for a business/batch.
+   * Each batch gets its own schedule row (businessId + batchNumber unique).
    */
   save: protectedProcedure
     .input(
@@ -94,14 +94,18 @@ export const scheduleRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const { db, activeBatch } = await assertOwnership(ctx.user.id, input.businessId);
 
-      // Upsert schedule
+      // Upsert schedule for this business + batch
       const existing = await db
         .select({ id: schedules.id })
         .from(schedules)
-        .where(eq(schedules.businessId, input.businessId))
+        .where(
+          and(
+            eq(schedules.businessId, input.businessId),
+            eq(schedules.batchNumber, activeBatch)
+          )
+        )
         .limit(1);
 
       if (existing.length > 0) {
@@ -114,10 +118,16 @@ export const scheduleRouter = router({
             publishMinute: input.publishMinute,
             confirmed: false,
           })
-          .where(eq(schedules.businessId, input.businessId));
+          .where(
+            and(
+              eq(schedules.businessId, input.businessId),
+              eq(schedules.batchNumber, activeBatch)
+            )
+          );
       } else {
         await db.insert(schedules).values({
           businessId: input.businessId,
+          batchNumber: activeBatch,
           cadence: input.cadence,
           startDate: input.startDate,
           publishHour: input.publishHour,
@@ -131,20 +141,26 @@ export const scheduleRouter = router({
 
   /**
    * Return current schedule with calculated publish dates per article.
+   * Only returns articles from the active batch.
    */
   get: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const { db, activeBatch } = await assertOwnership(ctx.user.id, input.businessId);
 
       const [schedule] = await db
         .select()
         .from(schedules)
-        .where(eq(schedules.businessId, input.businessId))
+        .where(
+          and(
+            eq(schedules.businessId, input.businessId),
+            eq(schedules.batchNumber, activeBatch)
+          )
+        )
         .limit(1);
 
       // Get approved articles in publish order (cornerstone → pillar → cluster)
+      // scoped to the active batch via article_nodes.batchNumber
       const approvedArticles = await db
         .select({
           id: articles.id,
@@ -160,6 +176,7 @@ export const scheduleRouter = router({
         .where(
           and(
             eq(articles.businessId, input.businessId),
+            eq(articleNodes.batchNumber, activeBatch),
             inArray(articles.status, ["approved", "scheduled", "published"])
           )
         )
@@ -198,17 +215,22 @@ export const scheduleRouter = router({
 
   /**
    * Lock the schedule — set scheduledPublishAt on each approved article.
+   * Only operates on articles from the active batch.
    */
   confirm: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const { db, activeBatch } = await assertOwnership(ctx.user.id, input.businessId);
 
       const [schedule] = await db
         .select()
         .from(schedules)
-        .where(eq(schedules.businessId, input.businessId))
+        .where(
+          and(
+            eq(schedules.businessId, input.businessId),
+            eq(schedules.batchNumber, activeBatch)
+          )
+        )
         .limit(1);
 
       if (!schedule || !schedule.cadence || !schedule.startDate) {
@@ -218,7 +240,7 @@ export const scheduleRouter = router({
         });
       }
 
-      // Get approved articles in order
+      // Get approved articles in order — scoped to active batch
       const approvedArticles = await db
         .select({ id: articles.id, sortOrder: articleNodes.sortOrder })
         .from(articles)
@@ -226,6 +248,7 @@ export const scheduleRouter = router({
         .where(
           and(
             eq(articles.businessId, input.businessId),
+            eq(articleNodes.batchNumber, activeBatch),
             inArray(articles.status, ["approved", "scheduled"])
           )
         )
@@ -262,7 +285,12 @@ export const scheduleRouter = router({
       await db
         .update(schedules)
         .set({ confirmed: true })
-        .where(eq(schedules.businessId, input.businessId));
+        .where(
+          and(
+            eq(schedules.businessId, input.businessId),
+            eq(schedules.batchNumber, activeBatch)
+          )
+        );
 
       return { confirmed: true, scheduledCount: dates.length };
     }),

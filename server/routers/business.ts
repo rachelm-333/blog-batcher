@@ -672,8 +672,47 @@ Rules:
       await db.delete(businessCompetitors).where(eq(businessCompetitors.businessId, input.businessId));
       await db.delete(businessExistingContent).where(eq(businessExistingContent.businessId, input.businessId));
       await db.delete(brandVoice).where(eq(brandVoice.businessId, input.businessId));
-      await db.delete(businesses).where(eq(businesses.id, input.businessId));
-
+            await db.delete(businesses).where(eq(businesses.id, input.businessId));
       return { success: true };
+    }),
+
+  /**
+   * Start a new batch for an existing business.
+   * Increments activeBatch, resets currentStage to 2 (Architecture),
+   * and preserves all business profile data and previous batch articles.
+   */
+  startNewBatch: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOwnership(ctx.user.id, input.businessId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [biz] = await db
+        .select({ activeBatch: businesses.activeBatch, currentStage: businesses.currentStage })
+        .from(businesses)
+        .where(eq(businesses.id, input.businessId))
+        .limit(1);
+      if (!biz) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
+
+      // Must have completed at least Stage 5 (Review) before starting a new batch
+      if (biz.currentStage < 5) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Complete the current batch (reach Stage 5) before starting a new one.",
+        });
+      }
+
+      const newBatch = (biz.activeBatch ?? 1) + 1;
+
+      await db
+        .update(businesses)
+        .set({
+          activeBatch: newBatch,
+          currentStage: 2, // Skip Stage 1 (profile already done), go straight to Architecture
+        })
+        .where(eq(businesses.id, input.businessId));
+
+      return { success: true, newBatch };
     }),
 });

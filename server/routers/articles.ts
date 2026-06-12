@@ -80,11 +80,12 @@ async function assertBusinessOwnership(userId: number, businessId: number) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
   const rows = await db
-    .select({ id: businesses.id })
+    .select({ id: businesses.id, activeBatch: businesses.activeBatch })
     .from(businesses)
     .where(and(eq(businesses.id, businessId), eq(businesses.userId, userId)))
     .limit(1);
   if (!rows.length) throw new TRPCError({ code: "FORBIDDEN", message: "Business not found" });
+  return rows[0];
 }
 
 /**
@@ -223,7 +224,8 @@ export const articlesRouter = router({
   startGeneration: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizSG = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchSG = bizSG.activeBatch ?? 1;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -276,52 +278,53 @@ export const articlesRouter = router({
       } // end admin bypass
       // ── End trial / credit guard ──────────────────────────────────────────────────
 
-      // Check article nodes exist (Stage 2 must be complete)
+      // Check article nodes exist for this batch (Stage 2 must be complete)
       const nodeRows = await db
         .select({ id: articleNodes.id })
         .from(articleNodes)
-        .where(eq(articleNodes.businessId, input.businessId));
+        .where(and(eq(articleNodes.businessId, input.businessId), eq(articleNodes.batchNumber, activeBatchSG)));
       if (!nodeRows.length) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "No article nodes found. Complete Stage 2 first." });
       }
 
-      // Check all keywords are approved
+      // Check all keywords for this batch are approved
       const kwRows = await db
         .select({ approved: keywords.keywordApproved, paaApproved: keywords.paaApproved })
         .from(keywords)
-        .where(eq(keywords.businessId, input.businessId));
+        .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatchSG)));
       const allApproved = kwRows.every(k => k.approved && k.paaApproved);
       if (!allApproved) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "All keywords and PAA questions must be approved before generating articles." });
       }
 
-      // Check nothing is already generating
+      // Check nothing is already generating for this batch
       const generatingRows = await db
         .select({ id: articles.id })
         .from(articles)
-        .where(and(eq(articles.businessId, input.businessId), eq(articles.status, "generating")));
+        .where(and(eq(articles.businessId, input.businessId), eq(articles.batchNumber, activeBatchSG), eq(articles.status, "generating")));
 
       if (generatingRows.length) {
         throw new TRPCError({ code: "CONFLICT", message: "Generation is already in progress for this business." });
       }
 
-      // Pre-generate slugs
-      await preGenerateSlugs(input.businessId);
+      // Pre-generate slugs for this batch
+      await preGenerateSlugs(input.businessId, activeBatchSG);
 
-      // Get ordered nodes
-      const orderedNodes = await getOrderedNodes(input.businessId);
+      // Get ordered nodes for this batch
+      const orderedNodes = await getOrderedNodes(input.businessId, activeBatchSG);
 
       // Initialise all article rows as pending_generation (if not already present)
       for (const node of orderedNodes) {
         const existing = await db
           .select({ id: articles.id })
           .from(articles)
-          .where(eq(articles.articleNodeId, node.nodeId))
+          .where(and(eq(articles.articleNodeId, node.nodeId), eq(articles.batchNumber, activeBatchSG)))
           .limit(1);
         if (!existing.length) {
           await db.insert(articles).values({
             articleNodeId: node.nodeId,
             businessId: input.businessId,
+            batchNumber: activeBatchSG,
             status: "pending_generation",
             generationAttempts: 0,
           });

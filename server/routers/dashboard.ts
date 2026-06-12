@@ -23,17 +23,18 @@ import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 
 // ---------------------------------------------------------------------------
-// Helper: assert business ownership
+// Helper: assert business ownership — returns the business row (including activeBatch)
 // ---------------------------------------------------------------------------
 async function assertOwnership(userId: number, businessId: number) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
   const [biz] = await db
-    .select({ id: businesses.id })
+    .select({ id: businesses.id, activeBatch: businesses.activeBatch })
     .from(businesses)
     .where(and(eq(businesses.id, businessId), eq(businesses.userId, userId)))
     .limit(1);
   if (!biz) throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+  return biz;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,19 +43,19 @@ async function assertOwnership(userId: number, businessId: number) {
 export const dashboardRouter = router({
   /**
    * Returns a full summary for the selected business:
-   *  - Business name, industry, location, currentStage
-   *  - Article status counts (total, by status, by statusBadge)
+   *  - Business name, industry, location, currentStage, activeBatch
+   *  - Article status counts (total, by status, by statusBadge) — scoped to activeBatch
    *  - Credit balance for the user
    *  - Quick-action context (which stage to continue from)
    */
   getSummary: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .query(async ({ ctx, input }) => {
-      await assertOwnership(ctx.user.id, input.businessId);
+      const owned = await assertOwnership(ctx.user.id, input.businessId);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      // Business info
+      // Business info — include activeBatch
       const [biz] = await db
         .select({
           id: businesses.id,
@@ -62,6 +63,7 @@ export const dashboardRouter = router({
           industry: businesses.industry,
           location: businesses.location,
           currentStage: businesses.currentStage,
+          activeBatch: businesses.activeBatch,
           cmsPlatform: businesses.cmsPlatform,
         })
         .from(businesses)
@@ -70,14 +72,22 @@ export const dashboardRouter = router({
 
       if (!biz) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
 
-      // Article status counts — fetch all articles for this business
+      const activeBatch = owned.activeBatch ?? 1;
+
+      // Article status counts — scoped to activeBatch via article_nodes join
       const articleRows = await db
         .select({
           status: articles.status,
           statusBadge: articles.statusBadge,
         })
         .from(articles)
-        .where(eq(articles.businessId, input.businessId));
+        .innerJoin(articleNodes, eq(articleNodes.id, articles.articleNodeId))
+        .where(
+          and(
+            eq(articles.businessId, input.businessId),
+            eq(articleNodes.batchNumber, activeBatch)
+          )
+        );
 
       // Count by lifecycle status
       const statusCounts = {
@@ -90,6 +100,7 @@ export const dashboardRouter = router({
         scheduled: 0,
         published: 0,
         failed: 0,
+        draft: 0,
       } as Record<string, number>;
 
       // Count by quality badge
@@ -148,16 +159,18 @@ export const dashboardRouter = router({
     }),
 
   /**
-   * Returns the last 10 automated publish actions for a business.
-   * Sourced from publish_audit_log joined to articles for the title.
+   * Returns the last N automated publish actions for a business,
+   * scoped to the active batch via the articles join.
    * Used for the Recent Activity feed on the dashboard.
    */
   getRecentActivity: protectedProcedure
     .input(z.object({ businessId: z.number(), limit: z.number().min(1).max(50).default(10) }))
     .query(async ({ ctx, input }) => {
-      await assertOwnership(ctx.user.id, input.businessId);
+      const owned = await assertOwnership(ctx.user.id, input.businessId);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const activeBatch = owned.activeBatch ?? 1;
 
       const rows = await db
         .select({
@@ -178,7 +191,13 @@ export const dashboardRouter = router({
         })
         .from(publishAuditLog)
         .leftJoin(articles, eq(articles.id, publishAuditLog.articleId))
-        .where(eq(publishAuditLog.businessId, input.businessId))
+        .leftJoin(articleNodes, eq(articleNodes.id, articles.articleNodeId))
+        .where(
+          and(
+            eq(publishAuditLog.businessId, input.businessId),
+            eq(articleNodes.batchNumber, activeBatch)
+          )
+        )
         .orderBy(desc(publishAuditLog.createdAt))
         .limit(input.limit);
 
@@ -188,7 +207,7 @@ export const dashboardRouter = router({
   /**
    * Returns all businesses owned by the logged-in user.
    * Used for the multi-business switcher dropdown.
-   * Includes article counts per business for display.
+   * Article counts are scoped to each business's activeBatch.
    */
   listBusinesses: protectedProcedure
     .query(async ({ ctx }) => {
@@ -203,6 +222,7 @@ export const dashboardRouter = router({
           industry: businesses.industry,
           location: businesses.location,
           currentStage: businesses.currentStage,
+          activeBatch: businesses.activeBatch,
           cmsPlatform: businesses.cmsPlatform,
           createdAt: businesses.createdAt,
           websiteUrl: businesses.websiteUrl,
@@ -213,16 +233,32 @@ export const dashboardRouter = router({
 
       if (!bizRows.length) return [];
 
-      // Fetch article counts for all businesses owned by this user in a single JOIN query
-      const countMap: Record<number, { total: number; published: number; scheduled: number }> = {};
+      // Fetch article counts per business, scoped to each business's activeBatch
+      // We join articles → article_nodes to filter by batchNumber
       const allArticlesAll = await db
-        .select({ businessId: articles.businessId, status: articles.status })
+        .select({
+          businessId: articles.businessId,
+          status: articles.status,
+          batchNumber: articleNodes.batchNumber,
+        })
         .from(articles)
+        .innerJoin(articleNodes, eq(articleNodes.id, articles.articleNodeId))
         .innerJoin(businesses, and(
           eq(businesses.id, articles.businessId),
           eq(businesses.userId, ctx.user.id)
         ));
+
+      // Build a map of activeBatch per business for fast lookup
+      const activeBatchMap: Record<number, number> = {};
+      for (const biz of bizRows) {
+        activeBatchMap[biz.id] = biz.activeBatch ?? 1;
+      }
+
+      const countMap: Record<number, { total: number; published: number; scheduled: number }> = {};
       for (const row of allArticlesAll) {
+        const bizActiveBatch = activeBatchMap[row.businessId] ?? 1;
+        // Only count articles from the active batch
+        if ((row.batchNumber ?? 1) !== bizActiveBatch) continue;
         if (!countMap[row.businessId]) {
           countMap[row.businessId] = { total: 0, published: 0, scheduled: 0 };
         }

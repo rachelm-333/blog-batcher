@@ -58,12 +58,12 @@ async function assertOwnership(userId: number, businessId: number) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
   const [biz] = await db
-    .select({ id: businesses.id })
+    .select({ id: businesses.id, activeBatch: businesses.activeBatch })
     .from(businesses)
     .where(and(eq(businesses.id, businessId), eq(businesses.userId, userId)))
     .limit(1);
   if (!biz) throw new TRPCError({ code: "FORBIDDEN", message: "Business not found or access denied" });
-  return db;
+  return { db, activeBatch: biz.activeBatch ?? 1 };
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,8 @@ export const schedulerRouter = router({
   scheduleArticle: protectedProcedure
     .input(z.object({ articleId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const db = await assertOwnership(ctx.user.id, 0); // ownership checked via article below
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const [row] = await db
         .select({
@@ -311,7 +312,7 @@ export const schedulerRouter = router({
   getSchedule: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .query(async ({ ctx, input }) => {
-      const db = await assertOwnership(ctx.user.id, input.businessId);
+      const { db, activeBatch } = await assertOwnership(ctx.user.id, input.businessId);
 
       const rows = await db
         .select({
@@ -334,6 +335,7 @@ export const schedulerRouter = router({
         .where(
           and(
             eq(articles.businessId, input.businessId),
+            eq(articleNodes.batchNumber, activeBatch),
             inArray(articles.status, ["scheduled", "published", "failed"])
           )
         )
@@ -354,7 +356,7 @@ export const schedulerRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await assertOwnership(ctx.user.id, input.businessId);
+      const { db, activeBatch } = await assertOwnership(ctx.user.id, input.businessId);
 
       const conditions = [eq(publishAuditLog.businessId, input.businessId)];
       if (input.articleId) {
@@ -376,7 +378,13 @@ export const schedulerRouter = router({
         })
         .from(publishAuditLog)
         .leftJoin(articles, eq(articles.id, publishAuditLog.articleId))
-        .where(and(...conditions))
+        .leftJoin(articleNodes, eq(articleNodes.id, articles.articleNodeId))
+        .where(
+          and(
+            ...conditions,
+            eq(articleNodes.batchNumber, activeBatch)
+          )
+        )
         .orderBy(desc(publishAuditLog.createdAt))
         .limit(input.limit);
 
@@ -478,7 +486,7 @@ export const schedulerRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const db = await assertOwnership(ctx.user.id, input.businessId);
+      const { db, activeBatch } = await assertOwnership(ctx.user.id, input.businessId);
 
       if (input.startDate <= new Date()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Start date must be in the future" });

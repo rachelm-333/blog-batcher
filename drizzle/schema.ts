@@ -134,6 +134,8 @@ export const businesses = mysqlTable("businesses", {
   scrapeCache: json("scrapeCache"),
   /** Stage the user is currently up to for this business (1–5). */
   currentStage: int("currentStage").default(1).notNull(),
+  /** The currently active batch number. Increments each time the user starts a new batch. */
+  activeBatch: int("activeBatch").default(1).notNull(),
   /** True if this business is a test business created by admin (excluded from billing). */
   isTestBusiness: boolean("isTestBusiness").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -312,7 +314,9 @@ export type InsertBrandVoice = typeof brandVoice.$inferInsert;
 // ---------------------------------------------------------------------------
 export const blogArchitectures = mysqlTable("blog_architectures", {
   id: int("id").autoincrement().primaryKey(),
-  businessId: int("businessId").notNull().unique().references(() => businesses.id),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  /** Batch number this architecture belongs to. */
+  batchNumber: int("batchNumber").default(1).notNull(),
   /** Pack size: 20 or 50 articles. 0 = free trial (1 article). */
   packSize: int("packSize").notNull(),
   /** Number of cornerstone articles in this architecture. */
@@ -348,6 +352,8 @@ export const articleNodes = mysqlTable("article_nodes", {
   id: int("id").autoincrement().primaryKey(),
   architectureId: int("architectureId").notNull().references(() => blogArchitectures.id),
   businessId: int("businessId").notNull().references(() => businesses.id),
+  /** Batch number this node belongs to. */
+  batchNumber: int("batchNumber").default(1).notNull(),
   /** Level in the hierarchy. */
   level: mysqlEnum("level", ["cornerstone", "pillar", "cluster"]).notNull(),
   /** Article type as selected in Stage 2. */
@@ -404,6 +410,8 @@ export const keywords = mysqlTable("keywords", {
   id: int("id").autoincrement().primaryKey(),
   articleNodeId: int("articleNodeId").notNull().unique().references(() => articleNodes.id),
   businessId: int("businessId").notNull().references(() => businesses.id),
+  /** Batch number this keyword belongs to. */
+  batchNumber: int("batchNumber").default(1).notNull(),
   /** Primary keyword assigned to this article slot. */
   primaryKeyword: varchar("primaryKeyword", { length: 512 }).notNull(),
   /** Monthly search volume from DataForSEO. */
@@ -449,6 +457,8 @@ export const articles = mysqlTable("articles", {
   id: int("id").autoincrement().primaryKey(),
   articleNodeId: int("articleNodeId").notNull().unique().references(() => articleNodes.id),
   businessId: int("businessId").notNull().references(() => businesses.id),
+  /** Batch number this article belongs to. */
+  batchNumber: int("batchNumber").default(1).notNull(),
   /** Article title / H1. */
   title: varchar("title", { length: 512 }),
   /** Full article body as formatted HTML. */
@@ -594,7 +604,9 @@ export type InsertArticleImage = typeof articleImages.$inferInsert;
 // ---------------------------------------------------------------------------
 export const schedules = mysqlTable("schedules", {
   id: int("id").autoincrement().primaryKey(),
-  businessId: int("businessId").notNull().unique().references(() => businesses.id),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  /** Batch number this schedule belongs to. */
+  batchNumber: int("batchNumber").default(1).notNull(),
   /** Publishing cadence selected by the user. */
   cadence: mysqlEnum("cadence", [
     "every_day",

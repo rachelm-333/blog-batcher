@@ -169,11 +169,11 @@ export function generateSlug(text: string): string {
  * Slugs are derived from the primary keyword for each node.
  * This must run before generation begins so internal links are real URLs.
  */
-export async function preGenerateSlugs(businessId: number): Promise<void> {
+export async function preGenerateSlugs(businessId: number, batchNumber = 1): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
-  // Get all nodes without slugs, joined with their keywords
+  // Get all nodes without slugs for this batch, joined with their keywords
   const nodes = await db
     .select({
       nodeId: articleNodes.id,
@@ -182,7 +182,7 @@ export async function preGenerateSlugs(businessId: number): Promise<void> {
     })
     .from(articleNodes)
     .leftJoin(keywords, eq(keywords.articleNodeId, articleNodes.id))
-    .where(and(eq(articleNodes.businessId, businessId), isNull(articleNodes.urlSlug)));
+    .where(and(eq(articleNodes.businessId, businessId), eq(articleNodes.batchNumber, batchNumber), isNull(articleNodes.urlSlug)));
 
   for (const node of nodes) {
     const slug = generateSlug(node.keyword || `article-${node.nodeId}`);
@@ -211,14 +211,14 @@ export interface OrderedNode {
  * Return all article_nodes for a business in the mandatory generation order:
  * Cornerstones first → Pillars (grouped by parent cornerstone) → Clusters (grouped by parent pillar)
  */
-export async function getOrderedNodes(businessId: number): Promise<OrderedNode[]> {
+export async function getOrderedNodes(businessId: number, batchNumber = 1): Promise<OrderedNode[]> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
   const nodes = await db
     .select()
     .from(articleNodes)
-    .where(eq(articleNodes.businessId, businessId));
+    .where(and(eq(articleNodes.businessId, businessId), eq(articleNodes.batchNumber, batchNumber)));
 
   const cornerstones = nodes
     .filter(n => n.level === "cornerstone")

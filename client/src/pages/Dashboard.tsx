@@ -8,10 +8,11 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
+import { toast } from "sonner";
 import {
   CheckCircle2, AlertTriangle, RefreshCw, XCircle, Clock,
   RotateCcw, ArrowRight, Plus, FileText, BarChart2, Calendar,
-  Zap, Building2, Lock
+  Zap, Building2, Lock, RotateCw
 } from "lucide-react";
 
 /* ── Stage definitions ── */
@@ -84,6 +85,26 @@ export default function Dashboard() {
   );
 
   const dbStage = summary?.business?.currentStage ?? 1;
+  const activeBatch = (summary?.business as { activeBatch?: number } | undefined)?.activeBatch ?? 1;
+
+  const utils = trpc.useUtils();
+  const startNewBatchMutation = trpc.business.startNewBatch.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Batch ${data.newBatch} started! You're now in Stage 2 — Architecture.`);
+      utils.dashboard.getSummary.invalidate();
+      utils.business.listAll.invalidate();
+      setLocation("/architecture");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
+
+  function handleStartNewBatch() {
+    if (!selectedBusinessId) return;
+    if (!confirm(`Start Batch ${activeBatch + 1} for ${bizName}? Your existing articles will be preserved and you'll go back to Stage 2 (Architecture) for the new batch.`)) return;
+    startNewBatchMutation.mutate({ businessId: selectedBusinessId });
+  }
   const statusCounts = summary?.statusCounts;
   const bizName = summary?.business?.name ?? "Your business";
 
@@ -200,13 +221,31 @@ export default function Dashboard() {
               }
             </p>
           </div>
-          <button
-            className="btn-primary"
-            onClick={() => setLocation(ctaPath)}
-            style={{ flexShrink: 0, marginTop: 8 }}
-          >
-            {ctaLabel} <ArrowRight style={{ width: 16, height: 16 }} />
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+            <button
+              className="btn-primary"
+              onClick={() => setLocation(ctaPath)}
+              style={{ flexShrink: 0 }}
+            >
+              {ctaLabel} <ArrowRight style={{ width: 16, height: 16 }} />
+            </button>
+            {currentStage >= 5 && (
+              <button
+                onClick={handleStartNewBatch}
+                disabled={startNewBatchMutation.isPending}
+                style={{
+                  fontSize: 12, fontWeight: 600, color: "#6e5afe",
+                  border: "1px solid #c4b5fd", borderRadius: 8,
+                  padding: "6px 14px", background: "#ede9ff",
+                  cursor: startNewBatchMutation.isPending ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", gap: 6, opacity: startNewBatchMutation.isPending ? 0.6 : 1,
+                }}
+              >
+                <RotateCw style={{ width: 13, height: 13 }} />
+                {startNewBatchMutation.isPending ? "Starting…" : `Start Batch ${activeBatch + 1}`}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── KPI cards ── */}

@@ -44,11 +44,12 @@ async function assertBusinessOwnership(userId: number, businessId: number) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
   const rows = await db
-    .select({ id: businesses.id })
+    .select({ id: businesses.id, activeBatch: businesses.activeBatch })
     .from(businesses)
     .where(and(eq(businesses.id, businessId), eq(businesses.userId, userId)))
     .limit(1);
   if (!rows.length) throw new TRPCError({ code: "FORBIDDEN", message: "Business not found" });
+  return rows[0];
 }
 
 // Human-readable labels for article types
@@ -187,7 +188,8 @@ export const keywordsRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const biz0 = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz0.activeBatch ?? 1;
 
       // Fetch business profile for context
       const [biz] = await db
@@ -205,18 +207,18 @@ export const keywordsRouter = router({
         .where(eq(brandVoice.businessId, input.businessId))
         .limit(1);
 
-      // Fetch all article nodes for this business
+      // Fetch all article nodes for this batch
       const nodes = await db
         .select()
         .from(articleNodes)
-        .where(eq(articleNodes.businessId, input.businessId));
+        .where(and(eq(articleNodes.businessId, input.businessId), eq(articleNodes.batchNumber, activeBatch)));
 
       if (!nodes.length) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "No article nodes found. Complete Stage 2 first." });
       }
 
-      // Delete any existing keyword rows for this business (re-assign)
-      await db.delete(keywords).where(eq(keywords.businessId, input.businessId));
+      // Delete any existing keyword rows for this batch (re-assign)
+      await db.delete(keywords).where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatch)));
 
       const exclusions = biz.keywordExclusions
         ? biz.keywordExclusions.split(",").map((s) => s.trim()).filter(Boolean)
@@ -343,6 +345,7 @@ export const keywordsRouter = router({
         return {
           articleNodeId: node.id,
           businessId: input.businessId,
+          batchNumber: activeBatch,
           primaryKeyword: kw,
           monthlySearchVolume: enriched?.msv ?? null,
           competitionLevel: enriched?.comp ?? null,
@@ -367,7 +370,8 @@ export const keywordsRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const biz1 = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch1 = biz1.activeBatch ?? 1;
 
       const rows = await db
         .select({
@@ -392,7 +396,7 @@ export const keywordsRouter = router({
         })
         .from(keywords)
         .innerJoin(articleNodes, eq(keywords.articleNodeId, articleNodes.id))
-        .where(eq(keywords.businessId, input.businessId))
+        .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatch1)))
         .orderBy(articleNodes.sortOrder);
 
       return rows;
@@ -504,12 +508,13 @@ export const keywordsRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizAA = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchAA = bizAA.activeBatch ?? 1;
 
       const allKw = await db
         .select({ id: keywords.id, articleNodeId: keywords.articleNodeId, primaryKeyword: keywords.primaryKeyword })
         .from(keywords)
-        .where(eq(keywords.businessId, input.businessId));
+        .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatchAA)));
 
       if (!allKw.length) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "No keywords found. Run keyword assignment first." });
@@ -549,7 +554,7 @@ export const keywordsRouter = router({
       await db
         .update(keywords)
         .set({ keywordApproved: true, cannibalizationWarning: false })
-        .where(eq(keywords.businessId, input.businessId));
+        .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatchAA)));
 
       return { approved: allKw.length };
     }),
@@ -565,12 +570,13 @@ export const keywordsRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizFP = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchFP = bizFP.activeBatch ?? 1;
 
       const approvedKw = await db
         .select({ id: keywords.id, primaryKeyword: keywords.primaryKeyword })
         .from(keywords)
-        .where(and(eq(keywords.businessId, input.businessId), eq(keywords.keywordApproved, true)));
+        .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatchFP), eq(keywords.keywordApproved, true)));
 
       if (!approvedKw.length) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Approve all keywords before fetching PAA." });
@@ -657,18 +663,19 @@ export const keywordsRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizAP = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchAP = bizAP.activeBatch ?? 1;
 
       await db
         .update(keywords)
         .set({ approvedPaaQuestion: input.approvedQuestion, paaApproved: true })
         .where(and(eq(keywords.id, input.keywordId), eq(keywords.businessId, input.businessId)));
 
-      // Check if ALL keywords now have PAA approved
+      // Check if ALL keywords in this batch now have PAA approved
       const allKw = await db
         .select({ paaApproved: keywords.paaApproved })
         .from(keywords)
-        .where(eq(keywords.businessId, input.businessId));
+        .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatchAP)));
 
       const allApproved = allKw.every((k) => k.paaApproved);
 
