@@ -59,11 +59,11 @@ import { HelpLink } from "@/components/HelpLink";
 // ---------------------------------------------------------------------------
 
 const WORD_COUNT_RULES = {
-  cornerstone: { min: 2000, max: 3000 },
-  pillar: { min: 1500, max: 2000 },
-  cluster: { min: 800, max: 1200 },
+  cornerstone: { min: 2000, max: 3200 },
+  pillar: { min: 1500, max: 2200 },
+  cluster: { min: 800, max: 1300 },
 } as const;
-const WORD_COUNT_TOLERANCE = 50; // within 50 words of min/max = pass
+const WORD_COUNT_TOLERANCE = 100; // within 100 words of min/max = pass
 
 const BANNED_PHRASES = [
   "in today's world",
@@ -179,7 +179,7 @@ function computePass1Checks(params: {
   const h2Matches = bodyHtml.match(/<h2[^>]*>(.*?)<\/h2>/gi) || [];
   const kwInH2 = h2Matches.some(h => kwPresent(h));
 
-  // H3
+  // H3 — auto-pass if there are no H3 headings in the article (H3s are optional)
   const h3Matches = bodyHtml.match(/<h3[^>]*>(.*?)<\/h3>/gi) || [];
   const kwInH3 = h3Matches.length === 0 || h3Matches.some(h => kwPresent(h));
 
@@ -1255,9 +1255,6 @@ export default function ArticleReview() {
 
             {/* ── SEO Panel ───────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
-              {/* Score badge — derived from live check count */}
-              <ScoreBadgePanel liveChecks={liveChecks} />
-
               {/* URL Slug */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
@@ -1836,8 +1833,30 @@ export default function ArticleReview() {
                   ? { bg: "bg-blue-500/10 border-blue-500/30", text: "text-blue-400" }
                   : { bg: "bg-amber-500/10 border-amber-500/30", text: "text-amber-500" };
 
+                // Status label for the top of the Quality Checkpoints section
+                const statusLabel = liveScore >= 16
+                  ? { emoji: "✨", label: "Perfect Score — 16/16", sub: "All 16 SEO checks passed. Publish with confidence.", cls: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400", sub_cls: "text-emerald-600" }
+                  : liveScore >= 15
+                  ? { emoji: "✅", label: "Authority Ready — 15/16", sub: "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards.", cls: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400", sub_cls: "text-emerald-600" }
+                  : liveScore >= 14
+                  ? { emoji: "✅", label: "Ready to Publish — 14/16", sub: "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards.", cls: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400", sub_cls: "text-emerald-600" }
+                  : liveScore >= 13
+                  ? { emoji: "⚡", label: `Strong — ${liveScore}/16`, sub: "Good SEO structure. A few optional improvements available.", cls: "bg-blue-500/10 border-blue-500/30 text-blue-400", sub_cls: "text-blue-500" }
+                  : { emoji: "⚠️", label: `Needs Review — ${liveScore}/16`, sub: "Below the 13-point threshold. Review the items below before publishing.", cls: "bg-amber-500/10 border-amber-500/30 text-amber-500", sub_cls: "text-amber-600" };
+
                 return (
                   <div className="space-y-2 mt-1">
+                    {/* Status header — replaces the old ScoreBadgePanel at the top */}
+                    <div className={`rounded-lg border p-3 ${statusLabel.cls.split(' ').slice(0,2).join(' ')}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{statusLabel.emoji}</span>
+                        <div>
+                          <div className={`text-sm font-bold ${statusLabel.cls.split(' ')[2]}`}>{statusLabel.label}</div>
+                          <div className={`text-xs ${statusLabel.sub_cls}`}>{statusLabel.sub}</div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Quality Checkpoints</div>
                     <div className="flex gap-2">
                       {/* Checkpoint 1 — SEO Structure */}
