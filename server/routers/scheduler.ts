@@ -16,7 +16,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   articles,
@@ -331,7 +331,7 @@ export const schedulerRouter = router({
           sortOrder: articleNodes.sortOrder,
         })
         .from(articles)
-        .leftJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
+        .innerJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
         .where(
           and(
             eq(articles.businessId, input.businessId),
@@ -382,7 +382,7 @@ export const schedulerRouter = router({
         .where(
           and(
             ...conditions,
-            eq(articleNodes.batchNumber, activeBatch)
+            or(eq(articleNodes.batchNumber, activeBatch), isNull(articleNodes.id))
           )
         )
         .orderBy(desc(publishAuditLog.createdAt))
