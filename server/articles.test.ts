@@ -516,8 +516,8 @@ describe("Pass 1 scorer — rules-based", () => {
     expect(result.points.p10_external_link).toBe(false);
   });
 
-  it("p1_keyword_density passes with 4+ mentions (regardless of density)", () => {
-    // 4 mentions in ~200 words = ~2% density — passes on mention count alone
+  it("p1_keyword_density passes when article has 4+ mentions AND density ≥1%", () => {
+    // 4 mentions in 200 words = 2.0% density — satisfies BOTH conditions (AND logic)
     const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney Services</h2><p>Our emergency plumber sydney team arrives fast. Call emergency plumber sydney now.</p>`;
     const result = runPass1Scorer(makePass1Params({
       bodyHtml: body,
@@ -527,19 +527,32 @@ describe("Pass 1 scorer — rules-based", () => {
     expect(result.points.p1_keyword_density).toBe(true);
   });
 
-  it("p1_keyword_density passes with density ≥1% even with fewer than 4 mentions", () => {
-    // 3 mentions in ~200 words = 1.5% density — passes on density alone
+  it("p1_keyword_density fails when 4+ mentions but density <1% (mention count alone is not enough)", () => {
+    // 4 mentions in 800 words = 0.5% density — has enough mentions but density too low
+    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney Services</h2><p>Our emergency plumber sydney team arrives fast. Call emergency plumber sydney now.</p>`;
+    const result = runPass1Scorer(makePass1Params({
+      bodyHtml: body,
+      wordCount: 800,
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    // 4/800 = 0.5% density — below 1% threshold, so AND logic fails
+    expect(result.points.p1_keyword_density).toBe(false);
+  });
+
+  it("p1_keyword_density fails when density ≥1% but fewer than 4 mentions (density alone is not enough)", () => {
+    // 3 mentions in 200 words = 1.5% density — good density but not enough mentions
     const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney</h2><p>Call emergency plumber sydney now. We help you fast.</p>`;
     const result = runPass1Scorer(makePass1Params({
       bodyHtml: body,
       wordCount: 200,
       primaryKeyword: "emergency plumber sydney",
     }));
-    expect(result.points.p1_keyword_density).toBe(true);
+    // 3 mentions < 4 required, so AND logic fails despite 1.5% density
+    expect(result.points.p1_keyword_density).toBe(false);
   });
 
   it("p1_keyword_density fails with fewer than 4 mentions AND density below 1%", () => {
-    // 1 mention in ~200 words = 0.5% density — fails both conditions
+    // 1 mention in 200 words = 0.5% density — fails both conditions
     const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Our Services</h2><p>We help you fast. Call us now. Available all day.</p>`;
     const result = runPass1Scorer(makePass1Params({
       bodyHtml: body,

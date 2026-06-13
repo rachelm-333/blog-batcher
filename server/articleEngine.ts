@@ -670,8 +670,8 @@ export function runPass1Scorer(params: {
   const wc = WORD_COUNT_RULES[level];
 
   const points: Record<string, boolean> = {
-    // Pass if: (4+ mentions AND density ≤ 2.5%) OR (density ≥ 1% AND density ≤ 2.5%) — OR logic
-    p1_keyword_density: (kwMatches >= 4 || kwDensity >= 0.01) && kwDensity <= 0.025,
+    // Pass if: 4+ mentions AND density ≥1% AND density ≤2.5% — AND logic (both conditions required)
+    p1_keyword_density: kwMatches >= 4 && kwDensity >= 0.01 && kwDensity <= 0.025,
     p2_keyword_in_h1: h1Present,
     p3_keyword_in_h2: kwInH2,
     p4_keyword_in_h3: kwInH3,
