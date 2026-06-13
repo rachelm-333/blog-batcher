@@ -2,17 +2,30 @@
  * Blog Batcher — Architecture Rules Engine
  *
  * Enforces the Cornerstone → Pillar → Cluster hierarchy rules:
+<<<<<<< Updated upstream
  *  - Cornerstones: 1–4
  *  - Pillars per Cornerstone: 1–4
  *  - Clusters per Pillar: always 3 (fixed)
+=======
+ *  - Cornerstones: 1–4  (minimum 1 — strict hierarchy required)
+ *  - Pillars per Cornerstone: 1–4  (minimum 1)
+ *  - Clusters per Pillar: always 3
+>>>>>>> Stashed changes
  *  - Minimum total: 1 cornerstone + 1 pillar + 3 clusters = 5 articles
  */
 
 export const PACK_SIZES = [20, 50] as const;
 export type PackSize = (typeof PACK_SIZES)[number];
 
+<<<<<<< Updated upstream
 export const CLUSTERS_PER_PILLAR = 3; // Fixed — always 3 clusters per pillar
 export const DEFAULT_CLUSTERS_PER_PILLAR = 3;
+=======
+/** Always 3 clusters per pillar — fixed constant */
+export const CLUSTERS_PER_PILLAR = 3;
+/** Alias for backward compatibility */
+export const DEFAULT_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
+>>>>>>> Stashed changes
 export const MIN_CLUSTERS_PER_PILLAR = 3;
 export const MAX_CLUSTERS_PER_PILLAR = 3;
 export const MIN_PILLARS_PER_CORNERSTONE = 1;
@@ -126,7 +139,6 @@ export function enforceDependencies(
   clustersPerPillar: number
 ): { cornerstones: number; pillarsPerCornerstone: number; clustersPerPillar: number; warnings: string[] } {
   const warnings: string[] = [];
-  // Strict hierarchy — no standalone modes
   return { cornerstones, pillarsPerCornerstone, clustersPerPillar, warnings };
 }
 
@@ -142,7 +154,11 @@ export interface GuardrailResult {
 
 /**
  * Validates a proposed architecture configuration against guardrail rules.
+<<<<<<< Updated upstream
  * Clamps each dimension to its allowed range and auto-corrects to fit within pack size.
+=======
+ * Clamps each dimension to its allowed range and auto-corrects if total exceeds pack size.
+>>>>>>> Stashed changes
  */
 export function validateArchitecture(
   packSize: PackSize | null,
@@ -153,7 +169,11 @@ export function validateArchitecture(
   const warnings: string[] = [];
   let cornerstones = proposedCornerstones;
   let pillarsPerCornerstone = proposedPillarsPerCornerstone;
+<<<<<<< Updated upstream
   const clustersPerPillar = CLUSTERS_PER_PILLAR; // Always fixed at 3
+=======
+  const clustersPerPillar = CLUSTERS_PER_PILLAR; // always fixed at 3
+>>>>>>> Stashed changes
 
   // ── Clamp cornerstones ────────────────────────────────────────────────────
   if (cornerstones < MIN_CORNERSTONES) {
@@ -175,11 +195,19 @@ export function validateArchitecture(
     pillarsPerCornerstone = MAX_PILLARS_PER_CORNERSTONE;
   }
 
+<<<<<<< Updated upstream
   // ── Auto-correct to fit within pack size ─────────────────────────────────
   if (packSize !== null) {
     let total = calcTotalArticles(cornerstones, pillarsPerCornerstone, clustersPerPillar);
     if (total > packSize) {
       // Reduce pillars first, then cornerstones
+=======
+  // ── Pack-size auto-correct ────────────────────────────────────────────────
+  if (packSize !== null) {
+    let total = calcTotalArticles(cornerstones, pillarsPerCornerstone, clustersPerPillar);
+    if (total > packSize) {
+      // Reduce pillarsPerCornerstone first, then cornerstones
+>>>>>>> Stashed changes
       while (total > packSize && pillarsPerCornerstone > MIN_PILLARS_PER_CORNERSTONE) {
         pillarsPerCornerstone--;
         total = calcTotalArticles(cornerstones, pillarsPerCornerstone, clustersPerPillar);
@@ -189,7 +217,11 @@ export function validateArchitecture(
         total = calcTotalArticles(cornerstones, pillarsPerCornerstone, clustersPerPillar);
       }
       warnings.push(
+<<<<<<< Updated upstream
         `Configuration exceeded pack size of ${packSize}. Adjusted to ${cornerstones} cornerstone(s) × ${pillarsPerCornerstone} pillar(s) = ${total} articles.`
+=======
+        `Configuration exceeded pack size of ${packSize}. Adjusted to ${cornerstones} cornerstones × ${pillarsPerCornerstone} pillars (${total} articles).`
+>>>>>>> Stashed changes
       );
     }
   }

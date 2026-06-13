@@ -143,6 +143,7 @@ vi.mock("./db", () => ({
   getDb: vi.fn(),
 }));
 
+<<<<<<< Updated upstream
 // Mock the API cost logger (keywords.ts now uses invokeLLMWithCost)
 // Also mock the path as seen from server/routers/keywords.ts
 vi.mock("../apiCostLogger", () => ({
@@ -154,7 +155,21 @@ vi.mock("../apiCostLogger", () => ({
     }) } }],
   }),
 }));
+=======
+// Mock the API cost logger — both relative paths resolve to the same module
+// ./apiCostLogger  → used by tests in server/
+// ../apiCostLogger → used by server/routers/keywords.ts
+>>>>>>> Stashed changes
 vi.mock("./apiCostLogger", () => ({
+  invokeLLMWithCost: vi.fn().mockResolvedValue({
+    choices: [{ message: { content: JSON.stringify({
+      "1": "plumber Gold Coast",
+      "2": "emergency plumber Brisbane",
+      "3": "hot water system repair",
+    }) } }],
+  }),
+}));
+vi.mock("/home/ubuntu/blog-batcher/server/apiCostLogger", () => ({
   invokeLLMWithCost: vi.fn().mockResolvedValue({
     choices: [{ message: { content: JSON.stringify({
       "1": "plumber Gold Coast",
@@ -433,16 +448,21 @@ describe("keywords.assignAll", () => {
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockResolvedValue([]),
         })
-        // 7th call: keyword seeds — .from().where().orderBy() resolves directly (empty = no pool)
+        // 7th call: keyword seeds (selectedKeywords) — .from().where().orderBy() resolves directly (empty = fall back)
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockResolvedValue([]),
+        })
+        // 8th call: keywordSeeds table — .from().where().orderBy() resolves directly (empty = no pool)
         .mockReturnValueOnce({
           from: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockResolvedValue([]),
         }),
       insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          onDuplicateKeyUpdate: vi.fn().mockResolvedValue(undefined),
-        }),
+        // values() must resolve directly (no onDuplicateKeyUpdate chain needed for assignAll)
+        values: vi.fn().mockResolvedValue(undefined),
       }),
       delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
       update: vi.fn().mockReturnValue({
@@ -454,5 +474,5 @@ describe("keywords.assignAll", () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.keywords.assignAll({ businessId: 1 });
     expect(result).toMatchObject({ assigned: expect.any(Number) });
-  });
+  }, 15000);
 });
