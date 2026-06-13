@@ -143,23 +143,9 @@ vi.mock("./db", () => ({
   getDb: vi.fn(),
 }));
 
-<<<<<<< Updated upstream
-// Mock the API cost logger (keywords.ts now uses invokeLLMWithCost)
-// Also mock the path as seen from server/routers/keywords.ts
-vi.mock("../apiCostLogger", () => ({
-  invokeLLMWithCost: vi.fn().mockResolvedValue({
-    choices: [{ message: { content: JSON.stringify({
-      "1": "plumber Gold Coast",
-      "2": "emergency plumber Brisbane",
-      "3": "hot water system repair",
-    }) } }],
-  }),
-}));
-=======
 // Mock the API cost logger — both relative paths resolve to the same module
 // ./apiCostLogger  → used by tests in server/
 // ../apiCostLogger → used by server/routers/keywords.ts
->>>>>>> Stashed changes
 vi.mock("./apiCostLogger", () => ({
   invokeLLMWithCost: vi.fn().mockResolvedValue({
     choices: [{ message: { content: JSON.stringify({
