@@ -175,6 +175,12 @@ describe("business.scrape", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("calls invokeLLM and returns structured scrape data", async () => {
+    // Mock global fetch so the test doesn't make a real HTTP request
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => "<html><body><h1>Sunshine Physio</h1></body></html>",
+    }));
+
     const mockScrapeResult = {
       name: "Sunshine Physio",
       industry: "Physiotherapy",

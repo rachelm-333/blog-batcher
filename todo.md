@@ -1035,3 +1035,23 @@
 - [ ] Redesign Architecture page layout: sliders centred, right-hand SEO explainer column
 - [ ] Right-hand column: blurb about content architecture importance for SEO authority
 - [ ] Right-hand column: visual diagram showing Cornerstone <- Pillar(s) <- Cluster(s) with link arrows
+
+## Article Engine Fixes from Claude Review (Jun 13 2026)
+- [ ] Prompt 1: Fix keyword density to AND logic (kwMatches >= 4 AND kwDensity >= 0.01 AND <= 0.025)
+- [ ] Prompt 1: Add focus keyword instruction to every buildSectionPrompt call
+- [ ] Prompt 1: Add keyword placement plan to buildOutlinePrompt
+- [ ] Prompt 2: Add problemsSolved column to businesses table + migration
+- [ ] Prompt 2: Update business router update procedure to accept problemsSolved
+- [ ] Prompt 2: Add problemsSolved textarea to business profile form
+- [ ] Prompt 2: Add problemsSolved to buildArticleContext()
+- [ ] Prompt 2: Add P15-PROBLEM instruction to buildGenerationPrompt()
+- [ ] Prompt 2: Add problem section requirement to buildOutlinePrompt()
+- [ ] Prompt 3: Expand BANNED_PHRASES to 30+ entries
+- [ ] Prompt 3: Strengthen buildScrubPrompt with anti-AI sentence variety rules
+- [ ] Prompt 3: Add second verification scrub pass after initial scrub
+- [ ] Prompt 4: Fix title keyword injection to use Claude rewrite instead of prepend
+- [ ] Prompt 4: Move slug enforcement before outline generation
+- [ ] Prompt 4: Pass full outline context to expansion section generation
+- [ ] Prompt 5: Run pnpm test -- all tests pass
+- [ ] Prompt 5: Run pnpm test -- layer7.test.ts passes
+- [ ] Prompt 5: Verify problemsSolved field saves and appears in article context

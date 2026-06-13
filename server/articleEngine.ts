@@ -71,6 +71,7 @@ export const MIN_DELIVERY_SCORE = 81;
 // Banned AI fingerprint phrases (from scope Section 6.4)
 // ---------------------------------------------------------------------------
 export const BANNED_PHRASES = [
+  // Original list
   "in today's world",
   "it's important to note",
   "it is important to note",
@@ -80,6 +81,43 @@ export const BANNED_PHRASES = [
   "leverage",
   "synergy",
   "transformative",
+  // Extended AI-fingerprint phrases
+  "it's crucial to",
+  "it is crucial to",
+  "one of the most important",
+  "ultimately,",
+  "essentially,",
+  "furthermore,",
+  "moreover,",
+  "at the end of the day",
+  "according to research",
+  "studies show",
+  "it has been shown",
+  "navigating the complexities",
+  "navigate the ever-changing",
+  "in today's competitive landscape",
+  "in today's fast-paced",
+  "in today's digital",
+  "look no further",
+  "cutting-edge",
+  "state-of-the-art",
+  "seamlessly",
+  "robust solution",
+  "tailored solutions",
+  "tailored to your needs",
+  "unlock your potential",
+  "unlock the power",
+  "empower your",
+  "elevate your",
+  "take your business to the next level",
+  "in conclusion,",
+  "to summarize,",
+  "to summarise,",
+  "it goes without saying",
+  "needless to say",
+  "as we all know",
+  "the bottom line is",
+  "at its core",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -278,6 +316,7 @@ export interface ArticleContext {
   testimonialsPageUrl?: string;
   shopUrl?: string;
   otherInternalLinks?: Array<{ label: string; url: string }>;
+  problemsSolved?: string;
 }
 
 /**
@@ -373,6 +412,7 @@ export async function buildArticleContext(
     otherInternalLinks: biz.otherInternalLinks
       ? (biz.otherInternalLinks as Array<{ label: string; url: string }>)
       : undefined,
+    problemsSolved: biz.problemsSolved ?? undefined,
   };
 }
 
@@ -476,7 +516,16 @@ ${ctx.allBatchSlugs.slice(0, 20).join(", ")}
 12. INTERNAL BLOG LINKS: Link to other articles in the batch using anchor text. No keyword cannibalization.
 13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
 14. E-E-A-T SIGNALS: Weave in Experience, Expertise, Authoritativeness, and Trustworthiness. Include social proof signals: ${ctx.socialProof || "mention industry experience"}.
-15. HUMAN AUTHENTICITY: No AI fingerprint patterns. Content must solve the reader's problem completely. Must be cohesive with the rest of the batch.
+${ctx.problemsSolved ? `
+CUSTOMER PROBLEMS THIS BUSINESS SOLVES:
+${ctx.problemsSolved}
+
+P15-PROBLEM: Every article produced for this business MUST do the following:
+- Open the first body paragraph (not the intro) by naming or implying the customer problem stated above
+- At least one H2 section must directly address WHY the reader has this problem or what happens if it goes unsolved
+- The CTA section must connect the service back to the resolution of this problem
+- Do NOT write generic educational content divorced from this business's actual value. Every section should be useful to a reader who HAS this problem.
+` : ""}15. HUMAN AUTHENTICITY: No AI fingerprint patterns. Content must solve the reader's problem completely. Must be cohesive with the rest of the batch.
 16. ARTICLE TYPE STRUCTURE: Format and structure this as a ${typeLabel}. The title must signal specific territory ownership.
 
 === CLOSING CTA SECTION (MANDATORY) ===
@@ -526,12 +575,16 @@ Review the article below and rewrite it to remove all AI tells. The result must 
 SPECIFIC THINGS TO FIX:
 1. Remove em dash (—) overuse — replace with commas, full stops, or restructure the sentence
 2. Remove rhetorical question openings — replace with direct statements
-3. Remove these exact phrases (replace with natural alternatives): "in today's world", "it's important to note", "it is important to note", "delve into", "game-changer", "game changer", "leverage", "synergy", "transformative"
+3. Remove these exact phrases (replace with natural alternatives): ${BANNED_PHRASES.map(p => `"${p}"`).join(", ")}
 4. Remove repetitive sentence structures — vary the rhythm
-5. Vary sentence length — mix short punchy sentences (5–10 words) with longer explanatory ones (20–30 words)
-6. Ensure the article sounds like it was written by a specific human with a point of view, not a generic assistant
-7. Preserve ALL HTML tags, links, headings, and schema markup exactly — only change the prose text
-8. Do NOT remove any content, sections, or paragraphs — the output MUST be at least as long as the input
+5. Vary sentence length deliberately: mix short punchy sentences (under 10 words) with medium ones (15–25 words). Never have 4+ sentences in a row of similar length.
+6. Remove transition words that only AI overuses: furthermore, moreover, additionally (when used to pad), in conclusion, to summarize.
+7. Replace any vague authority claims ('research shows', 'studies indicate', 'experts agree') with specific named examples, or remove them entirely.
+8. If a sentence could appear in any article about any industry, it is too generic. Rewrite it with a specific detail, number, or example from the article's actual topic.
+9. Remove any sentence that begins with 'It is important to' or 'It is crucial to' — rewrite as a direct statement.
+10. Ensure the article sounds like it was written by a specific human with a point of view, not a generic assistant
+11. Preserve ALL HTML tags, links, headings, and schema markup exactly — only change the prose text
+12. Do NOT remove any content, sections, or paragraphs — the output MUST be at least as long as the input
 
 IMPORTANT: Do NOT change the meaning, facts, keyword placement, or structure. Only improve the human authenticity of the writing.
 
@@ -617,7 +670,7 @@ export function runPass1Scorer(params: {
   const wc = WORD_COUNT_RULES[level];
 
   const points: Record<string, boolean> = {
-    // Pass if: (4+ mentions OR density ≥ 1%) AND density ≤ 2.5%
+    // Pass if: (4+ mentions AND density ≤ 2.5%) OR (density ≥ 1% AND density ≤ 2.5%) — OR logic
     p1_keyword_density: (kwMatches >= 4 || kwDensity >= 0.01) && kwDensity <= 0.025,
     p2_keyword_in_h1: h1Present,
     p3_keyword_in_h2: kwInH2,
@@ -848,6 +901,8 @@ RULES (ALL MANDATORY — these map directly to the 16-point SEO checklist):
 - Plan for an external authority link (.gov.au or industry body) in section 2 [P10]
 - Plan for at least 2 internal blog links to other articles in the batch [P12]
 - Plan for E-E-A-T signals (years experience, clients served, awards) in at least one section [P14]
+- Plan the outline so the focus keyword '${ctx.primaryKeyword}' can naturally appear in the opening paragraph, at least one H2 heading, at least one H3 heading (if the article uses H3s), and the conclusion section [P1]
+${ctx.problemsSolved ? `- The outline MUST include at least one section that directly addresses this customer problem: "${ctx.problemsSolved}". Label that section with a heading like 'Why [problem occurs]' or 'The real cost of [problem]' or 'How to solve [problem]'` : ""}
 
 Return a single JSON object:
 {
@@ -926,6 +981,7 @@ ${isCTA ? `CTA SECTION RULES:
 - Keep it to ${section.targetWords} words` : ""}
 
 ${!isFirst && !isCTA ? `CONTENT RULES:
+- The focus keyword is: "${ctx.primaryKeyword}". This section MUST include the focus keyword at least once, used naturally in a sentence. Do not force it — find a place where it fits the meaning of the sentence.
 - Start with <h2>${section.heading}</h2>
 - Write ${section.targetWords} words of specific, practical, expert-level content
 - Use H3 subheadings where appropriate to break up the content
@@ -1009,6 +1065,22 @@ export async function generateSingleArticle(
   //   Step 3 — Assemble: concatenate all sections into the final bodyHtml
   // No single call can be cut off mid-article.
   // =========================================================================
+
+  // --- Pre-Step 1: Enforce slug BEFORE outline so all section-level links use the correct slug ---
+  // (Prompt 4 FIX2: slug enforcement moved before outline generation)
+  {
+    const kwLower = ctx.primaryKeyword.toLowerCase();
+    const slugLower = ctx.urlSlug.toLowerCase();
+    const kwWords = kwLower.split(/\s+/);
+    const allWordsInSlug = kwWords.every((w) => slugLower.includes(w));
+    if (!allWordsInSlug) {
+      const kwSlug = kwLower.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      if (!slugLower.includes(kwSlug)) {
+        ctx.urlSlug = `${kwSlug}-${ctx.urlSlug}`.replace(/--+/g, "-").slice(0, 80);
+        console.log(`[ArticleEngine] Pre-outline P6 slug enforcement: set slug to "${ctx.urlSlug}" for node ${nodeId}`);
+      }
+    }
+  }
 
   // --- Step 1: Get article outline ---
   const outlinePrompt = buildOutlinePrompt(ctx);
@@ -1139,7 +1211,7 @@ Return ONLY the raw JSON-LD string (no markdown, no code fences, no explanation)
 
   let bodyHtml = sectionHtmlParts.join("\n\n");
   const bodyMarkdown = ""; // Markdown not generated in section-by-section mode
-  const title = outline.title;
+  let title = outline.title;
   let metaTitle = outline.metaTitle;
   let metaDescription = outline.metaDescription;
   const faqItems = outline.faqItems;
@@ -1151,20 +1223,45 @@ Return ONLY the raw JSON-LD string (no markdown, no code fences, no explanation)
   }
 
   // --- Pre-pass: P2 enforcement — keyword must appear in article title ---
-  // If the LLM omitted the keyword from the title, inject it.
+  // If the LLM omitted the keyword from the title, rewrite the title via LLM (not prepend).
   {
     const kwLower = ctx.primaryKeyword.toLowerCase();
     const titleLower = title.toLowerCase();
     if (!kwPresentInText(kwLower, titleLower)) {
-      // Prepend keyword to title (e.g. "Psychosocial Hazards Examples: Your Guide")
-      const capitalised = ctx.primaryKeyword.charAt(0).toUpperCase() + ctx.primaryKeyword.slice(1);
-      // Only modify the local `title` variable used for scoring — the H1 in bodyHtml is separate
-      // We also patch the first <h1> in bodyHtml if present
-      const h1Match = bodyHtml.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-      if (h1Match && !kwPresentInText(kwLower, h1Match[1].toLowerCase())) {
-        const newH1 = `${capitalised}: ${h1Match[1]}`;
-        bodyHtml = bodyHtml.replace(h1Match[0], h1Match[0].replace(h1Match[1], newH1));
-        console.log(`[ArticleEngine] P2 enforcement: injected keyword into H1 for node ${nodeId}`);
+      try {
+        const titleRewriteResult = await invokeLLMWithCost(
+          {
+            messages: [
+              {
+                role: "user",
+                content: `Rewrite this article title to naturally include the focus keyword.\nFocus keyword: "${ctx.primaryKeyword}"\nOriginal title: "${title}"\nRules: Keep the meaning. Sound like a real article title a human would write. Do not just prepend the keyword. Max 70 characters. Return ONLY the new title text, nothing else.`,
+              },
+            ],
+            max_tokens: 100,
+          },
+          { userId, feature: "article_generation" }
+        );
+        const rewrittenTitle = (titleRewriteResult.choices[0]?.message?.content ?? "").toString().trim().replace(/^"|"$/g, "");
+        if (rewrittenTitle && rewrittenTitle.length > 5 && rewrittenTitle.length <= 80) {
+          title = rewrittenTitle;
+          // Also patch the H1 in bodyHtml
+          const h1Match = bodyHtml.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+          if (h1Match) {
+            bodyHtml = bodyHtml.replace(h1Match[0], h1Match[0].replace(h1Match[1], rewrittenTitle));
+          }
+          console.log(`[ArticleEngine] P2 enforcement: LLM rewrote title to include keyword for node ${nodeId}: "${rewrittenTitle}"`);
+        } else {
+          // Fallback: prepend if LLM rewrite fails
+          const capitalised = ctx.primaryKeyword.charAt(0).toUpperCase() + ctx.primaryKeyword.slice(1);
+          const h1Match = bodyHtml.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+          if (h1Match && !kwPresentInText(kwLower, h1Match[1].toLowerCase())) {
+            const newH1 = `${capitalised}: ${h1Match[1]}`;
+            bodyHtml = bodyHtml.replace(h1Match[0], h1Match[0].replace(h1Match[1], newH1));
+            console.log(`[ArticleEngine] P2 enforcement: fallback prepend keyword into H1 for node ${nodeId}`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[ArticleEngine] P2 title rewrite failed for node ${nodeId}:`, err);
       }
     }
   }
@@ -1327,7 +1424,14 @@ Return ONLY the condensed article body as clean HTML, wrapped in these exact del
     const wordsNeeded = ctx.wordCountMin - currentWc;
     console.log(`[ArticleEngine] Expansion attempt ${expansionAttempt}/${MAX_EXPANSION_ATTEMPTS} for node ${nodeId}: ${currentWc} words, need ${wordsNeeded} more (min: ${ctx.wordCountMin})`);
     try {
-      const expansionSystemPrompt = `You are an expert SEO content writer. You will receive an article that is too short and must be expanded.
+      // Collect existing H2 headings from the current article for outline context
+    const existingH2Headings = Array.from(bodyHtml.matchAll(/<h2[^>]*>([^<]+)<\/h2>/gi)).map((m) => m[1].trim());
+    // Collect internal links already in the article
+    const existingInternalLinks = Array.from(bodyHtml.matchAll(/href="([^"]+)"[^>]*>([^<]+)<\/a>/gi))
+      .filter((m) => !m[1].startsWith("http") || (ctx.ctaUrl && m[1].includes(new URL(ctx.ctaUrl.startsWith("http") ? ctx.ctaUrl : `https://${ctx.ctaUrl}`).hostname)))
+      .map((m) => ({ url: m[1], label: m[2] }))
+      .slice(0, 10);
+    const expansionSystemPrompt = `You are an expert SEO content writer. You will receive an article that is too short and must be expanded.
 
 Current word count: ${currentWc} words
 Required minimum: ${ctx.wordCountMin} words (you are ${wordsNeeded} words SHORT)
@@ -1336,9 +1440,17 @@ Primary keyword: ${ctx.primaryKeyword}
 
 You MUST add at least ${wordsNeeded} words. This is not optional.
 
+Existing article outline (H2 sections already written):
+${existingH2Headings.map((h, i) => `${i + 1}. ${h}`).join("\n")}
+
+Internal links available in this article (use ONLY these, do not invent new URLs):
+${existingInternalLinks.map((l) => `- ${l.label}: ${l.url}`).join("\n") || "None"}
+
 How to expand:
-- Add ${Math.ceil(wordsNeeded / 200)} new H2 sections covering related subtopics the reader would find valuable
+- Add ${Math.ceil(wordsNeeded / 200)} new H2 section(s) that fit naturally into the existing outline above
 - Each new section should be 150–250 words with practical, specific advice
+- The new section(s) must NOT reference pages or URLs that are not in the internal links list above
+- Focus keyword: "${ctx.primaryKeyword}" — use it naturally once in each new section
 - Expand existing thin paragraphs with real-world examples and step-by-step guidance
 - Add a FAQ section if one does not already exist (3–5 questions and detailed answers)
 - Maintain the same tone, voice, and HTML structure
@@ -1462,6 +1574,59 @@ Return ONLY the expanded HTML wrapped in:
         }
       } catch (err) {
         console.warn(`[ArticleEngine] Post-scrub recovery expansion failed for node ${nodeId}:`, err);
+      }
+    }
+  }
+
+  // --- Pass B3: Second banned-phrase verification pass ---
+  // If any banned phrases survived the scrub, run a targeted second scrub.
+  {
+    const remainingBanned = BANNED_PHRASES.filter((phrase) =>
+      bodyHtml.toLowerCase().includes(phrase.toLowerCase())
+    );
+    if (remainingBanned.length > 0) {
+      console.log(`[ArticleEngine] Pass B3: ${remainingBanned.length} banned phrase(s) survived scrub for node ${nodeId}: ${remainingBanned.join(", ")} — running targeted scrub`);
+      try {
+        const targetedScrubPrompt = `Remove these specific phrases from the article and rewrite those sentences naturally. Do not change any other content, HTML tags, or structure.
+
+Phrases to remove: ${remainingBanned.join(", ")}
+
+For each phrase found:
+- Identify the sentence containing it
+- Rewrite that sentence to convey the same meaning without the banned phrase
+- Keep all surrounding HTML intact
+
+Return ONLY the full article HTML wrapped in:
+<SCRUBBED_HTML>
+...full article HTML here...
+</SCRUBBED_HTML>`;
+        const targetedResult = await invokeLLMWithCost(
+          {
+            messages: [
+              { role: "user", content: targetedScrubPrompt },
+              { role: "user", content: bodyHtml },
+            ],
+            max_tokens: 65536,
+          },
+          { userId, feature: "article_generation" }
+        );
+        const targetedContent = targetedResult.choices[0]?.message?.content ?? "";
+        const rawTargeted = typeof targetedContent === "string" ? targetedContent : JSON.stringify(targetedContent);
+        const targetedMatch = rawTargeted.match(/<SCRUBBED_HTML>([\s\S]*?)<\/SCRUBBED_HTML>/i);
+        const targetedHtml = targetedMatch ? targetedMatch[1].trim() : "";
+        if (targetedHtml && targetedHtml.length > 100) {
+          const targetedWc = targetedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+          const originalWc = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+          if (targetedWc >= originalWc * 0.8) {
+            bodyHtml = targetedHtml;
+            wordCount = targetedWc;
+            console.log(`[ArticleEngine] Pass B3 targeted scrub accepted for node ${nodeId}: ${targetedWc} words`);
+          } else {
+            console.warn(`[ArticleEngine] Pass B3 targeted scrub rejected for node ${nodeId}: too short (${targetedWc} vs ${originalWc})`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[ArticleEngine] Pass B3 targeted scrub failed for node ${nodeId}:`, err);
       }
     }
   }

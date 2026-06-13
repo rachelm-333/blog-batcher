@@ -82,6 +82,8 @@ export const businesses = mysqlTable("businesses", {
   isPhysicalLocation: boolean("isPhysicalLocation").default(false).notNull(),
   abnBusinessRegistration: varchar("abnBusinessRegistration", { length: 64 }),
   uniqueValueProposition: text("uniqueValueProposition"),
+  /** Short paragraph about what customer problems the business solves — used in article generation. */
+  problemsSolved: text("problems_solved"),
   /** Comma-separated topics to exclude from keyword research. */
   keywordExclusions: text("keywordExclusions"),
   /** Years the business has been operating — for E-E-A-T. */

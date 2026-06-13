@@ -200,6 +200,7 @@ export default function Onboarding() {
               abnBusinessRegistration: bizData?.abnBusinessRegistration ?? undefined,
               uniqueValueProposition:
                 bizData?.uniqueValueProposition ?? scrapeData?.uniqueValueProposition,
+              problemsSolved: bizData?.problemsSolved ?? undefined,
               keywordExclusions: bizData?.keywordExclusions ?? undefined,
               audiences: (
                 // Priority: saved audiences > scrapeCache audiences > scrapeData audiences > empty

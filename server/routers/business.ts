@@ -229,6 +229,7 @@ export const businessRouter = router({
         isPhysicalLocation: z.boolean().optional(),
         abnBusinessRegistration: z.string().optional(),
         uniqueValueProposition: z.string().optional(),
+        problemsSolved: z.string().optional(),
         keywordExclusions: z.string().optional(),
         yearsInBusiness: z.number().optional(),
         clientsServed: z.number().optional(),

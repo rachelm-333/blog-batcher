@@ -25,6 +25,7 @@ interface Props {
     isPhysicalLocation?: boolean;
     abnBusinessRegistration?: string;
     uniqueValueProposition?: string;
+    problemsSolved?: string;
     keywordExclusions?: string;
     audiences?: Audience[];
   };
@@ -41,6 +42,7 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
   const [isPhysical, setIsPhysical] = useState(initial.isPhysicalLocation ?? false);
   const [abn, setAbn] = useState(initial.abnBusinessRegistration ?? "");
   const [uvp, setUvp] = useState(initial.uniqueValueProposition ?? "");
+  const [problemsSolved, setProblemsSolved] = useState(initial.problemsSolved ?? "");
   const [keywordExclusions, setKeywordExclusions] = useState(initial.keywordExclusions ?? "");
   const [audiences, setAudiences] = useState<Audience[]>(
     initial.audiences?.length ? initial.audiences : [{ label: "", description: "" }]
@@ -71,6 +73,7 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
           isPhysicalLocation: isPhysical,
           abnBusinessRegistration: abn || undefined,
           uniqueValueProposition: uvp || undefined,
+          problemsSolved: problemsSolved || undefined,
           keywordExclusions: keywordExclusions || undefined,
         }),
         saveAudiences.mutateAsync({
@@ -175,6 +178,17 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
           placeholder="What makes your business different? This appears in every article's E-E-A-T signals."
           rows={3}
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label>What problems do your customers have before they find you?</Label>
+        <Textarea
+          value={problemsSolved}
+          onChange={(e) => setProblemsSolved(e.target.value)}
+          placeholder="e.g. Most of our clients were managing 6 different tools and losing track of projects. They came to us frustrated with wasted hours and no single source of truth."
+          rows={3}
+        />
+        <p className="text-xs text-muted-foreground">This is what your blog content will lead with — the pain the reader is in before your business solves it.</p>
       </div>
 
       <div className="space-y-2">
