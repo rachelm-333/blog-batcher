@@ -31,6 +31,7 @@ import {
   ArrowRight,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   ClipboardCopy,
   Copy,
   Code2,
@@ -269,23 +270,26 @@ function computePass1Checks(params: {
   };
 }
 
+// Labels describe the PROBLEM (what is missing or wrong) — used in the failing-checks list.
+// A label that appears in the amber/red failure list must always describe what needs fixing,
+// not what the passing state looks like.
 const PASS1_CHECK_LABELS: Record<keyof Pass1Checks, string> = {
-  p1_keyword_density: "Keyword density (4+ mentions or ≥1%)",
-  p2_keyword_in_h1: "Keyword in H1 title",
-  p3_keyword_in_h2: "Keyword in H2 heading",
-  p4_keyword_in_h3: "Keyword in H3 heading",
-  p5_keyword_first_100: "Keyword in first 150 words",
-  p6_keyword_in_slug: "Keyword in URL slug",
-  p7_meta_title: "Meta title ≤60 chars + keyword",
-  p8_meta_description: "Meta description 140–160 chars + keyword",
-  p9_opening_answer: "Opening answer / question block",
-  p10_external_link: "External link present",
-  p11_internal_cta: "Internal CTA link present",
-  p12_internal_blog_links: "2+ internal blog links",
-  p13_schema: "Schema markup present",
-  p14_eeat: "E-E-A-T signals (experience, clients, awards)",
-  p15_human_authenticity: "No AI fingerprint phrases",
-  p16_word_count: "Word count in target range",
+  p1_keyword_density: "Keyword density too low or too high (need 4+ mentions, 1–2.5%)",
+  p2_keyword_in_h1: "Keyword missing from H1 title",
+  p3_keyword_in_h2: "Keyword missing from H2 heading",
+  p4_keyword_in_h3: "Keyword missing from H3 heading (or no H3s present)",
+  p5_keyword_first_100: "Keyword not found in first 150 words",
+  p6_keyword_in_slug: "Keyword missing from URL slug",
+  p7_meta_title: "Meta title missing keyword or over 60 chars",
+  p8_meta_description: "Meta description missing keyword or not 140–160 chars",
+  p9_opening_answer: "Opening answer / question block missing",
+  p10_external_link: "No external link found",
+  p11_internal_cta: "No internal CTA link found",
+  p12_internal_blog_links: "Fewer than 2 internal blog links",
+  p13_schema: "Schema markup missing",
+  p14_eeat: "E-E-A-T signals missing (experience, clients, awards)",
+  p15_human_authenticity: "AI fingerprint phrases detected",
+  p16_word_count: "Word count outside target range",
 };
 
 // Which checks are directly affected by editable SEO fields
@@ -715,6 +719,7 @@ export default function ArticleReview() {
   useEffect(() => {
     setBodyEditMode(false);
     setBodyEditHtml((fullArticle as any)?.bodyHtml ?? "");
+    setPass2BreakdownOpen(false); // collapse breakdown when switching articles
   }, [(fullArticle as any)?.id]);
 
   const updateBody = trpc.articles.updateBody.useMutation({
@@ -733,6 +738,7 @@ export default function ArticleReview() {
 
   // Per-article publish action panel state
   const [publishPanelOpen, setPublishPanelOpen] = useState(false);
+  const [pass2BreakdownOpen, setPass2BreakdownOpen] = useState(false);
   const [publishMode, setPublishMode] = useState<"live" | "draft" | "schedule">("live");
   const [scheduleDate, setScheduleDate] = useState(""); // datetime-local string
 
@@ -1871,8 +1877,8 @@ export default function ArticleReview() {
                         <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">SEO Structure</div>
                         <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 1</div>
                       </div>
-                      {/* Checkpoint 2 — Writing Quality */}
-                      <div className={`flex-1 rounded-lg border p-2 text-center ${
+                      {/* Checkpoint 2 — Writing Quality (expandable) */}
+                      <div className={`flex-1 rounded-lg border ${
                         (selectedItem as any).pass2Score == null
                           ? "bg-muted/30 border-border"
                           : (selectedItem as any).pass2Score >= 70
@@ -1881,19 +1887,57 @@ export default function ArticleReview() {
                           ? "bg-amber-500/10 border-amber-500/30"
                           : "bg-red-500/10 border-red-500/30"
                       }`}>
-                        <div className={`text-base font-bold ${
-                          (selectedItem as any).pass2Score == null
-                            ? "text-muted-foreground"
-                            : (selectedItem as any).pass2Score >= 70
-                            ? "text-emerald-500"
-                            : (selectedItem as any).pass2Score >= 50
-                            ? "text-amber-500"
-                            : "text-red-400"
-                        }`}>
-                          {(selectedItem as any).pass2Score != null ? `${(selectedItem as any).pass2Score}/100` : "—"}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
-                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
+                        {/* Collapsed header — always visible */}
+                        <button
+                          type="button"
+                          onClick={() => (selectedItem as any).pass2Score != null && setPass2BreakdownOpen(v => !v)}
+                          className={`w-full p-2 text-center ${
+                            (selectedItem as any).pass2Score != null ? "cursor-pointer" : "cursor-default"
+                          }`}
+                        >
+                          <div className={`text-base font-bold ${
+                            (selectedItem as any).pass2Score == null
+                              ? "text-muted-foreground"
+                              : (selectedItem as any).pass2Score >= 70
+                              ? "text-emerald-500"
+                              : (selectedItem as any).pass2Score >= 50
+                              ? "text-amber-500"
+                              : "text-red-400"
+                          }`}>
+                            {(selectedItem as any).pass2Score != null ? `${(selectedItem as any).pass2Score}/100` : "—"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
+                          <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
+                          {(selectedItem as any).pass2Score != null && (
+                            <div className="flex items-center justify-center gap-0.5 mt-1">
+                              <span className="text-[9px] text-muted-foreground/60">See breakdown</span>
+                              <ChevronDown className={`h-2.5 w-2.5 text-muted-foreground/60 transition-transform ${
+                                pass2BreakdownOpen ? "rotate-180" : ""
+                              }`} />
+                            </div>
+                          )}
+                        </button>
+
+                        {/* Expanded breakdown */}
+                        {pass2BreakdownOpen && (selectedItem as any).pass2Score != null && (
+                          <div className="px-2.5 pb-2.5 border-t border-current/10 mt-0.5 pt-2 space-y-1.5">
+                            {[
+                              { label: "Search Intent", max: 20 },
+                              { label: "Human Authenticity", max: 20 },
+                              { label: "Title Territory", max: 20 },
+                              { label: "E-E-A-T Authority", max: 20 },
+                              { label: "Batch Cohesion", max: 20 },
+                            ].map(({ label, max }) => (
+                              <div key={label} className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] text-muted-foreground leading-tight">{label}</span>
+                                <span className="text-[10px] font-medium text-muted-foreground/70 shrink-0">/ {max}</span>
+                              </div>
+                            ))}
+                            <p className="text-[9px] text-muted-foreground/60 leading-snug pt-1 border-t border-current/10">
+                              Score reflects writing quality signals — not content accuracy. A score of 70+ is strong. Editing to chase a higher score can reduce natural voice.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
