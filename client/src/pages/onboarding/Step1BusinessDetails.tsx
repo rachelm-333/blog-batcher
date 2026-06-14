@@ -3,10 +3,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Loader2, Plus, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { HelpLink } from "@/components/HelpLink";
 
 interface Audience {
@@ -33,6 +40,14 @@ interface Props {
   onBack: () => void;
 }
 
+const INTERVIEW_QUESTIONS = [
+  "Think of your best client result. What was their situation BEFORE they came to you? What were they dealing with?",
+  "What were they frustrated with, struggling with, or worried about? What had they already tried that didn't work?",
+  "What changed for them after working with you? What can they now do, feel, or achieve that they couldn't before?",
+];
+
+type ModalStep = "q1" | "q2" | "q3" | "loading" | "result";
+
 export default function Step1BusinessDetails({ businessId, initial, onNext, onBack }: Props) {
   const [name, setName] = useState(initial.name ?? "");
   const [industry, setIndustry] = useState(initial.industry ?? "");
@@ -48,8 +63,15 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
     initial.audiences?.length ? initial.audiences : [{ label: "", description: "" }]
   );
 
+  // Interview modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalStep, setModalStep] = useState<ModalStep>("q1");
+  const [answers, setAnswers] = useState(["", "", ""]);
+  const [generatedParagraph, setGeneratedParagraph] = useState("");
+
   const updateBusiness = trpc.business.update.useMutation();
   const saveAudiences = trpc.business.saveAudiences.useMutation();
+  const generateProblemsSolved = trpc.business.generateProblemsSolved.useMutation();
 
   const addAudience = () => setAudiences((prev) => [...prev, { label: "", description: "" }]);
   const removeAudience = (i: number) => setAudiences((prev) => prev.filter((_, idx) => idx !== i));
@@ -91,6 +113,68 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
   };
 
   const saving = updateBusiness.isPending || saveAudiences.isPending;
+
+  // ── Interview modal helpers ────────────────────────────────────────────────
+
+  const openModal = () => {
+    setAnswers(["", "", ""]);
+    setGeneratedParagraph("");
+    setModalStep("q1");
+    setModalOpen(true);
+  };
+
+  const closeModal = () => setModalOpen(false);
+
+  const currentQuestionIndex = modalStep === "q1" ? 0 : modalStep === "q2" ? 1 : modalStep === "q3" ? 2 : -1;
+
+  const handleNextQuestion = () => {
+    if (modalStep === "q1") {
+      if (!answers[0].trim()) { toast.error("Please answer the question before continuing."); return; }
+      setModalStep("q2");
+    } else if (modalStep === "q2") {
+      if (!answers[1].trim()) { toast.error("Please answer the question before continuing."); return; }
+      setModalStep("q3");
+    } else if (modalStep === "q3") {
+      if (!answers[2].trim()) { toast.error("Please answer the question before continuing."); return; }
+      handleGenerate();
+    }
+  };
+
+  const handleBack = () => {
+    if (modalStep === "q2") setModalStep("q1");
+    else if (modalStep === "q3") setModalStep("q2");
+    else if (modalStep === "result") { setModalStep("q1"); setAnswers(["", "", ""]); setGeneratedParagraph(""); }
+  };
+
+  const handleGenerate = async () => {
+    setModalStep("loading");
+    try {
+      const result = await generateProblemsSolved.mutateAsync({
+        answer1: answers[0],
+        answer2: answers[1],
+        answer3: answers[2],
+        businessName: name || "this business",
+        industry: industry || "general",
+      });
+      setGeneratedParagraph(result.paragraph);
+      setModalStep("result");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Generation failed. Please try again.");
+      setModalStep("q3");
+    }
+  };
+
+  const handleUseThis = () => {
+    setProblemsSolved(generatedParagraph);
+    closeModal();
+    toast.success("Problems Solved field updated.");
+  };
+
+  const handleTryAgain = () => {
+    setAnswers(["", "", ""]);
+    setGeneratedParagraph("");
+    setModalStep("q1");
+  };
 
   return (
     <div className="space-y-8">
@@ -180,8 +264,21 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
         />
       </div>
 
+      {/* Problems Solved — with AI interview helper */}
       <div className="space-y-2">
-        <Label>What problems do your customers have before they find you?</Label>
+        <div className="flex items-center justify-between">
+          <Label>What problems do your customers have before they find you?</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={openModal}
+            className="text-xs gap-1.5 text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Help me write this →
+          </Button>
+        </div>
         <Textarea
           value={problemsSolved}
           onChange={(e) => setProblemsSolved(e.target.value)}
@@ -260,6 +357,113 @@ export default function Step1BusinessDetails({ businessId, initial, onNext, onBa
           Save & Continue
         </Button>
       </div>
+
+      {/* ── AI Interview Modal ─────────────────────────────────────────────── */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Let's figure out what problems you solve</DialogTitle>
+            <DialogDescription>
+              Answer 3 quick questions — I'll write it for you.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Question steps */}
+          {(modalStep === "q1" || modalStep === "q2" || modalStep === "q3") && (
+            <div className="space-y-5 pt-1">
+              {/* Progress indicator */}
+              <div className="flex items-center gap-2">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className={`h-1.5 flex-1 rounded-full transition-colors ${
+                      i <= currentQuestionIndex ? "bg-primary" : "bg-muted"
+                    }`}
+                  />
+                ))}
+                <span className="text-xs text-muted-foreground whitespace-nowrap ml-1">
+                  Question {currentQuestionIndex + 1} of 3
+                </span>
+              </div>
+
+              {/* Question text */}
+              <p className="text-sm font-medium text-foreground leading-relaxed">
+                {INTERVIEW_QUESTIONS[currentQuestionIndex]}
+              </p>
+
+              {/* Answer textarea */}
+              <Textarea
+                value={answers[currentQuestionIndex]}
+                onChange={(e) => {
+                  const updated = [...answers];
+                  updated[currentQuestionIndex] = e.target.value;
+                  setAnswers(updated);
+                }}
+                placeholder="Type your answer here..."
+                rows={4}
+                autoFocus
+              />
+
+              {/* Navigation buttons */}
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-between pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={currentQuestionIndex === 0 ? closeModal : handleBack}
+                  className="gap-1.5"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  {currentQuestionIndex === 0 ? "Cancel" : "Back"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleNextQuestion}
+                  className="gap-1.5"
+                >
+                  {modalStep === "q3" ? (
+                    <>Write it for me <ArrowRight className="h-4 w-4" /></>
+                  ) : (
+                    <>Next <ArrowRight className="h-4 w-4" /></>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Loading state */}
+          {modalStep === "loading" && (
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="text-sm">Writing your answer...</p>
+            </div>
+          )}
+
+          {/* Result state */}
+          {modalStep === "result" && (
+            <div className="space-y-5 pt-1">
+              <div className="rounded-lg border bg-muted/40 p-4">
+                <p className="text-sm text-foreground leading-relaxed">{generatedParagraph}</p>
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-between pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleTryAgain}
+                >
+                  Try again
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleUseThis}
+                  className="gap-1.5"
+                >
+                  Use this ✓
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

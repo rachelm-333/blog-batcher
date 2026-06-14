@@ -716,4 +716,53 @@ Rules:
 
       return { success: true, newBatch };
     }),
+
+  // -------------------------------------------------------------------------
+  // GENERATE PROBLEMS SOLVED — AI interview helper
+  // -------------------------------------------------------------------------
+  generateProblemsSolved: protectedProcedure
+    .input(
+      z.object({
+        answer1: z.string().min(1),
+        answer2: z.string().min(1),
+        answer3: z.string().min(1),
+        businessName: z.string(),
+        industry: z.string(),
+      })
+    )
+    .output(z.object({ paragraph: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const prompt = `You are helping a business owner describe the core problems their business solves for customers. Write a 2-3 sentence paragraph in first person plural ('our clients', 'we help') based on their answers below.
+
+The paragraph should:
+- Open with the customer's situation or frustration BEFORE finding this business
+- Name the specific pain, struggle, or problem in plain language (not corporate speak)
+- End with what changes or becomes possible after working with this business
+- Sound like a real business owner wrote it, not like marketing copy
+- Be specific — use the details they provided, not generic phrases
+
+Business: ${input.businessName}, Industry: ${input.industry}
+
+Answer 1 (situation before): ${input.answer1}
+Answer 2 (frustrations/struggles): ${input.answer2}
+Answer 3 (what changed after): ${input.answer3}
+
+Write only the paragraph. No intro, no label, no explanation.`;
+
+      const response = await invokeLLMWithCost(
+        {
+          messages: [
+            { role: "system", content: "You are a skilled copywriter. Return only the requested paragraph with no additional text." },
+            { role: "user", content: prompt },
+          ],
+        },
+        { userId: ctx.user.id, feature: "other" }
+      );
+
+      const paragraph = ((response?.choices?.[0]?.message?.content as string) ?? "").trim();
+      if (!paragraph) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Generation failed. Please try again." });
+      }
+      return { paragraph };
+    }),
 });
