@@ -169,7 +169,7 @@ async function generateAndSave(
         focusKeyword: null, // will be set from keyword row
         internalScore: result.internalScore,
         pass2Score: result.pass2Score,
-        pass1Details: result.pass1Points as unknown,
+        pass1Details: { points: result.pass1Points, metrics: result.pass1Metrics } as unknown,
         statusBadge: result.statusBadge,
         status: "generated",
         approvedAt: null,
@@ -1794,7 +1794,7 @@ ${row.bodyHtml ?? ""}
         .update(articles)
         .set({
           internalScore: badgeResult.internalScore,
-          pass1Details: pass1Result.points as unknown,
+          pass1Details: { points: pass1Result.points, metrics: pass1Result.details } as unknown,
           statusBadge: badgeResult.statusBadge,
         })
         .where(eq(articles.id, input.articleId));

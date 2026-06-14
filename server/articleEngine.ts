@@ -1068,6 +1068,7 @@ export interface GenerationResult {
   internalScore: number;
   statusBadge: "authority_ready" | "strong" | "needs_review";
   pass1Points: Record<string, boolean>;
+  pass1Metrics: Record<string, string>;
   pass2Score: number;
   pass2Feedback: string;
 }
@@ -1872,6 +1873,7 @@ Return ONLY the full article HTML wrapped in:
     internalScore,
     statusBadge,
     pass1Points: pass1.points,
+    pass1Metrics: pass1.details,
     pass2Score: pass2.score,
     pass2Feedback: pass2.feedback,
   };

@@ -31,7 +31,6 @@ import {
   ArrowRight,
   Calendar,
   CheckCircle2,
-  ChevronDown,
   ClipboardCopy,
   Copy,
   Code2,
@@ -270,11 +269,61 @@ function computePass1Checks(params: {
   };
 }
 
+// ---------------------------------------------------------------------------
+// pass1Details helpers — handles both legacy (boolean map) and new ({points, metrics}) format
+// ---------------------------------------------------------------------------
+
+type Pass1DetailsRaw = { points: Record<string, boolean>; metrics: Record<string, string> } | Record<string, boolean> | null | unknown;
+
+function extractPass1Points(raw: Pass1DetailsRaw): Record<string, boolean> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  // New format: { points: {...}, metrics: {...} }
+  if (r.points && typeof r.points === "object" && !Array.isArray(r.points)) {
+    return r.points as Record<string, boolean>;
+  }
+  // Legacy format: flat boolean map
+  if (typeof r.p1_keyword_density === "boolean" || typeof r.p2_keyword_in_h1 === "boolean") {
+    return r as Record<string, boolean>;
+  }
+  return null;
+}
+
+function extractPass1Metrics(raw: Pass1DetailsRaw): Record<string, string> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.metrics && typeof r.metrics === "object" && !Array.isArray(r.metrics)) {
+    return r.metrics as Record<string, string>;
+  }
+  return null;
+}
+
+/** Build a specific keyword density label based on the stored metrics string, e.g. "4 mentions, 0.89% density" */
+function getKeywordDensityLabel(metrics: Record<string, string> | null): string {
+  const raw = metrics?.p1_keyword_density; // e.g. "4 mentions, 0.89% density"
+  if (!raw) return "Keyword density too low or too high (need 4+ mentions, 1–2.5%)";
+  // Parse: "N mentions, X.XX% density"
+  const mentionMatch = raw.match(/(\d+)\s+mention/);
+  const densityMatch = raw.match(/([\d.]+)%\s+density/);
+  const kwMatches = mentionMatch ? parseInt(mentionMatch[1]) : null;
+  const kwDensityPct = densityMatch ? parseFloat(densityMatch[1]) : null;
+  if (kwMatches !== null && kwMatches < 4) {
+    return `Keyword used only ${kwMatches} time${kwMatches === 1 ? "" : "s"} — aim for 4+ mentions`;
+  }
+  if (kwDensityPct !== null && kwDensityPct > 2.5) {
+    return `Keyword density ${kwDensityPct.toFixed(1)}% — slightly over 2.5% ceiling`;
+  }
+  if (kwDensityPct !== null && kwDensityPct < 1.0 && kwMatches !== null && kwMatches >= 4) {
+    return `Keyword density ${kwDensityPct.toFixed(2)}% — just under 1% target (mentions are fine)`;
+  }
+  return `Keyword density ${kwDensityPct !== null ? kwDensityPct.toFixed(2) + "%" : ""} — outside 1–2.5% range`;
+}
+
 // Labels describe the PROBLEM (what is missing or wrong) — used in the failing-checks list.
 // A label that appears in the amber/red failure list must always describe what needs fixing,
 // not what the passing state looks like.
 const PASS1_CHECK_LABELS: Record<keyof Pass1Checks, string> = {
-  p1_keyword_density: "Keyword density too low or too high (need 4+ mentions, 1–2.5%)",
+  p1_keyword_density: "Keyword density too low or too high (need 4+ mentions, 1–2.5%)", // overridden dynamically via getKeywordDensityLabel()
   p2_keyword_in_h1: "Keyword missing from H1 title",
   p3_keyword_in_h2: "Keyword missing from H2 heading",
   p4_keyword_in_h3: "Keyword missing from H3 heading (or no H3s present)",
@@ -326,7 +375,7 @@ interface ArticleListItem {
   wordCount: number | null;
   internalScore: number | null;
   pass2Score: number | null;
-  pass1Details: Record<string, boolean> | null | unknown;
+  pass1Details: { points: Record<string, boolean>; metrics: Record<string, string> } | Record<string, boolean> | null | unknown;
   level: "cornerstone" | "pillar" | "cluster";
   articleType: string;
   urlSlug: string | null;
@@ -719,7 +768,6 @@ export default function ArticleReview() {
   useEffect(() => {
     setBodyEditMode(false);
     setBodyEditHtml((fullArticle as any)?.bodyHtml ?? "");
-    setPass2BreakdownOpen(false); // collapse breakdown when switching articles
   }, [(fullArticle as any)?.id]);
 
   const updateBody = trpc.articles.updateBody.useMutation({
@@ -738,7 +786,6 @@ export default function ArticleReview() {
 
   // Per-article publish action panel state
   const [publishPanelOpen, setPublishPanelOpen] = useState(false);
-  const [pass2BreakdownOpen, setPass2BreakdownOpen] = useState(false);
   const [publishMode, setPublishMode] = useState<"live" | "draft" | "schedule">("live");
   const [scheduleDate, setScheduleDate] = useState(""); // datetime-local string
 
@@ -1833,8 +1880,9 @@ export default function ArticleReview() {
                 if (dbScore == null) return null;
                 const liveScore = dbScore;
 
-                // Failing checks: use stored pass1Details from the DB
-                const storedDetails = (selectedItem as any).pass1Details as Record<string, boolean> | null;
+                // Failing checks: use stored pass1Details from the DB (handles both legacy boolean-map and new {points,metrics} format)
+                const storedDetails = extractPass1Points((selectedItem as any).pass1Details);
+                const storedMetrics = extractPass1Metrics((selectedItem as any).pass1Details);
                 const failingKeys = storedDetails
                   ? (Object.keys(storedDetails) as string[]).filter(k => !storedDetails[k])
                   : [];
@@ -1877,8 +1925,8 @@ export default function ArticleReview() {
                         <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">SEO Structure</div>
                         <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 1</div>
                       </div>
-                      {/* Checkpoint 2 — Writing Quality (expandable) */}
-                      <div className={`flex-1 rounded-lg border ${
+                      {/* Checkpoint 2 — Writing Quality */}
+                      <div className={`flex-1 rounded-lg border p-2 text-center ${
                         (selectedItem as any).pass2Score == null
                           ? "bg-muted/30 border-border"
                           : (selectedItem as any).pass2Score >= 70
@@ -1887,56 +1935,25 @@ export default function ArticleReview() {
                           ? "bg-amber-500/10 border-amber-500/30"
                           : "bg-red-500/10 border-red-500/30"
                       }`}>
-                        {/* Collapsed header — always visible */}
-                        <button
-                          type="button"
-                          onClick={() => (selectedItem as any).pass2Score != null && setPass2BreakdownOpen(v => !v)}
-                          className={`w-full p-2 text-center ${
-                            (selectedItem as any).pass2Score != null ? "cursor-pointer" : "cursor-default"
-                          }`}
-                        >
-                          <div className={`text-base font-bold ${
-                            (selectedItem as any).pass2Score == null
-                              ? "text-muted-foreground"
-                              : (selectedItem as any).pass2Score >= 70
-                              ? "text-emerald-500"
-                              : (selectedItem as any).pass2Score >= 50
-                              ? "text-amber-500"
-                              : "text-red-400"
-                          }`}>
-                            {(selectedItem as any).pass2Score != null ? `${(selectedItem as any).pass2Score}/100` : "—"}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
-                          <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
-                          {(selectedItem as any).pass2Score != null && (
-                            <div className="flex items-center justify-center gap-0.5 mt-1">
-                              <span className="text-[9px] text-muted-foreground/60">See breakdown</span>
-                              <ChevronDown className={`h-2.5 w-2.5 text-muted-foreground/60 transition-transform ${
-                                pass2BreakdownOpen ? "rotate-180" : ""
-                              }`} />
-                            </div>
-                          )}
-                        </button>
-
-                        {/* Expanded breakdown */}
-                        {pass2BreakdownOpen && (selectedItem as any).pass2Score != null && (
-                          <div className="px-2.5 pb-2.5 border-t border-current/10 mt-0.5 pt-2 space-y-1.5">
-                            {[
-                              { label: "Search Intent", max: 20 },
-                              { label: "Human Authenticity", max: 20 },
-                              { label: "Title Territory", max: 20 },
-                              { label: "E-E-A-T Authority", max: 20 },
-                              { label: "Batch Cohesion", max: 20 },
-                            ].map(({ label, max }) => (
-                              <div key={label} className="flex items-center justify-between gap-1">
-                                <span className="text-[10px] text-muted-foreground leading-tight">{label}</span>
-                                <span className="text-[10px] font-medium text-muted-foreground/70 shrink-0">/ {max}</span>
-                              </div>
-                            ))}
-                            <p className="text-[9px] text-muted-foreground/60 leading-snug pt-1 border-t border-current/10">
-                              Score reflects writing quality signals — not content accuracy. A score of 70+ is strong. Editing to chase a higher score can reduce natural voice.
-                            </p>
-                          </div>
+                        <div className={`text-base font-bold ${
+                          (selectedItem as any).pass2Score == null
+                            ? "text-muted-foreground"
+                            : (selectedItem as any).pass2Score >= 70
+                            ? "text-emerald-500"
+                            : (selectedItem as any).pass2Score >= 50
+                            ? "text-amber-500"
+                            : "text-red-400"
+                        }`}>
+                          {(selectedItem as any).pass2Score != null ? `${(selectedItem as any).pass2Score}/100` : "—"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
+                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
+                        {(selectedItem as any).pass2Score != null && (
+                          <p className="text-[9px] text-muted-foreground/60 leading-snug mt-1.5">
+                            {(selectedItem as any).pass2Score >= 70
+                              ? "Writing quality is strong. Focus on publishing, not perfecting."
+                              : "Consider using AI Edit Instruction to improve flow and depth."}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -1964,7 +1981,9 @@ export default function ArticleReview() {
                               <span className={`text-[10px] leading-tight ${
                                 liveScore >= 15 ? "text-emerald-700" : liveScore >= 13 ? "text-muted-foreground" : "text-amber-600"
                               }`}>
-                                {PASS1_CHECK_LABELS[k as keyof Pass1Checks] ?? k}
+                                {k === "p1_keyword_density"
+                                  ? getKeywordDensityLabel(storedMetrics)
+                                  : (PASS1_CHECK_LABELS[k as keyof Pass1Checks] ?? k)}
                               </span>
                             </div>
                           ))}
