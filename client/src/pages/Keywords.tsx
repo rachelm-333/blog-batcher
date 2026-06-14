@@ -480,6 +480,7 @@ export default function Keywords() {
   const allPaaFetched = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => { const q = k.paaQuestions as string[]|null; return q && q.length > 0; }), [kwData]);
   const allPaaApproved = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => k.paaApproved), [kwData]);
   const approvedCount = useMemo(() => kwData?.filter(k => k.keywordApproved).length ?? 0, [kwData]);
+  const paaApprovedCount = useMemo(() => kwData?.filter(k => k.paaApproved).length ?? 0, [kwData]);
   const totalCount = kwData?.length ?? 0;
 
   if (userLoading || bizLoading) {
@@ -839,13 +840,28 @@ export default function Keywords() {
           })}
         </div>
       </div>
-      {allPaaApproved && (
-        <div style={{ display:"flex", justifyContent:"flex-end" }}>
-          <button className="btn-primary" onClick={() => setLocation("/content-plan")}>
-            Plan your content <ArrowRight style={{ width:14, height:14 }} />
+      {/* Sticky bottom bar — always visible in PAA review */}
+      <div style={{ position:"sticky", bottom:0, left:0, right:0, background:"#fff", borderTop:"1px solid #e5e7eb", padding:"12px 20px", display:"flex", alignItems:"center", justifyContent:"space-between", zIndex:10, borderRadius:"0 0 12px 12px" }}>
+        <span style={{ fontSize:13, color:"#6b7280", fontWeight:500 }}>
+          {paaApprovedCount} of {totalCount} PAA questions selected
+        </span>
+        {!allPaaFetched ? (
+          <button
+            disabled
+            style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 20px", borderRadius:8, background:"#e5e7eb", color:"#9ca3af", fontSize:13, fontWeight:600, cursor:"not-allowed", border:"none" }}
+          >
+            Generate PAA questions first
           </button>
-        </div>
-      )}
+        ) : (
+          <button
+            className="btn-primary"
+            onClick={() => setLocation("/content-plan")}
+            style={{ display:"inline-flex", alignItems:"center", gap:6 }}
+          >
+            Save &amp; continue to content plan <ArrowRight style={{ width:14, height:14 }} />
+          </button>
+        )}
+      </div>
     </div>
   );
 
