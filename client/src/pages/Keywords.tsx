@@ -841,8 +841,8 @@ export default function Keywords() {
       </div>
       {allPaaApproved && (
         <div style={{ display:"flex", justifyContent:"flex-end" }}>
-          <button className="btn-primary" onClick={() => setLocation("/generate")}>
-            Proceed to Article Generation <ArrowRight style={{ width:14, height:14 }} />
+          <button className="btn-primary" onClick={() => setLocation("/content-plan")}>
+            Plan your content <ArrowRight style={{ width:14, height:14 }} />
           </button>
         </div>
       )}
@@ -857,8 +857,8 @@ export default function Keywords() {
       <p style={{ fontSize:13, color:"#6b7280", maxWidth:360, margin:"0 auto 24px" }}>
         All keywords and PAA questions are approved. Your articles are ready for generation.
       </p>
-      <button className="btn-primary" onClick={() => setLocation("/generate")}>
-        Go to Article Generation <ArrowRight style={{ width:14, height:14 }} />
+      <button className="btn-primary" onClick={() => setLocation("/content-plan")}>
+        Plan your content <ArrowRight style={{ width:14, height:14 }} />
       </button>
     </div>
   );

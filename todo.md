@@ -1058,3 +1058,16 @@
 
 ## Bug Fixes
 - [x] Fix Stage 3 Keywords assigned/unassigned counts — only primary keywords (one per article node) should count as assigned; secondary keywords must not inflate the assigned count
+
+## Content Plan Step (between Stage 3 and Stage 4)
+- [x] Add contentPlanDirection column to article_nodes table and run migration
+- [x] Add articles.generateContentPlan tRPC mutation (calls Claude per node, returns proposedTitle/angle/keySection)
+- [x] Add articles.saveContentPlanItem tRPC mutation (saves proposedTitle to article_nodes.title, direction to contentPlanDirection)
+- [x] Build client/src/pages/ContentPlan.tsx with skeleton loader, card layout, editable title/direction fields, auto-save on blur (800ms debounce)
+- [x] Add /content-plan route to App.tsx
+- [x] Change Keywords.tsx "Generate X articles" button to navigate to /content-plan instead of triggering generation
+- [x] ContentPlan.tsx "Start generating →" button navigates to /generate and triggers existing generation flow
+- [x] Add contentPlanDirection to ArticleContext type and buildArticleContext() in articleEngine.ts
+- [x] Add WRITER DIRECTION block to buildGenerationPrompt() in articleEngine.ts
+- [x] Add publisher direction instruction to buildOutlinePrompt() in articleEngine.ts
+- [x] Run pnpm test — 377 tests must pass, TypeScript 0 errors

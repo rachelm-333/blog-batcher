@@ -1,0 +1,1 @@
+ALTER TABLE `article_nodes` ADD `contentPlanDirection` text;

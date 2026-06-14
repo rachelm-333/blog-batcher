@@ -120,6 +120,13 @@
       "when": 1781399067765,
       "tag": "0016_supreme_trish_tilby",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1781407059890,
+      "tag": "0017_charming_madrox",
+      "breakpoints": true
     }
   ]
 }

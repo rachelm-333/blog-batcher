@@ -385,6 +385,11 @@ export const articleNodes = mysqlTable("article_nodes", {
   urlSlug: varchar("urlSlug", { length: 512 }),
   /** Display order within its level and parent. */
   sortOrder: int("sortOrder").default(0).notNull(),
+  /**
+   * Optional publisher direction for this article, entered on the Content Plan screen.
+   * Passed into the generation prompt to guide the writer.
+   */
+  contentPlanDirection: text("contentPlanDirection"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

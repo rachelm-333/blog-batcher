@@ -8,6 +8,7 @@ import Architecture from "./pages/Architecture";
 import Dashboard from "./pages/Dashboard";
 import Keywords from "./pages/Keywords";
 import ArticleGeneration from "./pages/ArticleGeneration";
+import ContentPlan from "./pages/ContentPlan";
 import ArticleReview from "./pages/ArticleReview";
 import PublishSchedule from "./pages/PublishSchedule";
 import Integrations from "./pages/Integrations";
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/architecture" component={Architecture} />
       <Route path="/keywords" component={Keywords} />
+      <Route path="/content-plan" component={ContentPlan} />
       <Route path="/generate" component={ArticleGeneration} />
       <Route path="/review" component={ArticleReview} />
       <Route path="/publish" component={PublishSchedule} />

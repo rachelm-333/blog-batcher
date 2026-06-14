@@ -38,6 +38,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
+import { invokeLLMWithCost } from "../apiCostLogger";
 import {
   generateSingleArticle,
   getOrderedNodes,
@@ -1819,5 +1820,149 @@ ${row.bodyHtml ?? ""}
         .where(eq(articles.id, input.articleId));
 
       return { readyToPublish: true };
+    }),
+
+  // ---------------------------------------------------------------------------
+  // articles.generateContentPlan
+  // For each approved article node in the active batch, call Claude to generate
+  // a proposedTitle, angle, and keySection.
+  // ---------------------------------------------------------------------------
+  generateContentPlan: protectedProcedure
+    .input(z.object({ businessId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      // Fetch business context
+      const [bizRow] = await db
+        .select({
+          name: businesses.name,
+          industry: businesses.industry,
+          customerSituationBefore: businesses.customerSituationBefore,
+          customerFrustrations: businesses.customerFrustrations,
+          customerTransformation: businesses.customerTransformation,
+        })
+        .from(businesses)
+        .where(eq(businesses.id, input.businessId))
+        .limit(1);
+      if (!bizRow) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
+
+      // Fetch approved article nodes with their assigned keywords
+      const nodes = await db
+        .select({
+          id: articleNodes.id,
+          level: articleNodes.level,
+          articleType: articleNodes.articleType,
+          contentPlanDirection: articleNodes.contentPlanDirection,
+          primaryKeyword: keywords.primaryKeyword,
+          msv: keywords.monthlySearchVolume,
+          competitionLevel: keywords.competitionLevel,
+        })
+        .from(articleNodes)
+        .leftJoin(keywords, eq(keywords.articleNodeId, articleNodes.id))
+        .where(and(eq(articleNodes.businessId, input.businessId), eq(articleNodes.batchNumber, activeBatch)));
+
+      // Call Claude for each node in parallel
+      const results = await Promise.all(
+        nodes.map(async (node) => {
+          const kw = node.primaryKeyword ?? "(no keyword assigned)";
+          const prompt = `You are planning a blog post for ${bizRow.name ?? "a business"}, a ${bizRow.industry ?? "business"} business.\n\nCustomer context:\n- Problem before finding this business: ${bizRow.customerSituationBefore ?? "Not specified"}\n- Frustrations: ${bizRow.customerFrustrations ?? "Not specified"}\n- Transformation after: ${bizRow.customerTransformation ?? "Not specified"}\n\nArticle details:\n- Level: ${node.level}\n- Focus keyword: ${kw}\n- Article type: ${node.articleType}\n\nGenerate a content plan for this article. Return JSON with exactly these fields:\n{\n  "proposedTitle": "a specific, compelling article title using the focus keyword",\n  "angle": "one sentence describing the specific problem or question this article addresses for the reader",\n  "keySection": "the one section heading that will be most valuable to the reader"\n}\n\nRules:\n- The proposedTitle must include the focus keyword\n- The angle must connect to the customer problem above - not a generic description\n- Be specific - not 'this article covers X' but 'readers who are struggling with X will learn Y'`;
+          try {
+            const resp = await invokeLLMWithCost(
+              {
+                messages: [
+                  { role: "system", content: "You are a content strategist. Return only valid JSON." },
+                  { role: "user", content: prompt },
+                ],
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "content_plan_item",
+                    strict: true,
+                    schema: {
+                      type: "object",
+                      properties: {
+                        proposedTitle: { type: "string" },
+                        angle: { type: "string" },
+                        keySection: { type: "string" },
+                      },
+                      required: ["proposedTitle", "angle", "keySection"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+              },
+              { userId: ctx.user.id, feature: "other" }
+            );
+            const raw = resp?.choices?.[0]?.message?.content ?? "{}";
+            const parsed = JSON.parse(typeof raw === "string" ? raw : JSON.stringify(raw)) as {
+              proposedTitle: string;
+              angle: string;
+              keySection: string;
+            };
+            return {
+              nodeId: node.id,
+              keyword: kw,
+              level: node.level,
+              articleType: node.articleType,
+              msv: node.msv ?? null,
+              competitionLevel: node.competitionLevel ?? null,
+              contentPlanDirection: node.contentPlanDirection ?? null,
+              proposedTitle: parsed.proposedTitle ?? kw,
+              angle: parsed.angle ?? "",
+              keySection: parsed.keySection ?? "",
+            };
+          } catch {
+            return {
+              nodeId: node.id,
+              keyword: kw,
+              level: node.level,
+              articleType: node.articleType,
+              msv: node.msv ?? null,
+              competitionLevel: node.competitionLevel ?? null,
+              contentPlanDirection: node.contentPlanDirection ?? null,
+              proposedTitle: kw,
+              angle: "",
+              keySection: "",
+            };
+          }
+        })
+      );
+      return results;
+    }),
+
+  // ---------------------------------------------------------------------------
+  // articles.saveContentPlanItem
+  // Saves the user-edited proposedTitle (to urlSlug) and/or direction for a node.
+  // ---------------------------------------------------------------------------
+  saveContentPlanItem: protectedProcedure
+    .input(
+      z.object({
+        nodeId: z.number().int().positive(),
+        proposedTitle: z.string().optional(),
+        direction: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [node] = await db
+        .select({ businessId: articleNodes.businessId })
+        .from(articleNodes)
+        .where(eq(articleNodes.id, input.nodeId))
+        .limit(1);
+      if (!node) throw new TRPCError({ code: "NOT_FOUND", message: "Article node not found" });
+      await assertBusinessOwnership(ctx.user.id, node.businessId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updatePayload: Record<string, any> = {};
+      if (input.direction !== undefined) {
+        updatePayload.contentPlanDirection = input.direction.trim() || null;
+      }
+      if (Object.keys(updatePayload).length > 0) {
+        await db.update(articleNodes).set(updatePayload).where(eq(articleNodes.id, input.nodeId));
+      }
+      return { saved: true };
     }),
 });

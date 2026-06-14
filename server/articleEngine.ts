@@ -320,6 +320,7 @@ export interface ArticleContext {
   customerSituationBefore?: string;
   customerFrustrations?: string;
   customerTransformation?: string;
+  contentPlanDirection?: string;
 }
 
 /**
@@ -419,6 +420,7 @@ export async function buildArticleContext(
     customerSituationBefore: biz.customerSituationBefore ?? undefined,
     customerFrustrations: biz.customerFrustrations ?? undefined,
     customerTransformation: biz.customerTransformation ?? undefined,
+    contentPlanDirection: node.contentPlanDirection ?? undefined,
   };
 }
 
@@ -537,6 +539,11 @@ WRITING RULES BASED ON THIS INTELLIGENCE:
 - Use the frustrations (field 2) when writing any section about common mistakes, what to avoid, or why other approaches fail
 - Use the transformation (field 3) in the conclusion and CTA — what the reader can achieve, not just what the business offers
 - Pull specific words and phrases from these answers where they fit naturally — this is how the article sounds like it was written by someone who actually knows the customer, not an AI that read a brief
+` : ""}${ctx.contentPlanDirection ? `
+WRITER DIRECTION FROM PUBLISHER:
+The person publishing this article has added this specific direction:
+"${ctx.contentPlanDirection}"
+Follow this direction. If it specifies topics, examples, or angles to cover — include them. This takes priority over general guidelines.
 ` : ""}15. HUMAN AUTHENTICITY: No AI fingerprint patterns. Content must solve the reader's problem completely. Must be cohesive with the rest of the batch.
 16. ARTICLE TYPE STRUCTURE: Format and structure this as a ${typeLabel}. The title must signal specific territory ownership.
 
@@ -917,6 +924,8 @@ RULES (ALL MANDATORY — these map directly to the 16-point SEO checklist):
 ${ctx.problemsSolved ? `- The outline MUST include at least one section that directly addresses this customer problem: "${ctx.problemsSolved}". Label that section with a heading like 'Why [problem occurs]' or 'The real cost of [problem]' or 'How to solve [problem]'` : ""}
 ${ctx.customerSituationBefore ? `- Plan at least one section using this customer scenario as the opening context: "${ctx.customerSituationBefore}"` : ""}
 ${ctx.customerFrustrations ? `- Plan at least one section that addresses these specific frustrations: "${ctx.customerFrustrations}"` : ""}
+${ctx.contentPlanDirection ? `- Publisher direction for this specific article: "${ctx.contentPlanDirection}"
+  Build the outline around this direction.` : ""}
 
 Return a single JSON object:
 {
