@@ -317,6 +317,9 @@ export interface ArticleContext {
   shopUrl?: string;
   otherInternalLinks?: Array<{ label: string; url: string }>;
   problemsSolved?: string;
+  customerSituationBefore?: string;
+  customerFrustrations?: string;
+  customerTransformation?: string;
 }
 
 /**
@@ -413,6 +416,9 @@ export async function buildArticleContext(
       ? (biz.otherInternalLinks as Array<{ label: string; url: string }>)
       : undefined,
     problemsSolved: biz.problemsSolved ?? undefined,
+    customerSituationBefore: biz.customerSituationBefore ?? undefined,
+    customerFrustrations: biz.customerFrustrations ?? undefined,
+    customerTransformation: biz.customerTransformation ?? undefined,
   };
 }
 
@@ -517,14 +523,20 @@ ${ctx.allBatchSlugs.slice(0, 20).join(", ")}
 13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
 14. E-E-A-T SIGNALS: Weave in Experience, Expertise, Authoritativeness, and Trustworthiness. Include social proof signals: ${ctx.socialProof || "mention industry experience"}.
 ${ctx.problemsSolved ? `
-CUSTOMER PROBLEMS THIS BUSINESS SOLVES:
-${ctx.problemsSolved}
-
-P15-PROBLEM: Every article produced for this business MUST do the following:
-- Open the first body paragraph (not the intro) by naming or implying the customer problem stated above
-- At least one H2 section must directly address WHY the reader has this problem or what happens if it goes unsolved
-- The CTA section must connect the service back to the resolution of this problem
-- Do NOT write generic educational content divorced from this business's actual value. Every section should be useful to a reader who HAS this problem.
+CUSTOMER INTELLIGENCE — USE THIS TO WRITE LIKE A HUMAN WHO KNOWS THESE CUSTOMERS:
+What the customer's situation was BEFORE finding this business:
+"${ctx.customerSituationBefore ?? 'not provided'}"
+What they were frustrated with or had already tried:
+"${ctx.customerFrustrations ?? 'not provided'}"
+What changed or became possible after working with this business:
+"${ctx.customerTransformation ?? 'not provided'}"
+Summary (use for CTA and closing sections):
+"${ctx.problemsSolved}"
+WRITING RULES BASED ON THIS INTELLIGENCE:
+- Use the customer's actual situation (field 1) to open the first body section — describe the scenario in second person ("If you've ever found yourself...") or third person ("Most [industry] clients come to us after...")
+- Use the frustrations (field 2) when writing any section about common mistakes, what to avoid, or why other approaches fail
+- Use the transformation (field 3) in the conclusion and CTA — what the reader can achieve, not just what the business offers
+- Pull specific words and phrases from these answers where they fit naturally — this is how the article sounds like it was written by someone who actually knows the customer, not an AI that read a brief
 ` : ""}15. HUMAN AUTHENTICITY: No AI fingerprint patterns. Content must solve the reader's problem completely. Must be cohesive with the rest of the batch.
 16. ARTICLE TYPE STRUCTURE: Format and structure this as a ${typeLabel}. The title must signal specific territory ownership.
 
@@ -903,6 +915,8 @@ RULES (ALL MANDATORY — these map directly to the 16-point SEO checklist):
 - Plan for E-E-A-T signals (years experience, clients served, awards) in at least one section [P14]
 - Plan the outline so the focus keyword '${ctx.primaryKeyword}' can naturally appear in the opening paragraph, at least one H2 heading, at least one H3 heading (if the article uses H3s), and the conclusion section [P1]
 ${ctx.problemsSolved ? `- The outline MUST include at least one section that directly addresses this customer problem: "${ctx.problemsSolved}". Label that section with a heading like 'Why [problem occurs]' or 'The real cost of [problem]' or 'How to solve [problem]'` : ""}
+${ctx.customerSituationBefore ? `- Plan at least one section using this customer scenario as the opening context: "${ctx.customerSituationBefore}"` : ""}
+${ctx.customerFrustrations ? `- Plan at least one section that addresses these specific frustrations: "${ctx.customerFrustrations}"` : ""}
 
 Return a single JSON object:
 {

@@ -84,6 +84,12 @@ export const businesses = mysqlTable("businesses", {
   uniqueValueProposition: text("uniqueValueProposition"),
   /** Short paragraph about what customer problems the business solves — used in article generation. */
   problemsSolved: text("problems_solved"),
+  /** Raw interview answer 1: customer situation BEFORE finding this business. */
+  customerSituationBefore: text("customer_situation_before"),
+  /** Raw interview answer 2: customer frustrations and what they had already tried. */
+  customerFrustrations: text("customer_frustrations"),
+  /** Raw interview answer 3: what changed or became possible after working with this business. */
+  customerTransformation: text("customer_transformation"),
   /** Comma-separated topics to exclude from keyword research. */
   keywordExclusions: text("keywordExclusions"),
   /** Years the business has been operating — for E-E-A-T. */

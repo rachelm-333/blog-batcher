@@ -763,6 +763,28 @@ Write only the paragraph. No intro, no label, no explanation.`;
       if (!paragraph) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Generation failed. Please try again." });
       }
+
+      // Save the raw interview answers to the business record
+      const db = await getDb();
+      if (db) {
+        // Find the user's active business to save the answers against
+        const [biz] = await db
+          .select({ id: businesses.id })
+          .from(businesses)
+          .where(eq(businesses.userId, ctx.user.id))
+          .limit(1);
+        if (biz) {
+          await db
+            .update(businesses)
+            .set({
+              customerSituationBefore: input.answer1,
+              customerFrustrations: input.answer2,
+              customerTransformation: input.answer3,
+            })
+            .where(eq(businesses.id, biz.id));
+        }
+      }
+
       return { paragraph };
     }),
 });
