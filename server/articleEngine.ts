@@ -818,7 +818,10 @@ Return JSON: { "score": <0-100 integer>, "feedback": "<one sentence summary>" }`
       timeoutPromise,
     ]);
     const content = result.choices[0]?.message?.content;
-    const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+    // Strip markdown code fences if the model wrapped the JSON in ```json ... ```
+    const rawContent = typeof content === "string" ? content : JSON.stringify(content);
+    const strippedContent = rawContent.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+    const parsed = JSON.parse(strippedContent);
     return {
       score: Math.min(100, Math.max(0, parseInt(parsed.score) || 0)),
       feedback: parsed.feedback || "",
@@ -1485,7 +1488,7 @@ Return ONLY the expanded article body as clean HTML, wrapped in these exact deli
             { role: "system", content: expansionSystemPrompt },
             { role: "user", content: bodyHtml },
           ],
-          max_tokens: 65536,
+          max_tokens: 12000,
         },
         { userId, feature: "article_generation" }
       );
@@ -1519,7 +1522,7 @@ Return ONLY the expanded article body as clean HTML, wrapped in these exact deli
       {
         messages: [{ role: "user", content: scrubPrompt }],
         // No json_object mode — we use plain HTML delimiters to avoid JSON encoding issues
-        max_tokens: 65536,
+        max_tokens: 12000,
       },
       { userId, feature: "article_generation" }
     );
@@ -1572,7 +1575,7 @@ Return ONLY the expanded HTML wrapped in:
               { role: "system", content: recoverySystemPrompt },
               { role: "user", content: bodyHtml },
             ],
-            max_tokens: 65536,
+            max_tokens: 12000,
           },
           { userId, feature: "article_generation" }
         );
@@ -1622,7 +1625,7 @@ Return ONLY the full article HTML wrapped in:
               { role: "user", content: targetedScrubPrompt },
               { role: "user", content: bodyHtml },
             ],
-            max_tokens: 65536,
+            max_tokens: 12000,
           },
           { userId, feature: "article_generation" }
         );

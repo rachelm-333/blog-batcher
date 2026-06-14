@@ -845,7 +845,7 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
           { role: "system", content: systemPrompt },
           { role: "user", content: `EDITING INSTRUCTION: ${input.instruction}\n\nARTICLE:\n${article.bodyHtml}` },
         ],
-        max_tokens: 65536,
+        max_tokens: 12000,
       });
 
       const rawContent = result.choices[0]?.message?.content ?? "";
