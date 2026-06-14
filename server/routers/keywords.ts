@@ -874,7 +874,8 @@ export const keywordsRouter = router({
   getSavedSelections: protectedProcedure
     .input(z.object({ businessId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
       const db = await getDb();
       if (!db) return [];
 
@@ -887,20 +888,20 @@ export const keywordsRouter = router({
 
       if (saved.length === 0) return [];
 
-      // Load all currently assigned keywords for this business
+      // Load all currently assigned primary keywords for this business's active batch
       const assigned = await db
         .select({
           primaryKeyword: keywords.primaryKeyword,
           articleNodeId: keywords.articleNodeId,
         })
         .from(keywords)
-        .where(eq(keywords.businessId, input.businessId));
+        .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatch)));
 
       // Load article node labels so we can show which article each keyword is assigned to
       const nodes = await db
         .select({ id: articleNodes.id, level: articleNodes.level, sortOrder: articleNodes.sortOrder })
         .from(articleNodes)
-        .where(eq(articleNodes.businessId, input.businessId))
+        .where(and(eq(articleNodes.businessId, input.businessId), eq(articleNodes.batchNumber, activeBatch)))
         .orderBy(asc(articleNodes.sortOrder));
 
       // Build a map: normalised keyword → assigned node id

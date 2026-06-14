@@ -1055,3 +1055,6 @@
 - [ ] Prompt 5: Run pnpm test -- all tests pass
 - [ ] Prompt 5: Run pnpm test -- layer7.test.ts passes
 - [ ] Prompt 5: Verify problemsSolved field saves and appears in article context
+
+## Bug Fixes
+- [x] Fix Stage 3 Keywords assigned/unassigned counts — only primary keywords (one per article node) should count as assigned; secondary keywords must not inflate the assigned count
