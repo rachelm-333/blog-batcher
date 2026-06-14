@@ -14,7 +14,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
-import { Loader2, ArrowRight, Zap, BarChart2 } from "lucide-react";
+import { Loader2, ArrowRight, Zap, BarChart2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 /* ─── Level badge ────────────────────────────────────────── */
@@ -283,6 +283,18 @@ export default function ContentPlan() {
   const [planItems, setPlanItems] = useState<PlanItem[] | null>(null);
   const [isFlushing, setIsFlushing] = useState(false);
 
+  // PAA status — check which nodes have PAA questions but haven't approved one
+  const kwQuery = trpc.keywords.getAll.useQuery(
+    { businessId },
+    { enabled: !!businessId }
+  );
+  // A node needs PAA approval if: paaQuestions is a non-empty array AND paaApproved is false
+  const paaWarningNodes = (kwQuery.data ?? []).filter((k: { paaQuestions: unknown; paaApproved: boolean; primaryKeyword: string }) => {
+    const hasPaa = Array.isArray(k.paaQuestions) && (k.paaQuestions as unknown[]).length > 0;
+    return hasPaa && !k.paaApproved;
+  });
+  const hasPaaWarning = paaWarningNodes.length > 0;
+
   // Refs to each ArticleCard so we can call flushPending on them
   const cardRefs = useRef<Map<number, ArticleCardHandle>>(new Map());
 
@@ -404,6 +416,29 @@ export default function ContentPlan() {
               </button>
             </div>
           </div>
+
+          {/* PAA warning banner */}
+          {hasPaaWarning && !isLoading && (
+            <div style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 18px", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, marginBottom:20 }}>
+              <AlertTriangle style={{ width:16, height:16, color:"#d97706", flexShrink:0, marginTop:2 }} />
+              <div>
+                <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#92400e" }}>
+                  {paaWarningNodes.length} article{paaWarningNodes.length > 1 ? "s" : ""} still need a PAA question approved
+                </p>
+                <p style={{ margin:"4px 0 0", fontSize:12, color:"#a16207" }}>
+                  Go back to the Keywords page and select a "People Also Ask" question for:{" "}
+                  <strong>{paaWarningNodes.map((k: { primaryKeyword: string }) => k.primaryKeyword).join(", ")}</strong>.
+                  You can still generate without them — those articles will skip the PAA check.
+                </p>
+              </div>
+              <button
+                onClick={() => setLocation("/keywords")}
+                style={{ marginLeft:"auto", flexShrink:0, fontSize:12, fontWeight:600, color:"#d97706", background:"none", border:"1px solid #fde68a", borderRadius:6, padding:"5px 12px", cursor:"pointer", whiteSpace:"nowrap" }}
+              >
+                Go back
+              </button>
+            </div>
+          )}
 
           {/* Loading state */}
           {isLoading && (

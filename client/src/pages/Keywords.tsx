@@ -855,10 +855,27 @@ export default function Keywords() {
         ) : (
           <button
             className="btn-primary"
-            onClick={() => setLocation("/content-plan")}
-            style={{ display:"inline-flex", alignItems:"center", gap:6 }}
+            disabled={approvePAA.isPending || skipPAA.isPending}
+            onClick={async () => {
+              // Wait for any in-flight approvePAA / skipPAA mutations to settle
+              // before navigating so the DB reflects the latest selection.
+              if (approvePAA.isPending || skipPAA.isPending) {
+                await new Promise<void>(resolve => {
+                  const check = setInterval(() => {
+                    if (!approvePAA.isPending && !skipPAA.isPending) {
+                      clearInterval(check);
+                      resolve();
+                    }
+                  }, 50);
+                });
+              }
+              setLocation("/content-plan");
+            }}
+            style={{ display:"inline-flex", alignItems:"center", gap:6, opacity: (approvePAA.isPending || skipPAA.isPending) ? 0.7 : 1 }}
           >
-            Save &amp; continue to content plan <ArrowRight style={{ width:14, height:14 }} />
+            {(approvePAA.isPending || skipPAA.isPending)
+              ? <><Loader2 style={{ width:13, height:13 }} className="animate-spin" /> Saving…</>
+              : <>Save &amp; continue to content plan <ArrowRight style={{ width:14, height:14 }} /></>}
           </button>
         )}
       </div>

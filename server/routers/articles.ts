@@ -288,12 +288,21 @@ export const articlesRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "No article nodes found. Complete Stage 2 first." });
       }
 
-      // Check all keywords for this batch are approved
+      // Check all keywords for this batch are approved.
+      // PAA approval is only required when PAA questions actually exist for a node.
+      // If DataForSEO returned no PAA results (paaQuestions is null or empty array),
+      // the node is treated as PAA-approved automatically.
       const kwRows = await db
-        .select({ approved: keywords.keywordApproved, paaApproved: keywords.paaApproved })
+        .select({ approved: keywords.keywordApproved, paaApproved: keywords.paaApproved, paaQuestions: keywords.paaQuestions })
         .from(keywords)
         .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatchSG)));
-      const allApproved = kwRows.every(k => k.approved && k.paaApproved);
+      const allApproved = kwRows.every(k => {
+        if (!k.approved) return false;
+        // If no PAA questions exist for this node, skip the PAA approval check
+        const hasPaaQuestions = Array.isArray(k.paaQuestions) && (k.paaQuestions as unknown[]).length > 0;
+        if (!hasPaaQuestions) return true;
+        return k.paaApproved;
+      });
       if (!allApproved) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "All keywords and PAA questions must be approved before generating articles." });
       }
