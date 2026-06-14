@@ -1884,7 +1884,7 @@ export default function ArticleReview() {
                 const storedDetails = extractPass1Points((selectedItem as any).pass1Details);
                 const storedMetrics = extractPass1Metrics((selectedItem as any).pass1Details);
                 const failingKeys = storedDetails
-                  ? (Object.keys(storedDetails) as string[]).filter(k => !storedDetails[k])
+                  ? (Object.keys(storedDetails) as string[]).filter(k => !storedDetails[k] && k !== "p13_schema")
                   : [];
 
                 const cp1Color = liveScore >= 15
@@ -1956,6 +1956,14 @@ export default function ArticleReview() {
                           </p>
                         )}
                       </div>
+                    </div>
+
+                    {/* Schema markup — always shown as a green informational note (never as a failure) */}
+                    <div className="flex items-center gap-1.5 px-0.5 mt-0.5">
+                      <span className="shrink-0 text-[10px] text-emerald-500">✓</span>
+                      <span className="text-[10px] text-emerald-600 leading-tight">
+                        Schema markup — added automatically on publish
+                      </span>
                     </div>
 
                     {/* Failing checklist breakdown — shown whenever score < 16 (even Authority Ready 15/16 shows the 1 missed point) */}
