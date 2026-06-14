@@ -49,7 +49,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
 import { HelpLink } from "@/components/HelpLink";
@@ -811,26 +811,9 @@ export default function ArticleReview() {
     });
   }, [fullArticle, selectedItem, seoEdits.metaTitle, seoEdits.metaDescription, seoEdits.urlSlug, seoEdits.focusKeyword]);
 
+  // livePassCount is used only by fieldFailing() for SEO field warning indicators (amber borders).
+  // It is NOT used for the score display — both sidebar and detail panel use selectedItem.internalScore.
   const livePassCount = liveChecks ? Object.values(liveChecks).filter(Boolean).length : null;
-  const liveTotalChecks = 16;
-
-  // Silently write the live score back to the DB so the sidebar stays in sync.
-  // Fires once per article open (tracked by ref). No visible flash — the list
-  // invalidates in the background and the sidebar card updates quietly.
-  const syncScore = trpc.articles.syncScore.useMutation({
-    onSuccess: () => {
-      utils.articles.getAll.invalidate({ businessId: business?.id ?? 0 });
-    },
-  });
-  const lastSyncedId = useRef<number | null>(null);
-  useEffect(() => {
-    if (livePassCount == null) return;
-    const fa = fullArticle as any;
-    if (!fa?.id) return;
-    if (fa.id === lastSyncedId.current) return; // already synced this article
-    lastSyncedId.current = fa.id;
-    syncScore.mutate({ articleId: fa.id });
-  }, [livePassCount, (fullArticle as any)?.id]);
 
   // Helper: does a field have a failing check AND the overall score is below the publish threshold?
   // Only triggers amber/warning styling when the article genuinely needs attention (score < 14).
@@ -934,7 +917,7 @@ export default function ArticleReview() {
   return (
     <DashboardLayout>
     <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", background:"#faf9f5" }}>
-      <StageStepper currentStage={currentStage} />
+      <StageStepper currentStage={currentStage} activeStage={5} />
       <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       {/* ── Left sidebar: article list ─────────────────────────────────── */}
       <div className="w-72 min-w-[280px] border-r border-border flex flex-col bg-card overflow-y-auto">
@@ -1838,16 +1821,15 @@ export default function ArticleReview() {
 
               {/* Dual checkpoint badges */}
               {(() => {
-                // Use live-computed score (from current article content) as the
-                // single source of truth — avoids stale DB badge contradictions.
-                const liveScore = livePassCount ?? (selectedItem.internalScore != null ? Math.round((selectedItem.internalScore / 100) * 16) : null);
-                if (liveScore == null) return null;
+                // Always use the DB-stored internalScore (same source as the sidebar card).
+                // internalScore is 0-100; convert to a /16 display value.
+                const dbScore = selectedItem.internalScore != null ? Math.round((selectedItem.internalScore / 100) * 16) : null;
+                if (dbScore == null) return null;
+                const liveScore = dbScore;
 
-                // Failing checks: prefer live computation, fall back to stored pass1Details
+                // Failing checks: use stored pass1Details from the DB
                 const storedDetails = (selectedItem as any).pass1Details as Record<string, boolean> | null;
-                const failingKeys = liveChecks
-                  ? (Object.keys(liveChecks) as (keyof Pass1Checks)[]).filter(k => !liveChecks[k])
-                  : storedDetails
+                const failingKeys = storedDetails
                   ? (Object.keys(storedDetails) as string[]).filter(k => !storedDetails[k])
                   : [];
 
