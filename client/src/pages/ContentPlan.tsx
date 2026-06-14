@@ -2,8 +2,12 @@
  * Stage 3.5 — Content Plan
  * Shows Claude-generated article plans (title, angle, key section) for each
  * approved article node. Users can edit titles and add direction before generation.
+ *
+ * BUG 1 FIX: When "Start Generating" is clicked, we flush all pending debounced
+ * saves synchronously (cancel timers, fire saves immediately), wait for all
+ * mutations to settle, then navigate to /generate.
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -64,46 +68,69 @@ type PlanItem = {
   keySection: string;
 };
 
+/* ─── Card ref handle (exposes flush) ────────────────────── */
+export type ArticleCardHandle = {
+  /** Cancel pending debounce and return the current unsaved values (or null if nothing pending) */
+  flushPending: () => { nodeId: number; proposedTitle: string; direction: string } | null;
+};
+
 /* ─── Article card ───────────────────────────────────────── */
-function ArticleCard({
-  item,
-  onSave,
-}: {
+const ArticleCard = forwardRef<ArticleCardHandle, {
   item: PlanItem;
   onSave: (nodeId: number, proposedTitle: string, direction: string) => void;
-}) {
+}>(function ArticleCard({ item, onSave }, ref) {
   const [title, setTitle] = useState(item.proposedTitle);
   const [direction, setDirection] = useState(item.contentPlanDirection ?? "");
   const titleDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track whether there's a pending (unsaved) change
+  const pendingTitle = useRef(item.proposedTitle);
+  const pendingDir = useRef(item.contentPlanDirection ?? "");
+  const hasPending = useRef(false);
 
-  // Debounced auto-save on change
+  useImperativeHandle(ref, () => ({
+    flushPending: () => {
+      if (!hasPending.current) return null;
+      if (titleDebounce.current) clearTimeout(titleDebounce.current);
+      if (dirDebounce.current) clearTimeout(dirDebounce.current);
+      hasPending.current = false;
+      return { nodeId: item.nodeId, proposedTitle: pendingTitle.current, direction: pendingDir.current };
+    },
+  }));
+
   const handleTitleChange = useCallback((val: string) => {
     setTitle(val);
+    pendingTitle.current = val;
+    hasPending.current = true;
     if (titleDebounce.current) clearTimeout(titleDebounce.current);
     titleDebounce.current = setTimeout(() => {
-      onSave(item.nodeId, val, direction);
+      hasPending.current = false;
+      onSave(item.nodeId, val, pendingDir.current);
     }, 800);
-  }, [direction, item.nodeId, onSave]);
+  }, [item.nodeId, onSave]);
 
   const handleDirectionChange = useCallback((val: string) => {
     setDirection(val);
+    pendingDir.current = val;
+    hasPending.current = true;
     if (dirDebounce.current) clearTimeout(dirDebounce.current);
     dirDebounce.current = setTimeout(() => {
-      onSave(item.nodeId, title, val);
+      hasPending.current = false;
+      onSave(item.nodeId, pendingTitle.current, val);
     }, 800);
-  }, [title, item.nodeId, onSave]);
+  }, [item.nodeId, onSave]);
 
-  // Also save on blur
   const handleTitleBlur = useCallback(() => {
     if (titleDebounce.current) clearTimeout(titleDebounce.current);
-    onSave(item.nodeId, title, direction);
-  }, [item.nodeId, title, direction, onSave]);
+    hasPending.current = false;
+    onSave(item.nodeId, pendingTitle.current, pendingDir.current);
+  }, [item.nodeId, onSave]);
 
   const handleDirectionBlur = useCallback(() => {
     if (dirDebounce.current) clearTimeout(dirDebounce.current);
-    onSave(item.nodeId, title, direction);
-  }, [item.nodeId, title, direction, onSave]);
+    hasPending.current = false;
+    onSave(item.nodeId, pendingTitle.current, pendingDir.current);
+  }, [item.nodeId, onSave]);
 
   return (
     <div style={{
@@ -219,7 +246,7 @@ function ArticleCard({
       </div>
     </div>
   );
-}
+});
 
 /* ─── Skeleton card ──────────────────────────────────────── */
 function SkeletonCard() {
@@ -254,6 +281,10 @@ export default function ContentPlan() {
   const currentStage = (business?.currentStage as number | undefined) ?? 1;
 
   const [planItems, setPlanItems] = useState<PlanItem[] | null>(null);
+  const [isFlushing, setIsFlushing] = useState(false);
+
+  // Refs to each ArticleCard so we can call flushPending on them
+  const cardRefs = useRef<Map<number, ArticleCardHandle>>(new Map());
 
   const generatePlanMutation = trpc.articles.generateContentPlan.useMutation({
     onSuccess: (data) => {
@@ -281,9 +312,39 @@ export default function ContentPlan() {
     saveItemMutation.mutate({ nodeId, proposedTitle, direction });
   }, [saveItemMutation]);
 
-  const handleStartGenerating = () => {
-    setLocation("/generate");
-  };
+  /**
+   * BUG 1 FIX: Flush all pending debounced saves before navigating.
+   * 1. Collect all unsaved changes from card refs
+   * 2. Fire saveContentPlanItem for each pending card
+   * 3. Wait for all saves to complete (Promise.all)
+   * 4. Navigate to /generate
+   */
+  const handleStartGenerating = useCallback(async () => {
+    setIsFlushing(true);
+    try {
+      const flushPromises: Promise<unknown>[] = [];
+      for (const [, cardRef] of Array.from(cardRefs.current)) {
+        const pending = cardRef.flushPending();
+        if (pending) {
+          flushPromises.push(
+            new Promise<void>((resolve, reject) => {
+              saveItemMutation.mutate(
+                { nodeId: pending.nodeId, proposedTitle: pending.proposedTitle, direction: pending.direction },
+                { onSuccess: () => resolve(), onError: (e) => reject(e) }
+              );
+            })
+          );
+        }
+      }
+      if (flushPromises.length > 0) {
+        await Promise.all(flushPromises);
+      }
+      setLocation("/generate");
+    } catch {
+      toast.error("Failed to save notes — please try again.");
+      setIsFlushing(false);
+    }
+  }, [saveItemMutation, setLocation]);
 
   if (userLoading || bizLoading) {
     return (
@@ -298,6 +359,7 @@ export default function ContentPlan() {
   if (!user || !business) return null;
 
   const isLoading = generatePlanMutation.isPending || planItems === null;
+  const isStartDisabled = isLoading || isFlushing;
 
   return (
     <DashboardLayout>
@@ -330,10 +392,12 @@ export default function ContentPlan() {
               <button
                 className="btn-primary"
                 onClick={handleStartGenerating}
-                disabled={isLoading}
+                disabled={isStartDisabled}
                 style={{ display:"flex", alignItems:"center", gap:8 }}
               >
-                {isLoading
+                {isFlushing
+                  ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Saving your notes…</>
+                  : isLoading
                   ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Planning…</>
                   : <><Zap style={{ width:14, height:14 }} /> Start generating <ArrowRight style={{ width:14, height:14 }} /></>
                 }
@@ -360,6 +424,10 @@ export default function ContentPlan() {
               {planItems.map((item) => (
                 <ArticleCard
                   key={item.nodeId}
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(item.nodeId, el);
+                    else cardRefs.current.delete(item.nodeId);
+                  }}
                   item={item}
                   onSave={handleSave}
                 />
@@ -373,18 +441,20 @@ export default function ContentPlan() {
               <button
                 className="btn-ghost"
                 onClick={() => setLocation("/keywords")}
-                style={{ fontSize:13, color:"#6b7280" }}
+                style={{ fontSize:13 }}
               >
                 ← Back to keywords
               </button>
               <button
                 className="btn-primary"
                 onClick={handleStartGenerating}
+                disabled={isStartDisabled}
                 style={{ display:"flex", alignItems:"center", gap:8 }}
               >
-                <Zap style={{ width:14, height:14 }} />
-                Start generating {planItems.length} articles
-                <ArrowRight style={{ width:14, height:14 }} />
+                {isFlushing
+                  ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Saving your notes…</>
+                  : <><Zap style={{ width:14, height:14 }} /> Start generating {planItems.length} articles <ArrowRight style={{ width:14, height:14 }} /></>
+                }
               </button>
             </div>
           )}

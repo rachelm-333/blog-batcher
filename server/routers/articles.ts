@@ -347,6 +347,12 @@ export const articlesRouter = router({
           }
         }
         console.log(`[Articles] Batch generation complete for business ${input.businessId}`);
+        // Advance business to stage 5 (Review & edit) now that all articles are written
+        try {
+          await advanceBusinessStage(input.businessId, 5);
+        } catch (err) {
+          console.error(`[Articles] Failed to advance stage for business ${input.businessId}:`, err);
+        }
         // Mark trial as used after the trial article is generated
         if (isTrialGen) {
           try {
@@ -372,13 +378,13 @@ export const articlesRouter = router({
    * Poll generation progress.
    * Returns per-article status rows so the frontend can show a live progress bar.
    */
-  getGenerationStatus: protectedProcedure
+    getGenerationStatus: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .query(async ({ ctx, input }) => {
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-
       const rows = await db
         .select({
           articleId: articles.id,
@@ -397,7 +403,7 @@ export const articlesRouter = router({
         })
         .from(articles)
         .innerJoin(articleNodes, eq(articleNodes.id, articles.articleNodeId))
-        .where(eq(articles.businessId, input.businessId))
+        .where(and(eq(articles.businessId, input.businessId), eq(articles.batchNumber, activeBatch)))
         .orderBy(articleNodes.sortOrder);
 
       const total = rows.length;
@@ -425,7 +431,8 @@ export const articlesRouter = router({
   getAll: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .query(async ({ ctx, input }) => {
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -460,7 +467,7 @@ export const articlesRouter = router({
         })
         .from(articles)
         .innerJoin(articleNodes, eq(articleNodes.id, articles.articleNodeId))
-        .where(eq(articles.businessId, input.businessId))
+        .where(and(eq(articles.businessId, input.businessId), eq(articles.batchNumber, activeBatch)))
         .orderBy(articleNodes.sortOrder);
 
       return rows;

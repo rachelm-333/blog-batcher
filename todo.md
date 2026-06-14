@@ -1071,3 +1071,10 @@
 - [x] Add WRITER DIRECTION block to buildGenerationPrompt() in articleEngine.ts
 - [x] Add publisher direction instruction to buildOutlinePrompt() in articleEngine.ts
 - [x] Run pnpm test — 377 tests must pass, TypeScript 0 errors
+
+## Bug Fixes — Article Generation Flow (Jun 14 2026)
+- [ ] BUG 1: ContentPlan.tsx — flush pending debounce saves before navigating to /generate
+- [ ] BUG 2: Filter all article queries by activeBatch (ArticleGeneration.tsx, ArticleReview.tsx, server-side getAll/getGenerationStatus)
+- [ ] BUG 3: Confirm batch filter resolves wrong statuses; ensure new articles insert with status='generated'
+- [ ] BUG 4: Advance businesses.currentStage to 4 after generation completes; sidebar/breadcrumb must read fresh DB value
+- [ ] BUG 5: Fix Review button in ArticleGeneration.tsx to navigate to correct route
