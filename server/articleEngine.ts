@@ -1370,66 +1370,59 @@ Return ONLY the raw JSON-LD string (no markdown, no code fences, no explanation)
   }
 
   // --- Pass A1: Word count condensation (if over maximum) ---
-  // If the model produced more words than the maximum, ask it to condense.
-  const overMaxWordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-  if (overMaxWordCount > ctx.wordCountMax) {
-    const wordsOver = overMaxWordCount - ctx.wordCountMax;
-    console.log(`[ArticleEngine] Word count over max for node ${nodeId}: ${overMaxWordCount} words (max: ${ctx.wordCountMax}) — running condensation pass`);
-    try {
-      const condensationSystemPrompt = `You are an expert SEO content editor. You will receive an article that is too long and must be condensed.
-
-Current word count: ${overMaxWordCount} words
-Required maximum: ${ctx.wordCountMax} words (you are ${wordsOver} words OVER)
-Required minimum: ${ctx.wordCountMin} words
-
-Condense the article to fit within ${ctx.wordCountMax} words. Rules:
-- Remove the least valuable content first (redundant explanations, repetitive examples)
-- Do NOT remove the introduction, conclusion, or CTA section
-- Do NOT remove any headings (H2/H3)
-- Preserve all internal links, keyword mentions, and schema markup
-- Use Australian English spelling
+  // Retry loop: up to MAX_CONDENSATION_ATTEMPTS passes until the article is under the max.
+  const MAX_CONDENSATION_ATTEMPTS = 3;
+  wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  if (wordCount > ctx.wordCountMax) {
+    for (let condensationAttempt = 1; condensationAttempt <= MAX_CONDENSATION_ATTEMPTS; condensationAttempt++) {
+      if (wordCount <= ctx.wordCountMax) break;
+      const currentWordCount = wordCount;
+      console.log(`[ArticleEngine] Condensation attempt ${condensationAttempt}/${MAX_CONDENSATION_ATTEMPTS} for node ${nodeId}: ${currentWordCount} words (max: ${ctx.wordCountMax})`);
+      try {
+        const condensationPrompt = `This article is ${currentWordCount} words. The maximum for a ${ctx.level} article is ${ctx.wordCountMax} words. Condense it to under ${ctx.wordCountMax} words. Remove redundant sentences, shorten over-explained sections, and cut any padding. Do not remove headings, key points, or examples — only cut filler.
 
 Return ONLY the condensed article body as clean HTML, wrapped in these exact delimiters:
 <CONDENSED_HTML>
 ...full condensed HTML here...
 </CONDENSED_HTML>`;
 
-      const condensationResult = await invokeLLMWithCost(
-        {
-          messages: [
-            { role: "system", content: condensationSystemPrompt },
-            { role: "user", content: bodyHtml },
-          ],
-          max_tokens: 65536,
-        },
-        { userId, feature: "article_generation" }
-      );
-      const condensationContent = condensationResult.choices[0]?.message?.content ?? "";
-      const rawCondensation = typeof condensationContent === "string" ? condensationContent : JSON.stringify(condensationContent);
-      const condensationMatch = rawCondensation.match(/<CONDENSED_HTML>([\s\S]*?)<\/CONDENSED_HTML>/i);
-      const condensedHtml = condensationMatch ? condensationMatch[1].trim() : rawCondensation.trim();
-      if (condensedHtml && condensedHtml.length > 100) {
-        const condensedWordCount = condensedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-        // Accept if: shorter than original AND above minimum (even if still over max — progress is progress)
-        if (condensedWordCount < overMaxWordCount && condensedWordCount >= ctx.wordCountMin) {
-          bodyHtml = condensedHtml;
-          wordCount = condensedWordCount;
-          if (condensedWordCount <= ctx.wordCountMax) {
-            console.log(`[ArticleEngine] Condensation pass successful for node ${nodeId}: ${overMaxWordCount} → ${condensedWordCount} words`);
+        const condensationResult = await invokeLLMWithCost(
+          {
+            messages: [
+              { role: "system", content: "You are an expert SEO content editor. Condense the article as instructed. Preserve all headings, key points, examples, internal links, keyword mentions, and schema markup. Use Australian English spelling." },
+              { role: "user", content: condensationPrompt + "\n\n" + bodyHtml },
+            ],
+            max_tokens: 12000,
+          },
+          { userId, feature: "article_generation" }
+        );
+        const condensationContent = condensationResult.choices[0]?.message?.content ?? "";
+        const rawCondensation = typeof condensationContent === "string" ? condensationContent : JSON.stringify(condensationContent);
+        const condensationMatch = rawCondensation.match(/<CONDENSED_HTML>([\s\S]*?)<\/CONDENSED_HTML>/i);
+        const condensedHtml = condensationMatch ? condensationMatch[1].trim() : rawCondensation.trim();
+        if (condensedHtml && condensedHtml.length > 100) {
+          const condensedWordCount = condensedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+          if (condensedWordCount < currentWordCount && condensedWordCount >= ctx.wordCountMin) {
+            bodyHtml = condensedHtml;
+            wordCount = condensedWordCount;
+            if (condensedWordCount <= ctx.wordCountMax) {
+              console.log(`[ArticleEngine] Condensation attempt ${condensationAttempt} successful for node ${nodeId}: ${currentWordCount} → ${condensedWordCount} words`);
+              break;
+            } else {
+              console.log(`[ArticleEngine] Condensation attempt ${condensationAttempt} partial for node ${nodeId}: ${currentWordCount} → ${condensedWordCount} words (still over max)`);
+            }
           } else {
-            console.log(`[ArticleEngine] Condensation pass partial for node ${nodeId}: ${overMaxWordCount} → ${condensedWordCount} words (still over max, but shorter)`);
+            console.warn(`[ArticleEngine] Condensation attempt ${condensationAttempt} unusable for node ${nodeId}: ${condensedWordCount} words (original: ${currentWordCount}) — keeping current`);
           }
-        } else {
-          console.warn(`[ArticleEngine] Condensation pass result unusable for node ${nodeId}: ${condensedWordCount} words (original: ${overMaxWordCount}) — using original`);
-          wordCount = overMaxWordCount;
         }
+      } catch (err) {
+        console.warn(`[ArticleEngine] Condensation pass failed for node ${nodeId}:`, err);
+        break;
       }
-    } catch (err) {
-      console.warn(`[ArticleEngine] Condensation pass failed for node ${nodeId}:`, err);
-      wordCount = overMaxWordCount;
     }
-  } else {
-    wordCount = overMaxWordCount;
+    if (wordCount > ctx.wordCountMax) {
+      console.warn(`[ArticleEngine] WARNING: node ${nodeId} still ${wordCount} words after ${MAX_CONDENSATION_ATTEMPTS} condensation attempts (max: ${ctx.wordCountMax})`);
+    }
   }
 
   // --- Pass A2: Word count expansion loop (guaranteed minimum) ---

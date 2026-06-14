@@ -1013,13 +1013,11 @@ export default function ArticleReview() {
                   <div className="mt-1.5 flex flex-wrap gap-1 items-center">
                     <StatusBadgeChip badge={item.statusBadge as StatusBadge} status={item.status as ArticleStatus} />
                   </div>
-                  {/* Checkpoint 1 mini-badge — live score for selected article, DB score for others */}
-                  {(item.internalScore != null || (isSelected && livePassCount != null)) && (
+                  {/* Checkpoint 1 mini-badge — always show stored DB score for all articles */}
+                  {item.internalScore != null && (
                     <div className="mt-1 flex gap-1">
                       {(() => {
-                        const displayScore = isSelected && livePassCount != null
-                          ? livePassCount
-                          : item.internalScore != null ? Math.round((item.internalScore / 100) * 16) : null;
+                        const displayScore = item.internalScore != null ? Math.round((item.internalScore / 100) * 16) : null;
                         if (displayScore == null) return null;
                         return (
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
