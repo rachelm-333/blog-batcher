@@ -226,6 +226,7 @@ export const articlesRouter = router({
   startGeneration: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      try {
       const bizSG = await assertBusinessOwnership(ctx.user.id, input.businessId);
       const activeBatchSG = bizSG.activeBatch ?? 1;
       const db = await getDb();
@@ -382,6 +383,11 @@ export const articlesRouter = router({
       // Return a deterministic jobId so the client can correlate polls
       const jobId = `gen_${input.businessId}_${Date.now()}`;
       return { started: true, totalArticles: orderedNodes.length, jobId };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error('[startGeneration] Unexpected error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err instanceof Error ? err.message : 'Generation failed to start — please try again' });
+      }
     }),
 
   /**
@@ -879,6 +885,7 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
   approve: protectedProcedure
     .input(z.object({ articleId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -908,6 +915,11 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
       await advanceBusinessStage(article.businessId, 5);
 
       return { approved: true, alreadyApproved: false };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error('[approve] Unexpected error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err instanceof Error ? err.message : 'Approve failed — please try again' });
+      }
     }),
 
   /**
@@ -918,6 +930,7 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
     approveAll: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
@@ -942,6 +955,11 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
       // Advance business to stage 5 (Review & edit)
       await advanceBusinessStage(input.businessId, 5);
       return { approvedCount: ids.length };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error('[approveAll] Unexpected error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err instanceof Error ? err.message : 'Approve all failed — please try again' });
+      }
     }),
 
   /**
@@ -1516,6 +1534,7 @@ ${row.bodyHtml ?? ""}
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -1702,6 +1721,18 @@ ${row.bodyHtml ?? ""}
           .set({ status: "failed", errorMessage: result.error ?? "Publish failed" })
           .where(eq(articles.id, input.articleId));
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Publish failed" });
+      }
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error('[publishSingle] Unexpected error:', err);
+        // Try to mark the article as failed so the user sees it in the UI
+        try {
+          const dbFallback = await getDb();
+          if (dbFallback) {
+            await dbFallback.update(articles).set({ status: "failed", errorMessage: err instanceof Error ? err.message : "Publish failed" }).where(eq(articles.id, input.articleId));
+          }
+        } catch { /* ignore fallback error */ }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err instanceof Error ? err.message : 'Publish failed — please try again' });
       }
     }),
 
