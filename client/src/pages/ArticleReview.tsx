@@ -31,12 +31,14 @@ import {
   ArrowRight,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   ClipboardCopy,
   Copy,
   Code2,
   Download,
   ExternalLink,
   FileText,
+  Filter,
   Globe,
   ImageIcon,
   Loader2,
@@ -897,6 +899,27 @@ export default function ArticleReview() {
   const totalCount = articleList.length;
   const allApproved = approvedCount === totalCount && totalCount > 0;
 
+  // Article list filter
+  type ListFilter = "all" | "low_pass2" | "needs_review" | "approved";
+  const [listFilter, setListFilter] = useState<ListFilter>("all");
+  const filteredArticleList = useMemo(() => {
+    switch (listFilter) {
+      case "low_pass2":
+        return articleList.filter(a => a.pass2Score != null && a.pass2Score < 75);
+      case "needs_review":
+        return articleList.filter(a => a.statusBadge === "needs_review" || a.status === "failed");
+      case "approved":
+        return articleList.filter(a => a.status === "approved" || a.status === "scheduled" || a.status === "published");
+      default:
+        return articleList;
+    }
+  }, [articleList, listFilter]);
+
+  const lowPass2Count = useMemo(
+    () => articleList.filter(a => a.pass2Score != null && a.pass2Score < 75).length,
+    [articleList]
+  );
+
   // Stage guard
   useEffect(() => {
     if (!authLoading && !bizLoading) {
@@ -1024,6 +1047,62 @@ export default function ArticleReview() {
           </div>
         )}
 
+        {/* Filter dropdown */}
+        {totalCount > 0 && (
+          <div className="px-3 py-2 border-b border-border">
+            <div className="relative">
+              <button
+                className="w-full flex items-center justify-between gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-border bg-background hover:bg-muted/50 transition-colors"
+                onClick={() => setListFilter(prev => prev === "all" ? "low_pass2" : "all")}
+                title="Cycle through filters"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Filter className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-foreground font-medium">
+                    {listFilter === "all" && "All articles"}
+                    {listFilter === "low_pass2" && (
+                      <span className="flex items-center gap-1">
+                        Low quality score
+                        {lowPass2Count > 0 && (
+                          <span className="bg-amber-500/20 text-amber-600 text-[10px] px-1 rounded font-semibold">{lowPass2Count}</span>
+                        )}
+                      </span>
+                    )}
+                    {listFilter === "needs_review" && "Needs review"}
+                    {listFilter === "approved" && "Approved"}
+                  </span>
+                </span>
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              </button>
+              {/* Filter options — shown as a small inline segmented row */}
+              <div className="mt-1.5 flex gap-1 flex-wrap">
+                {(["all", "low_pass2", "needs_review", "approved"] as ListFilter[]).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setListFilter(f)}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                      listFilter === f
+                        ? f === "low_pass2"
+                          ? "bg-amber-500/20 border-amber-500/40 text-amber-600 font-semibold"
+                          : "bg-primary/10 border-primary/40 text-primary font-semibold"
+                        : "bg-transparent border-border text-muted-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {f === "all" && "All"}
+                    {f === "low_pass2" && (
+                      <span>
+                        Quality &lt; 75{lowPass2Count > 0 && ` (${lowPass2Count})`}
+                      </span>
+                    )}
+                    {f === "needs_review" && "Needs review"}
+                    {f === "approved" && "Approved"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Article list */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           {articlesLoading ? (
@@ -1041,8 +1120,19 @@ export default function ArticleReview() {
                 Go to Article Generation
               </button>
             </div>
+          ) : filteredArticleList.length === 0 ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              No articles match this filter.
+              <br />
+              <button
+                className="mt-2 text-primary underline text-xs"
+                onClick={() => setListFilter("all")}
+              >
+                Show all articles
+              </button>
+            </div>
           ) : (
-            articleList.map((item) => {
+            filteredArticleList.map((item) => {
               const isSelected = item.articleNodeId === selectedNodeId;
               return (
                 <button
