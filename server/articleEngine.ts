@@ -940,6 +940,19 @@ URL Slug: /${ctx.urlSlug}
 Total Word Count Target: ${ctx.wordCountMin}–${ctx.wordCountMax} words
 Level: ${ctx.level}
 
+TITLE RULES — these are mandatory:
+- Never write a title that starts with 'What Is' or 'What Are'
+- Never write a title that is purely definitional (e.g. 'What Is Branding', 'What Is SEO', 'Understanding X')
+- Every title must have a specific angle, audience, or outcome:
+  WEAK: 'What Is Brand Strategy?'
+  STRONG: 'Brand Strategy for Small Businesses: Where to Start'
+  WEAK: 'What Are Psychosocial Hazards?'
+  STRONG: 'Psychosocial Hazards: Your Legal Obligations as an Australian Employer'
+- Titles must create curiosity or signal a specific benefit
+- Include the focus keyword naturally — do not just prepend it
+- For Australian businesses, include 'Australia' or the location in the title where it fits naturally
+- The title must make someone stop scrolling and want to read
+
 RULES (ALL MANDATORY — these map directly to the 16-point SEO checklist):
 - H1 title MUST contain the exact primary keyword verbatim [P2]
 - Meta title MUST contain the primary keyword and be ≤60 characters [P7]
