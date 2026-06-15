@@ -2010,4 +2010,45 @@ ${row.bodyHtml ?? ""}
       }
       return { saved: true };
     }),
+
+  // ---------------------------------------------------------------------------
+  // articles.keepAndReview
+  // Resets a failed article back to 'generated' so it can be reviewed and
+  // approved normally without retrying the publish step.
+  // ---------------------------------------------------------------------------
+  keepAndReview: protectedProcedure
+    .input(z.object({ articleId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        const [row] = await db
+          .select({ id: articles.id, status: articles.status, businessId: articles.businessId })
+          .from(articles)
+          .where(eq(articles.id, input.articleId))
+          .limit(1);
+
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+        await assertBusinessOwnership(ctx.user.id, row.businessId);
+
+        if (row.status !== "failed") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only failed articles can be kept for review" });
+        }
+
+        await db
+          .update(articles)
+          .set({ status: "generated", errorMessage: null })
+          .where(eq(articles.id, input.articleId));
+
+        return { kept: true };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keepAndReview] Error:", err);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: err instanceof Error ? err.message : "Failed to update article status",
+        });
+      }
+    }),
 });

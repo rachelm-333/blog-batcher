@@ -812,6 +812,15 @@ export default function ArticleReview() {
     onError: (err) => toast.error(err.message),
   });
 
+  const keepAndReview = trpc.articles.keepAndReview.useMutation({
+    onSuccess: () => {
+      toast.success("Article reset — ready to review and approve.");
+      refetchArticles();
+      refetchFull();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   // Article body editing state
   const [bodyEditMode, setBodyEditMode] = useState(false);
   const [bodyEditHtml, setBodyEditHtml] = useState("");
@@ -1221,21 +1230,36 @@ export default function ArticleReview() {
                           {item.errorMessage}
                         </p>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        type="button"
-                        className="h-6 text-[10px] px-2 border-destructive/50 text-destructive hover:bg-destructive/10"
-                        disabled={retryPublish.isPending && retryPublish.variables?.articleId === item.id}
-                        onClick={() => item.id && retryPublish.mutate({ articleId: item.id })}
-                      >
-                        {retryPublish.isPending && retryPublish.variables?.articleId === item.id ? (
-                          <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />
-                        ) : (
-                          <RefreshCw className="h-2.5 w-2.5 mr-1" />
-                        )}
-                        Retry publish
-                      </Button>
+                      <div className="flex gap-1.5 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          type="button"
+                          className="h-6 text-[10px] px-2 border-destructive/50 text-destructive hover:bg-destructive/10"
+                          disabled={retryPublish.isPending && retryPublish.variables?.articleId === item.id}
+                          onClick={() => item.id && retryPublish.mutate({ articleId: item.id })}
+                        >
+                          {retryPublish.isPending && retryPublish.variables?.articleId === item.id ? (
+                            <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />
+                          ) : (
+                            <RefreshCw className="h-2.5 w-2.5 mr-1" />
+                          )}
+                          Retry publish
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          type="button"
+                          className="h-6 text-[10px] px-2 border-border text-muted-foreground hover:bg-muted/50"
+                          disabled={keepAndReview.isPending && keepAndReview.variables?.articleId === item.id}
+                          onClick={() => item.id && keepAndReview.mutate({ articleId: item.id })}
+                        >
+                          {keepAndReview.isPending && keepAndReview.variables?.articleId === item.id ? (
+                            <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />
+                          ) : null}
+                          Keep &amp; review
+                        </Button>
+                      </div>
                     </div>
                   )}
                   {/* Checkpoint 1 mini-badge — always show stored DB score for all articles */}
@@ -1674,20 +1698,34 @@ export default function ArticleReview() {
                       )}
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
-                    onClick={() => selectedItem.id && retryPublish.mutate({ articleId: selectedItem.id })}
-                    disabled={retryPublish.isPending}
-                  >
-                    {retryPublish.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                    )}
-                    Retry Publish
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                      onClick={() => selectedItem.id && retryPublish.mutate({ articleId: selectedItem.id })}
+                      disabled={retryPublish.isPending || keepAndReview.isPending}
+                    >
+                      {retryPublish.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                      )}
+                      Retry Publish
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs border-border text-muted-foreground hover:bg-muted/50"
+                      onClick={() => selectedItem.id && keepAndReview.mutate({ articleId: selectedItem.id })}
+                      disabled={keepAndReview.isPending || retryPublish.isPending}
+                    >
+                      {keepAndReview.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : null}
+                      Keep &amp; Review
+                    </Button>
+                  </div>
                 </div>
               ) : selectedItem.status === "published" ? (
                 <div className="space-y-2">
