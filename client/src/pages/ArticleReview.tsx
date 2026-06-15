@@ -905,7 +905,7 @@ export default function ArticleReview() {
   const filteredArticleList = useMemo(() => {
     switch (listFilter) {
       case "low_pass2":
-        return articleList.filter(a => a.pass2Score != null && a.pass2Score < 75);
+        return articleList.filter(a => a.pass2Score != null && a.pass2Score < 70);
       case "needs_review":
         return articleList.filter(a => a.statusBadge === "needs_review" || a.status === "failed");
       case "approved":
@@ -916,7 +916,7 @@ export default function ArticleReview() {
   }, [articleList, listFilter]);
 
   const lowPass2Count = useMemo(
-    () => articleList.filter(a => a.pass2Score != null && a.pass2Score < 75).length,
+    () => articleList.filter(a => a.pass2Score != null && a.pass2Score < 70).length,
     [articleList]
   );
 
@@ -1091,7 +1091,7 @@ export default function ArticleReview() {
                     {f === "all" && "All"}
                     {f === "low_pass2" && (
                       <span>
-                        Quality &lt; 75{lowPass2Count > 0 && ` (${lowPass2Count})`}
+                        Quality &lt; 70{lowPass2Count > 0 && ` (${lowPass2Count})`}
                       </span>
                     )}
                     {f === "needs_review" && "Needs review"}
@@ -2031,25 +2031,25 @@ export default function ArticleReview() {
                       <div className={`flex-1 rounded-lg border p-2 text-center ${
                         (selectedItem as any).pass2Score == null
                           ? "bg-muted/30 border-border"
-                          : (selectedItem as any).pass2Score >= 75
+                          : (selectedItem as any).pass2Score >= 70
                           ? "bg-emerald-500/10 border-emerald-500/30"
                           : "bg-amber-500/10 border-amber-500/30"
                       }`}>
                         <div className={`text-[11px] font-semibold leading-tight ${
                           (selectedItem as any).pass2Score == null
                             ? "text-muted-foreground"
-                            : (selectedItem as any).pass2Score >= 75
+                            : (selectedItem as any).pass2Score >= 70
                             ? "text-emerald-500"
                             : "text-amber-500"
                         }`}>
                           {(selectedItem as any).pass2Score == null
                             ? "—"
-                            : (selectedItem as any).pass2Score >= 75
+                            : (selectedItem as any).pass2Score >= 70
                             ? "Excellent — ready to publish"
                             : "Improving quality..."}
                         </div>
                         {(selectedItem as any).pass2Score != null &&
-                          (selectedItem as any).pass2Score < 75 &&
+                          (selectedItem as any).pass2Score < 70 &&
                           (selectedItem as any).pass2Details && (
                           <div className="text-[9px] text-muted-foreground/80 mt-1 leading-tight text-left px-0.5">
                             <span className="font-medium text-amber-500/80">Low score reason:</span>{" "}

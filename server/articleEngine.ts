@@ -1900,11 +1900,11 @@ Return ONLY the full article HTML wrapped in:
   let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
   console.log(`[ArticleEngine] Pass 2 score: ${pass2.score} for node ${nodeId} — ${pass2.reason}`);
 
-  // --- Pass 2 quality floor: one improvement attempt if score < 75 ---
-  if (pass2.score < 75) {
-    console.log(`[ArticleEngine] Pass 2 quality floor triggered (score ${pass2.score} < 75) for node ${nodeId}. Running improvement pass...`);
+  // --- Pass 2 quality floor: one improvement attempt if score < 70 ---
+  if (pass2.score < 70) {
+    console.log(`[ArticleEngine] Pass 2 quality floor triggered (score ${pass2.score} < 70) for node ${nodeId}. Running improvement pass...`);
     try {
-      const improvementPrompt = `This article scored ${pass2.score}/100 on writing quality. The target is 75+. Improve it by:
+      const improvementPrompt = `This article scored ${pass2.score}/100 on writing quality. The target is 70+. Improve it by:
 - Strengthening the opening to better match search intent
 - Adding more specific, authoritative detail in the weakest sections
 - Ensuring the human voice is consistent throughout
