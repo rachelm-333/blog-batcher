@@ -98,6 +98,10 @@ export const businesses = mysqlTable("businesses", {
   clientsServed: int("clientsServed"),
   /** Awards, certifications, accreditations — for E-E-A-T. */
   awardsAccreditations: text("awardsAccreditations"),
+  /** Social media profiles — for E-E-A-T and article context. */
+  linkedinUrl: varchar("linkedinUrl", { length: 2048 }),
+  facebookUrl: varchar("facebookUrl", { length: 2048 }),
+  instagramHandle: varchar("instagramHandle", { length: 255 }),
   /** Primary CTA button text, e.g. 'Book a free consultation'. */
   primaryCtaText: varchar("primaryCtaText", { length: 255 }),
   primaryCtaUrl: varchar("primaryCtaUrl", { length: 2048 }),

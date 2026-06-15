@@ -127,6 +127,13 @@
       "when": 1781407059890,
       "tag": "0017_charming_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1781494920923,
+      "tag": "0018_gorgeous_raider",
+      "breakpoints": true
     }
   ]
 }

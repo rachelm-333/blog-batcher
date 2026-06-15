@@ -17,6 +17,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
+
 import {
   articles,
   brandVoice,
@@ -33,6 +34,10 @@ import { getDb } from "../db";
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
+
+/** Converts null, undefined, or the literal string "null"/"undefined" to undefined. */
+const cleanVal = (v: string | null | undefined): string | undefined =>
+  v && v !== "null" && v !== "undefined" ? v : undefined;
 
 /** Ensure the user owns the given business. Throws FORBIDDEN if not. */
 async function assertOwnership(userId: number, businessId: number) {
@@ -234,6 +239,9 @@ export const businessRouter = router({
         yearsInBusiness: z.number().optional(),
         clientsServed: z.number().optional(),
         awardsAccreditations: z.string().optional(),
+        linkedinUrl: z.string().optional(),
+        facebookUrl: z.string().optional(),
+        instagramHandle: z.string().optional(),
         primaryCtaText: z.string().optional(),
         primaryCtaUrl: z.string().optional(),
         contactPageUrl: z.string().optional(),
@@ -474,19 +482,19 @@ Rules:
             lastScrapedAt: new Date(),
             scrapeCache: parsed,
             // Pre-fill top-level fields from scrape
-            industry: parsed.industry ?? undefined,
-            location: parsed.location ?? undefined,
-            serviceArea: parsed.serviceArea ?? undefined,
-            uniqueValueProposition: parsed.uniqueValueProposition ?? undefined,
-            primaryCtaText: parsed.primaryCtaText ?? undefined,
-            primaryCtaUrl: parsed.primaryCtaUrl ?? undefined,
-            contactPageUrl: parsed.contactPageUrl ?? undefined,
-            bookingsPageUrl: parsed.bookingsPageUrl ?? undefined,
-            testimonialsPageUrl: parsed.testimonialsPageUrl ?? undefined,
-            shopUrl: parsed.shopUrl ?? undefined,
+            industry: cleanVal(parsed.industry),
+            location: cleanVal(parsed.location),
+            serviceArea: cleanVal(parsed.serviceArea),
+            uniqueValueProposition: cleanVal(parsed.uniqueValueProposition),
+            primaryCtaText: cleanVal(parsed.primaryCtaText),
+            primaryCtaUrl: cleanVal(parsed.primaryCtaUrl),
+            contactPageUrl: cleanVal(parsed.contactPageUrl),
+            bookingsPageUrl: cleanVal(parsed.bookingsPageUrl),
+            testimonialsPageUrl: cleanVal(parsed.testimonialsPageUrl),
+            shopUrl: cleanVal(parsed.shopUrl),
             yearsInBusiness: parsed.yearsInBusiness ?? undefined,
             clientsServed: parsed.clientsServed ?? undefined,
-            awardsAccreditations: parsed.awardsAccreditations ?? undefined,
+            awardsAccreditations: cleanVal(parsed.awardsAccreditations),
           })
           .where(eq(businesses.id, input.businessId));
 

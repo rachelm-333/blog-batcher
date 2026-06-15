@@ -306,6 +306,9 @@ export default function Onboarding() {
               yearsInBusiness: bizData?.yearsInBusiness,
               clientsServed: bizData?.clientsServed,
               awardsAccreditations: bizData?.awardsAccreditations,
+              linkedinUrl: bizData?.linkedinUrl,
+              facebookUrl: bizData?.facebookUrl,
+              instagramHandle: bizData?.instagramHandle,
             }}
             onNext={next}
             onBack={back}

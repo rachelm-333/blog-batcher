@@ -321,6 +321,9 @@ export interface ArticleContext {
   customerFrustrations?: string;
   customerTransformation?: string;
   contentPlanDirection?: string;
+  linkedinUrl?: string;
+  facebookUrl?: string;
+  instagramHandle?: string;
 }
 
 /**
@@ -421,6 +424,9 @@ export async function buildArticleContext(
     customerFrustrations: biz.customerFrustrations ?? undefined,
     customerTransformation: biz.customerTransformation ?? undefined,
     contentPlanDirection: node.contentPlanDirection ?? undefined,
+    linkedinUrl: biz.linkedinUrl ?? undefined,
+    facebookUrl: biz.facebookUrl ?? undefined,
+    instagramHandle: biz.instagramHandle ?? undefined,
   };
 }
 
@@ -479,6 +485,7 @@ Industry: ${ctx.industry}
 Location: ${ctx.location}
 Unique Value Proposition: ${ctx.uvp}
 Social Proof: ${ctx.socialProof || "Not provided"}
+${(ctx.linkedinUrl || ctx.facebookUrl || ctx.instagramHandle) ? `Social Presence: This business has verified social profiles:\n${ctx.linkedinUrl ? `- LinkedIn: ${ctx.linkedinUrl}\n` : ""}${ctx.facebookUrl ? `- Facebook: ${ctx.facebookUrl}\n` : ""}${ctx.instagramHandle ? `- Instagram: ${ctx.instagramHandle}\n` : ""}These can be referenced as evidence of established business presence.` : ""}
 Target Audiences: ${ctx.audiences.join(", ") || "General audience"}
 
 Services/Products (use these for internal CTA links):

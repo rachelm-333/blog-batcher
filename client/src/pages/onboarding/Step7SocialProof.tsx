@@ -13,15 +13,24 @@ interface Props {
     yearsInBusiness?: number | null;
     clientsServed?: number | null;
     awardsAccreditations?: string | null;
+    linkedinUrl?: string | null;
+    facebookUrl?: string | null;
+    instagramHandle?: string | null;
   };
   onNext: () => void;
   onBack: () => void;
 }
 
 export default function Step7SocialProof({ businessId, initial, onNext, onBack }: Props) {
+  const cleanStr = (v: string | null | undefined) =>
+    v && v !== "null" && v !== "undefined" ? v : "";
+
   const [years, setYears] = useState(initial.yearsInBusiness?.toString() ?? "");
   const [clients, setClients] = useState(initial.clientsServed?.toString() ?? "");
-  const [awards, setAwards] = useState(initial.awardsAccreditations ?? "");
+  const [awards, setAwards] = useState(cleanStr(initial.awardsAccreditations));
+  const [linkedin, setLinkedin] = useState(cleanStr(initial.linkedinUrl));
+  const [facebook, setFacebook] = useState(cleanStr(initial.facebookUrl));
+  const [instagram, setInstagram] = useState(cleanStr(initial.instagramHandle));
 
   const updateBusiness = trpc.business.update.useMutation();
 
@@ -32,6 +41,9 @@ export default function Step7SocialProof({ businessId, initial, onNext, onBack }
         yearsInBusiness: years ? parseInt(years, 10) : undefined,
         clientsServed: clients ? parseInt(clients, 10) : undefined,
         awardsAccreditations: awards || undefined,
+        linkedinUrl: linkedin || undefined,
+        facebookUrl: facebook || undefined,
+        instagramHandle: instagram || undefined,
       });
       toast.success("Social proof saved.");
       onNext();
@@ -99,6 +111,40 @@ export default function Step7SocialProof({ businessId, initial, onNext, onBack }
             List any awards, industry certifications, or professional accreditations.
           </p>
         </div>
+
+        <div className="pt-2 border-t border-border">
+          <p className="text-sm font-medium text-foreground mb-1">Social Media Profiles <span className="text-muted-foreground font-normal">(optional)</span></p>
+          <p className="text-xs text-muted-foreground mb-4">Helps establish your online presence and E-E-A-T signals</p>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>LinkedIn URL</Label>
+              <Input
+                value={linkedin}
+                onChange={(e) => setLinkedin(e.target.value)}
+                placeholder="https://linkedin.com/company/your-business"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Facebook URL</Label>
+              <Input
+                value={facebook}
+                onChange={(e) => setFacebook(e.target.value)}
+                placeholder="https://facebook.com/your-business"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Instagram Handle</Label>
+              <Input
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+                placeholder="@yourbusiness"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-between pt-4">
@@ -107,7 +153,7 @@ export default function Step7SocialProof({ businessId, initial, onNext, onBack }
         </Button>
         <Button onClick={handleSave} disabled={updateBusiness.isPending}>
           {updateBusiness.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {years || clients || awards ? "Save & Continue" : "Skip & Continue"}
+          {years || clients || awards || linkedin || facebook || instagram ? "Save & Continue" : "Skip & Continue"}
         </Button>
       </div>
     </div>
