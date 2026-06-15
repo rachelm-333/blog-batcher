@@ -1194,10 +1194,13 @@ export default function ArticleReview() {
             filteredArticleList.map((item) => {
               const isSelected = item.articleNodeId === selectedNodeId;
               return (
-                <button
+                <div
                   key={item.articleNodeId}
-                    onClick={() => setSelectedNodeId(item.articleNodeId)}
-                  className={`w-full text-left p-3 rounded-lg border transition-all ${
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedNodeId(item.articleNodeId)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedNodeId(item.articleNodeId); } }}
+                  className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer ${
                     isSelected
                       ? "bg-primary/10 border-primary"
                       : "bg-background border-border hover:bg-muted/50"
@@ -1266,7 +1269,7 @@ export default function ArticleReview() {
                       )}
                     </div>
                   )}
-                </button>
+                </div>
               );
             })
           )}
