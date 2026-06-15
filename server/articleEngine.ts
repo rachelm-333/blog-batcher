@@ -1853,8 +1853,49 @@ Return ONLY the full article HTML wrapped in:
 
   // --- Pass 2: AI quality scorer ---
   console.log(`[ArticleEngine] Pass 2 scoring for node ${nodeId} (${wordCount} words)...`);
-  const pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
+  let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
   console.log(`[ArticleEngine] Pass 2 score: ${pass2.score} for node ${nodeId} — ${pass2.feedback}`);
+
+  // --- Pass 2 quality floor: one improvement attempt if score < 75 ---
+  if (pass2.score < 75) {
+    console.log(`[ArticleEngine] Pass 2 quality floor triggered (score ${pass2.score} < 75) for node ${nodeId}. Running improvement pass...`);
+    try {
+      const improvementPrompt = `This article scored ${pass2.score}/100 on writing quality. The target is 75+. Improve it by:
+- Strengthening the opening to better match search intent
+- Adding more specific, authoritative detail in the weakest sections
+- Ensuring the human voice is consistent throughout
+- Do NOT change the structure, headings, keyword usage, or length
+- Do NOT make it sound more AI-generated — make it sound more expert
+Return the improved article HTML body only, no explanation.
+
+${bodyHtml}`;
+
+      const improvementResult = await invokeLLMWithCost(
+        {
+          messages: [{ role: "user", content: improvementPrompt }],
+          maxTokens: 12000,
+        },
+        { userId }
+      );
+
+      const rawContent = improvementResult.choices[0]?.message?.content ?? "";
+      const improvedHtml = typeof rawContent === "string"
+        ? rawContent
+        : (rawContent as Array<{ type: string; text?: string }>)
+            .filter(b => b.type === "text")
+            .map(b => b.text ?? "")
+            .join("");
+
+      if (improvedHtml && improvedHtml.trim().length > 100) {
+        bodyHtml = improvedHtml.trim();
+        const improvedPass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
+        console.log(`[ArticleEngine] Pass 2 quality floor: score after improvement attempt = ${improvedPass2.score} for node ${nodeId}`);
+        pass2 = improvedPass2;
+      }
+    } catch (err) {
+      console.warn(`[ArticleEngine] Pass 2 quality floor improvement failed for node ${nodeId}:`, err);
+    }
+  }
 
   // --- Derive badge ---
   const { internalScore, statusBadge } = deriveStatusBadge(pass1.score, pass2.score);

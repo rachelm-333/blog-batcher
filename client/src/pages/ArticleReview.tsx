@@ -1925,36 +1925,29 @@ export default function ArticleReview() {
                         <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">SEO Structure</div>
                         <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 1</div>
                       </div>
-                      {/* Checkpoint 2 — Writing Quality */}
+                      {/* Checkpoint 2 — Writing Quality (label only, no score number) */}
                       <div className={`flex-1 rounded-lg border p-2 text-center ${
                         (selectedItem as any).pass2Score == null
                           ? "bg-muted/30 border-border"
-                          : (selectedItem as any).pass2Score >= 70
+                          : (selectedItem as any).pass2Score >= 75
                           ? "bg-emerald-500/10 border-emerald-500/30"
-                          : (selectedItem as any).pass2Score >= 50
-                          ? "bg-amber-500/10 border-amber-500/30"
-                          : "bg-red-500/10 border-red-500/30"
+                          : "bg-amber-500/10 border-amber-500/30"
                       }`}>
-                        <div className={`text-base font-bold ${
+                        <div className={`text-[11px] font-semibold leading-tight ${
                           (selectedItem as any).pass2Score == null
                             ? "text-muted-foreground"
-                            : (selectedItem as any).pass2Score >= 70
+                            : (selectedItem as any).pass2Score >= 75
                             ? "text-emerald-500"
-                            : (selectedItem as any).pass2Score >= 50
-                            ? "text-amber-500"
-                            : "text-red-400"
+                            : "text-amber-500"
                         }`}>
-                          {(selectedItem as any).pass2Score != null ? `${(selectedItem as any).pass2Score}/100` : "—"}
+                          {(selectedItem as any).pass2Score == null
+                            ? "—"
+                            : (selectedItem as any).pass2Score >= 75
+                            ? "Excellent — ready to publish"
+                            : "Improving quality..."}
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
                         <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
-                        {(selectedItem as any).pass2Score != null && (
-                          <p className="text-[9px] text-muted-foreground/60 leading-snug mt-1.5">
-                            {(selectedItem as any).pass2Score >= 70
-                              ? "Writing quality is strong. Focus on publishing, not perfecting."
-                              : "Consider using AI Edit Instruction to improve flow and depth."}
-                          </p>
-                        )}
                       </div>
                     </div>
 
