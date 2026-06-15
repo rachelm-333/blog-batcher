@@ -200,6 +200,10 @@ export default function PublishSchedule() {
     setPublishHour(Math.floor(utcTotalMinutes / 60));
     setPublishMinute(utcTotalMinutes % 60);
   }
+  // Auto-schedule result state
+  const [autoScheduledDates, setAutoScheduledDates] = useState<typeof autoPreviewDates | null>(null);
+  const [autoScheduleError, setAutoScheduleError] = useState<string | null>(null);
+
   const [calendarMonth, setCalendarMonth] = useState<{ year: number; month: number }>(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -277,24 +281,17 @@ export default function PublishSchedule() {
   const autoSchedule = trpc.scheduler.autoSchedule.useMutation({
     onSuccess: (data) => {
       if (data.failedCount > 0) {
-        toast.error(
-          `Scheduled ${data.scheduledCount} articles. ${data.failedCount} failed.`,
-          { description: "Check Schedule Management for details.", duration: 10000 }
-        );
+        setAutoScheduleError(`Scheduling failed — ${data.failedCount} article(s) could not be scheduled. Check Schedule Management for details.`);
       } else {
-        const first = data.firstPublishAt ? new Date(data.firstPublishAt).toLocaleDateString() : "";
-        const last = data.lastPublishAt ? new Date(data.lastPublishAt).toLocaleDateString() : "";
-        toast.success(
-          `✅ ${data.scheduledCount} articles auto-scheduled!`,
-          {
-            description: `First: ${first} · Last: ${last}. Articles will publish automatically at 9am UTC.`,
-            duration: 8000,
-          }
-        );
+        // Capture the preview dates at the moment of success so the success panel shows them
+        setAutoScheduledDates(autoPreviewDates);
+        setAutoScheduleError(null);
       }
       refetchSchedule();
     },
-    onError: (err) => toast.error("Auto-schedule failed", { description: err.message, duration: 8000 }),
+    onError: (err) => {
+      setAutoScheduleError(`Scheduling failed — ${err.message}`);
+    },
   });
 
   // Derived state
@@ -391,6 +388,9 @@ export default function PublishSchedule() {
 
   function handleAutoSchedule() {
     if (!business?.id) return;
+    // Reset any previous result state
+    setAutoScheduledDates(null);
+    setAutoScheduleError(null);
     const futureStart = new Date(startDate);
     if (futureStart <= new Date()) {
       futureStart.setDate(new Date().getDate() + 1);
@@ -720,27 +720,87 @@ export default function PublishSchedule() {
                 </div>
               </div>
 
-              {/* Auto-schedule button */}
-              <Button
-                size="lg"
-                disabled={!allApproved || autoSchedule.isPending || autoPreviewDates.length === 0}
-                onClick={handleAutoSchedule}
-                className="w-full sm:w-auto min-w-[260px]"
-              >
-                {autoSchedule.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
-                {autoSchedule.isPending
-                  ? `Scheduling ${autoPreviewDates.length} articles…`
-                  : `Auto-Schedule ${autoPreviewDates.length} Articles →`}
-              </Button>
-              {!allApproved && (
-                <p className="text-xs text-amber-500 flex items-center gap-1.5">
-                  <AlertTriangle className="h-3 w-3" />
-                  Approve all articles first before auto-scheduling.
-                </p>
+              {/* Auto-schedule success panel */}
+              {autoScheduledDates && autoScheduledDates.length > 0 ? (
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/8 p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                      <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-emerald-700 dark:text-emerald-300">Articles scheduled successfully</h3>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        Your {autoScheduledDates.length} articles are queued and will publish automatically:
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="space-y-2">
+                    {autoScheduledDates.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-3 text-sm">
+                        <span className="mt-0.5 text-emerald-500 font-bold text-base leading-none">✓</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-foreground truncate block">{item.title}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {item.date.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                            {" at "}{publishHourDisplay}:{String(publishMinute).padStart(2, "0")} {publishAmPm}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="pt-2 border-t border-emerald-500/20 flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const calEl = document.getElementById("publishing-calendar");
+                        if (calEl) calEl.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="text-emerald-700 dark:text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10"
+                    >
+                      <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                      View publishing calendar →
+                    </Button>
+                    <button
+                      className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+                      onClick={() => setAutoScheduledDates(null)}
+                    >
+                      Schedule again
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Auto-schedule button */}
+                  <Button
+                    size="lg"
+                    disabled={!allApproved || autoSchedule.isPending || autoPreviewDates.length === 0}
+                    onClick={handleAutoSchedule}
+                    className="w-full sm:w-auto min-w-[260px]"
+                  >
+                    {autoSchedule.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    {autoSchedule.isPending
+                      ? `Scheduling ${autoPreviewDates.length} articles…`
+                      : `Auto-Schedule ${autoPreviewDates.length} Articles →`}
+                  </Button>
+                  {/* Error state */}
+                  {autoScheduleError && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-500">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{autoScheduleError}</span>
+                    </div>
+                  )}
+                  {!allApproved && (
+                    <p className="text-xs text-amber-500 flex items-center gap-1.5">
+                      <AlertTriangle className="h-3 w-3" />
+                      Approve all articles first before auto-scheduling.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -934,7 +994,7 @@ export default function PublishSchedule() {
         </section>
 
         {/* Publishing Calendar Preview — shown for both modes */}
-        <section>
+        <section id="publishing-calendar">
           <h2 className="text-base font-bold text-foreground mb-1">Publishing Calendar Preview</h2>
           <p className="text-xs text-muted-foreground mb-4">
             {previewDates.length > 0
