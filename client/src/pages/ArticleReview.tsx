@@ -749,8 +749,13 @@ export default function ArticleReview() {
 
   const approveAll = trpc.articles.approveAll.useMutation({
     onSuccess: (data) => {
-      toast.success(`${data.approvedCount} articles approved.`);
+      if (data.approvedCount > 0) {
+        toast.success(`${data.approvedCount} article${data.approvedCount === 1 ? '' : 's'} approved — ready to schedule.`);
+      } else {
+        toast.info("All articles are already approved.");
+      }
       refetchArticles();
+      refetchFull();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -1033,6 +1038,7 @@ export default function ArticleReview() {
             <Button
               size="sm"
               variant="outline"
+              type="button"
               className="w-full text-xs"
               onClick={() => business?.id && approveAll.mutate({ businessId: business.id })}
               disabled={approveAll.isPending}
@@ -1190,19 +1196,28 @@ export default function ArticleReview() {
 
         {/* Proceed to Publish */}
         <div className="p-4 border-t border-border">
-          <Button
-            className="w-full"
-            disabled={!allApproved}
-            onClick={() => navigate("/publish")}
-          >
-            {allApproved ? (
-              <>
-                Proceed to Publish <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            ) : (
-              `Approve all ${totalCount} articles to proceed`
-            )}
-          </Button>
+          {allApproved ? (
+            <Button
+              className="w-full"
+              type="button"
+              onClick={() => navigate("/publish")}
+            >
+              Proceed to Publish <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              className="w-full"
+              type="button"
+              disabled={approveAll.isPending}
+              onClick={() => business?.id && approveAll.mutate({ businessId: business.id })}
+            >
+              {approveAll.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Approving...</>
+              ) : (
+                <>Approve all {totalCount} articles to proceed</>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 

@@ -915,37 +915,32 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
    * Only approves articles in generated or pending_approval status.
    * Returns count of newly approved articles.
    */
-  approveAll: protectedProcedure
+    approveAll: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
-
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
       const toApprove = await db
         .select({ id: articles.id })
         .from(articles)
         .where(
           and(
             eq(articles.businessId, input.businessId),
+            eq(articles.batchNumber, activeBatch),
             inArray(articles.status, ["generated", "pending_approval"])
           )
         );
-
       if (toApprove.length === 0) return { approvedCount: 0 };
-
       const ids = toApprove.map(a => a.id);
       const now = new Date();
-
       await db
         .update(articles)
         .set({ status: "approved", approvedAt: now })
         .where(inArray(articles.id, ids));
-
       // Advance business to stage 5 (Review & edit)
       await advanceBusinessStage(input.businessId, 5);
-
       return { approvedCount: ids.length };
     }),
 
