@@ -1951,14 +1951,6 @@ export default function ArticleReview() {
                       </div>
                     </div>
 
-                    {/* Schema markup — always shown as a green informational note (never as a failure) */}
-                    <div className="flex items-center gap-1.5 px-0.5 mt-0.5">
-                      <span className="shrink-0 text-[10px] text-emerald-500">✓</span>
-                      <span className="text-[10px] text-emerald-600 leading-tight">
-                        Schema markup — added automatically on publish
-                      </span>
-                    </div>
-
                     {/* Failing checklist breakdown — shown whenever score < 16 (even Authority Ready 15/16 shows the 1 missed point) */}
                     {liveScore < 16 && failingKeys.length > 0 && (
                       <div className={`rounded-lg border p-2.5 ${
@@ -1988,6 +1980,13 @@ export default function ArticleReview() {
                               </span>
                             </div>
                           ))}
+                          {/* Schema markup — always shown as last item: a point gained automatically on publish */}
+                          <div className="flex items-start gap-1.5">
+                            <span className="mt-0.5 shrink-0 text-[10px] text-emerald-500">✓</span>
+                            <span className="text-[10px] leading-tight text-emerald-600">
+                              Schema markup — added automatically on publish (+1 point)
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
