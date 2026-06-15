@@ -817,7 +817,7 @@ export function runPass1Scorer(params: {
 // Pass 2 — AI quality scorer
 // ---------------------------------------------------------------------------
 
-export async function runPass2Scorer(bodyHtml: string, primaryKeyword: string, userId?: number | null): Promise<{ score: number; feedback: string }> {
+export async function runPass2Scorer(bodyHtml: string, primaryKeyword: string, userId?: number | null): Promise<{ score: number; reason: string }> {
   const prompt = `You are an SEO content quality auditor. Score the following article on these 5 criteria (each worth 20 points, total 100):
 
 1. SEARCH INTENT RESOLUTION (20 pts): Does it fully resolve what the searcher is looking for?
@@ -831,7 +831,7 @@ Primary keyword: ${primaryKeyword}
 Article (first 3000 chars):
 ${bodyHtml.slice(0, 3000)}
 
-Return JSON: { "score": <0-100 integer>, "feedback": "<one sentence summary>" }`;
+Return JSON: { "score": <0-100 integer>, "reason": "<one sentence explaining the main weakness — be specific about which criterion lost the most points and why>" }`;
 
   try {
     // Race the LLM call against a 30-second timeout so it never hangs indefinitely
@@ -855,12 +855,12 @@ Return JSON: { "score": <0-100 integer>, "feedback": "<one sentence summary>" }`
     const parsed = JSON.parse(strippedContent);
     return {
       score: Math.min(100, Math.max(0, parseInt(parsed.score) || 0)),
-      feedback: parsed.feedback || "",
+      reason: parsed.reason || parsed.feedback || "",
     };
   } catch (err) {
     // If AI scorer fails or times out, return a neutral score so generation isn't blocked
     console.warn(`[ArticleEngine] Pass 2 scorer failed/timed out:`, err instanceof Error ? err.message : err);
-    return { score: 75, feedback: "AI quality check unavailable" };
+    return { score: 75, reason: "" };
   }
 }
 
@@ -1114,7 +1114,7 @@ export interface GenerationResult {
   pass1Points: Record<string, boolean>;
   pass1Metrics: Record<string, string>;
   pass2Score: number;
-  pass2Feedback: string;
+  pass2Reason: string;
 }
 
 export async function generateSingleArticle(
@@ -1898,7 +1898,7 @@ Return ONLY the full article HTML wrapped in:
   // --- Pass 2: AI quality scorer ---
   console.log(`[ArticleEngine] Pass 2 scoring for node ${nodeId} (${wordCount} words)...`);
   let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
-  console.log(`[ArticleEngine] Pass 2 score: ${pass2.score} for node ${nodeId} — ${pass2.feedback}`);
+  console.log(`[ArticleEngine] Pass 2 score: ${pass2.score} for node ${nodeId} — ${pass2.reason}`);
 
   // --- Pass 2 quality floor: one improvement attempt if score < 75 ---
   if (pass2.score < 75) {
@@ -1960,6 +1960,6 @@ ${bodyHtml}`;
     pass1Points: pass1.points,
     pass1Metrics: pass1.details,
     pass2Score: pass2.score,
-    pass2Feedback: pass2.feedback,
+    pass2Reason: pass2.reason,
   };
 }

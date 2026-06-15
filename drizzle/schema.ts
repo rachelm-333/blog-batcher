@@ -511,6 +511,11 @@ export const articles = mysqlTable("articles", {
    */
   pass2Score: int("pass2Score"),
   /**
+   * Pass 2 reason — one sentence explaining the main weakness from the AI quality scorer.
+   * Only populated when pass2Score < 75 so the user knows exactly what to fix.
+   */
+  pass2Details: text("pass2Details"),
+  /**
    * Pass 1 checklist details — JSON object mapping each of the 16 check IDs
    * (p1_keyword_density … p16_word_count) to a boolean pass/fail result.
    * Persisted at generation time so the Review page can show exactly which

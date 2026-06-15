@@ -386,6 +386,7 @@ interface ArticleListItem {
   wordCount: number | null;
   internalScore: number | null;
   pass2Score: number | null;
+  pass2Details?: string | null;
   pass1Details: { points: Record<string, boolean>; metrics: Record<string, string> } | Record<string, boolean> | null | unknown;
   level: "cornerstone" | "pillar" | "cluster";
   articleType: string;
@@ -1957,6 +1958,14 @@ export default function ArticleReview() {
                             ? "Excellent — ready to publish"
                             : "Improving quality..."}
                         </div>
+                        {(selectedItem as any).pass2Score != null &&
+                          (selectedItem as any).pass2Score < 75 &&
+                          (selectedItem as any).pass2Details && (
+                          <div className="text-[9px] text-muted-foreground/80 mt-1 leading-tight text-left px-0.5">
+                            <span className="font-medium text-amber-500/80">Low score reason:</span>{" "}
+                            {(selectedItem as any).pass2Details}
+                          </div>
+                        )}
                         <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Writing Quality</div>
                         <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 2</div>
                       </div>

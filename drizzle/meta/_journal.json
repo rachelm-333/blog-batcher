@@ -134,6 +134,13 @@
       "when": 1781494920923,
       "tag": "0018_gorgeous_raider",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1781515355924,
+      "tag": "0019_blushing_doomsday",
+      "breakpoints": true
     }
   ]
 }

@@ -169,6 +169,7 @@ async function generateAndSave(
         focusKeyword: null, // will be set from keyword row
         internalScore: result.internalScore,
         pass2Score: result.pass2Score,
+        pass2Details: result.pass2Reason || null,
         pass1Details: { points: result.pass1Points, metrics: result.pass1Metrics } as unknown,
         statusBadge: result.statusBadge,
         status: "generated",
@@ -457,6 +458,7 @@ export const articlesRouter = router({
           wordCount: articles.wordCount,
           internalScore: articles.internalScore,
           pass2Score: articles.pass2Score,
+          pass2Details: articles.pass2Details,
           pass1Details: articles.pass1Details,
           statusBadge: articles.statusBadge,
           status: articles.status,
@@ -508,6 +510,7 @@ export const articlesRouter = router({
           wordCount: articles.wordCount,
           internalScore: articles.internalScore,
           pass2Score: articles.pass2Score,
+          pass2Details: articles.pass2Details,
           pass1Details: articles.pass1Details,
           statusBadge: articles.statusBadge,
           status: articles.status,
