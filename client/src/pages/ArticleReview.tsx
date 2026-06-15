@@ -32,6 +32,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -1042,23 +1047,43 @@ export default function ArticleReview() {
       <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       {/* ── Left sidebar: article list ─────────────────────────────────── */}
       <div className="w-72 min-w-[280px] border-r border-border flex flex-col bg-card overflow-y-auto">
-        {/* Header */}
-        <div className="px-4 py-4 border-b border-border">
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-sm font-bold text-foreground">Stage 5 — Review &amp; Publish</h2>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {approvedCount} / {totalCount} approved
-          </p>
-          {totalCount > 0 && (
-            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${totalCount > 0 ? (approvedCount / totalCount) * 100 : 0}%` }}
-              />
+        {/* Header — green banner when all approved, otherwise normal progress */}
+        {allApproved ? (
+          <div className="px-4 py-3 border-b border-border bg-emerald-500/10">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold text-emerald-600">Ready to publish</p>
+                <p className="text-[10px] text-emerald-600/80 mt-0.5">{approvedCount} / {totalCount} approved</p>
+              </div>
+              <Button
+                size="sm"
+                type="button"
+                className="shrink-0 text-xs font-bold"
+                style={{ background: "#7c3aed", color: "#fff" }}
+                onClick={() => navigate("/publish")}
+              >
+                Proceed to Schedule <ArrowRight className="ml-1 h-3 w-3" />
+              </Button>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="px-4 py-4 border-b border-border">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-sm font-bold text-foreground">Stage 5 — Review &amp; Publish</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {approvedCount} / {totalCount} approved
+            </p>
+            {totalCount > 0 && (
+              <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${totalCount > 0 ? (approvedCount / totalCount) * 100 : 0}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Approve all button */}
         {!allApproved && totalCount > 0 && (
@@ -1185,6 +1210,31 @@ export default function ArticleReview() {
                   <div className="mt-1.5 flex flex-wrap gap-1 items-center">
                     <StatusBadgeChip badge={item.statusBadge as StatusBadge} status={item.status as ArticleStatus} />
                   </div>
+                  {/* Publish Failed: show error hint + retry button */}
+                  {item.status === "failed" && (
+                    <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                      {item.errorMessage && (
+                        <p className="text-[10px] text-destructive leading-tight mb-1.5 line-clamp-2">
+                          {item.errorMessage}
+                        </p>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        className="h-6 text-[10px] px-2 border-destructive/50 text-destructive hover:bg-destructive/10"
+                        disabled={retryPublish.isPending && retryPublish.variables?.articleId === item.id}
+                        onClick={() => item.id && retryPublish.mutate({ articleId: item.id })}
+                      >
+                        {retryPublish.isPending && retryPublish.variables?.articleId === item.id ? (
+                          <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />
+                        ) : (
+                          <RefreshCw className="h-2.5 w-2.5 mr-1" />
+                        )}
+                        Retry publish
+                      </Button>
+                    </div>
+                  )}
                   {/* Checkpoint 1 mini-badge — always show stored DB score for all articles */}
                   {item.internalScore != null && (
                     <div className="mt-1 flex gap-1">
@@ -1222,31 +1272,7 @@ export default function ArticleReview() {
           )}
         </div>
 
-        {/* Proceed to Publish */}
-        <div className="p-4 border-t border-border">
-          {allApproved ? (
-            <Button
-              className="w-full"
-              type="button"
-              onClick={() => navigate("/publish")}
-            >
-              Proceed to Publish <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
-            <Button
-              className="w-full"
-              type="button"
-              disabled={approveAll.isPending}
-              onClick={() => business?.id && approveAll.mutate({ businessId: business.id })}
-            >
-              {approveAll.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Approving...</>
-              ) : (
-                <>Approve all {totalCount} articles to proceed</>
-              )}
-            </Button>
-          )}
-        </div>
+        {/* Bottom CTA removed — top sidebar has Approve All + green banner when all approved */}
       </div>
 
       {/* ── Right panel: article body + SEO panel ─────────────────────── */}
