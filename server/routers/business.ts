@@ -287,7 +287,7 @@ export const businessRouter = router({
       let metaTitle = "";
       let metaDescription = "";
 
-      // Detect website builders that commonly block scrapers
+      // Detect website builders that commonly block basic HTTP scrapers
       const BUILDER_PATTERNS = [
         { pattern: /\.wix\.com|wixsite\.com|x-wix-/i, name: "Wix" },
         { pattern: /squarespace\.com|squarespace-cdn/i, name: "Squarespace" },
@@ -296,49 +296,91 @@ export const businessRouter = router({
       ];
       const detectedBuilder = BUILDER_PATTERNS.find((b) => b.pattern.test(input.websiteUrl));
       if (detectedBuilder) {
-        console.warn(`[Scrape] Detected ${detectedBuilder.name} site — content may be limited:`, input.websiteUrl);
+        console.log(`[Scrape] Detected ${detectedBuilder.name} site — using JS-rendered scraper:`, input.websiteUrl);
       }
 
+      // ── TIER 1: Jina AI Reader — handles JavaScript-rendered pages (Wix, Squarespace, Webflow, etc.) ──
+      let jinaSucceeded = false;
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-        const fetchRes = await fetch(input.websiteUrl, {
-          signal: controller.signal,
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; BlogBatcher/1.0)" },
+        const jinaUrl = `https://r.jina.ai/${input.websiteUrl}`;
+        const jinaController = new AbortController();
+        const jinaTimeout = setTimeout(() => jinaController.abort(), 25000);
+        const jinaRes = await fetch(jinaUrl, {
+          signal: jinaController.signal,
+          headers: {
+            "Accept": "text/plain",
+            "User-Agent": "Mozilla/5.0 (compatible; BlogBatcher/1.0)",
+          },
         });
-        clearTimeout(timeoutId);
-        const html = await fetchRes.text();
+        clearTimeout(jinaTimeout);
 
-        // Extract <title> and <meta name="description"> as reliable fallback signals
-        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-        if (titleMatch) metaTitle = titleMatch[1].trim();
-        const metaDescMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
-          || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
-        if (metaDescMatch) metaDescription = metaDescMatch[1].trim();
+        if (jinaRes.ok) {
+          const jinaText = await jinaRes.text();
+          // Jina returns markdown — extract title from the first line if present
+          const jinaTitleMatch = jinaText.match(/^Title:\s*(.+)$/m);
+          if (jinaTitleMatch) metaTitle = jinaTitleMatch[1].trim();
 
-        // Strip HTML tags and collapse whitespace for a clean text payload
-        websiteContent = html
-          .replace(/<script[\s\S]*?<\/script>/gi, "")
-          .replace(/<style[\s\S]*?<\/style>/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/&nbsp;/g, " ")
-          .replace(/&amp;/g, "&")
-          .replace(/&lt;/g, "<")
-          .replace(/&gt;/g, ">")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 12000); // cap at ~12k chars to stay within token budget
+          // Use the Jina content directly (already clean markdown, no HTML stripping needed)
+          websiteContent = jinaText.slice(0, 12000);
 
-        // If the body content is very sparse (builder blocked body content),
-        // supplement with the meta signals so the LLM has something to work with
-        if (websiteContent.length < 200 && (metaTitle || metaDescription)) {
-          console.warn(`[Scrape] Sparse body content (${websiteContent.length} chars) — supplementing with meta tags`);
-          websiteContent = `Page title: ${metaTitle}\nMeta description: ${metaDescription}\n\n${websiteContent}`;
+          if (websiteContent.length > 200) {
+            jinaSucceeded = true;
+            console.log(`[Scrape] Jina AI Reader succeeded (${websiteContent.length} chars) for:`, input.websiteUrl);
+          } else {
+            console.warn(`[Scrape] Jina AI Reader returned sparse content (${websiteContent.length} chars), falling back to direct fetch`);
+          }
+        } else {
+          console.warn(`[Scrape] Jina AI Reader returned ${jinaRes.status}, falling back to direct fetch`);
         }
-      } catch (fetchErr) {
-        // Fetch failed (timeout, DNS error, etc.) — proceed with URL only
-        console.warn("[Scrape] Website fetch failed, proceeding with URL only:", fetchErr);
-        websiteContent = "(Website content could not be fetched — use the URL and business name to infer details.)";
+      } catch (jinaErr) {
+        console.warn("[Scrape] Jina AI Reader failed, falling back to direct fetch:", jinaErr);
+      }
+
+      // ── TIER 2: Direct fetch + meta tag extraction ──────────────────────────
+      if (!jinaSucceeded) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000);
+          const fetchRes = await fetch(input.websiteUrl, {
+            signal: controller.signal,
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; BlogBatcher/1.0)" },
+          });
+          clearTimeout(timeoutId);
+          const html = await fetchRes.text();
+
+          // Extract <title> and <meta name="description"> as reliable fallback signals
+          const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+          if (titleMatch) metaTitle = titleMatch[1].trim();
+          const metaDescMatch =
+            html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ||
+            html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+          if (metaDescMatch) metaDescription = metaDescMatch[1].trim();
+
+          // Strip HTML tags and collapse whitespace
+          websiteContent = html
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 12000);
+
+          // Supplement sparse body with meta signals
+          if (websiteContent.length < 200 && (metaTitle || metaDescription)) {
+            console.warn(`[Scrape] Sparse body (${websiteContent.length} chars) — supplementing with meta tags`);
+            websiteContent = `Page title: ${metaTitle}\nMeta description: ${metaDescription}\n\n${websiteContent}`;
+          }
+
+          console.log(`[Scrape] Direct fetch succeeded (${websiteContent.length} chars) for:`, input.websiteUrl);
+        } catch (fetchErr) {
+          // ── TIER 3: Both failed — proceed with URL + business name only ──────
+          console.warn("[Scrape] Both Jina and direct fetch failed, proceeding with URL only:", fetchErr);
+          websiteContent = "(Website content could not be fetched — use the URL and business name to infer details.)";
+        }
       }
 
       const prompt = `You are an expert business analyst and SEO strategist. Analyse the following website content for the business "${input.businessName}" (${input.websiteUrl}) and extract the information below. Return ONLY valid JSON matching the schema — no markdown, no explanation.
