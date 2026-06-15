@@ -262,8 +262,8 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
         }>;
       };
 
-      // Cap at 200 results total to keep response manageable
-      const LIMIT = 200;
+      // Cap at 60 results total — enough choice without being overwhelming
+      const LIMIT = 60;
       let allSuggestions: Array<{ keyword: string; msv: number | null; competition: string | null; cpc: number | null }> = [];
 
       try {
@@ -278,6 +278,7 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
         allSuggestions = suggestions
           .filter((s) => s.monthlySearchVolume != null && s.monthlySearchVolume > 0)
           .sort((a, b) => (b.monthlySearchVolume ?? 0) - (a.monthlySearchVolume ?? 0))
+          .slice(0, 60) // hard cap at 60 across all seeds combined
           .map((s) => ({
             keyword: s.keyword,
             msv: s.monthlySearchVolume,

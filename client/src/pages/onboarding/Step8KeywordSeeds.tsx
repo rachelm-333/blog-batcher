@@ -61,7 +61,10 @@ const COMPETITION_COLOUR: Record<string, string> = {
   low: "#22c55e",
 };
 
-export default function Step8KeywordSeeds({ businessId, onNext, onBack, articlesNeeded = 18 }: Props) {
+export default function Step8KeywordSeeds({ businessId, onNext, onBack, articlesNeeded }: Props) {
+  // Fetch real article count from architecture so the counter reflects the user's actual plan
+  const { data: archData } = trpc.architecture.getOrCreate.useQuery({ businessId });
+  const articleCount = articlesNeeded ?? archData?.architecture?.totalArticleCount ?? 18;
   const [seeds, setSeeds] = useState<string[]>([]);
   const [groups, setGroups] = useState<SeedGroup[]>([]);
   const [expandedSeeds, setExpandedSeeds] = useState<Set<string>>(new Set());
@@ -270,7 +273,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
   const validSeeds = seeds.filter((s) => s.trim());
   const totalKeywords = groups.reduce((sum, g) => sum + g.keywords.length, 0);
   const selectedCount = selected.size;
-  const needMore = Math.max(0, articlesNeeded - selectedCount);
+  const needMore = Math.max(0, articleCount - selectedCount);
 
   // Build a flat sorted list of selected keywords for the summary panel
   const selectedKeywords = Array.from(selected)
@@ -394,16 +397,13 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
         {/* Selection counter */}
         {(totalKeywords > 0 || selectedCount > 0) && (
           <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium ${
-            selectedCount >= articlesNeeded
+            selectedCount >= articleCount
               ? "bg-green-50 text-green-700 border border-green-200"
               : "bg-amber-50 text-amber-700 border border-amber-200"
           }`}>
             <CheckSquare size={14} />
             <span>
-              {selectedCount} of {articlesNeeded} keywords selected
-              {needMore > 0
-                ? ` — select ${needMore} more to fill your ${articlesNeeded}-article pack`
-                : " — you have enough to fill your pack ✓"}
+              {selectedCount} keyword{selectedCount !== 1 ? "s" : ""} selected — select one keyword per article ({articleCount} articles in your plan)
             </span>
           </div>
         )}
