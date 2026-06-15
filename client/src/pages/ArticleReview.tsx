@@ -21,6 +21,14 @@ import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -642,7 +650,7 @@ export default function ArticleReview() {
   const { user, loading: authLoading } = useAuth();
 
   // Business + articles data
-  const { activeBusiness: business, isLoading: bizLoading } = useActiveBusiness();
+  const { activeBusiness: business, isLoading: bizLoading, refetch: refetchBusiness } = useActiveBusiness();
 
   const { data: articlesData, isLoading: articlesLoading, refetch: refetchArticles } = trpc.articles.getAll.useQuery(
     { businessId: business?.id ?? 0 },
@@ -659,6 +667,9 @@ export default function ArticleReview() {
 
   // Selected article
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approvedModalCount, setApprovedModalCount] = useState(0);
+  const [approveJustSucceeded, setApproveJustSucceeded] = useState(false);
 
   const articleList: ArticleListItem[] = useMemo(() => articlesData ?? [], [articlesData]);
 
@@ -739,23 +750,40 @@ export default function ArticleReview() {
       if (data.alreadyApproved) {
         toast.info("Article already approved.");
       } else {
-        toast.success("Article approved!");
+        setApproveJustSucceeded(true);
+        setTimeout(() => setApproveJustSucceeded(false), 2500);
       }
       refetchArticles();
       refetchFull();
+      refetchBusiness();
+      // Check if all articles will now be approved after this one
+      // We check after refetch settles via a short delay
+      setTimeout(() => {
+        refetchArticles().then((result) => {
+          const list = result.data as ArticleListItem[] | undefined;
+          if (!list) return;
+          const total = list.length;
+          const approved = list.filter(a =>
+            a.status === "approved" || a.status === "scheduled" || a.status === "published"
+          ).length;
+          if (total > 0 && approved === total) {
+            setApprovedModalCount(total);
+            setShowApprovalModal(true);
+          }
+        });
+      }, 400);
     },
     onError: (err) => toast.error(err.message),
   });
 
   const approveAll = trpc.articles.approveAll.useMutation({
     onSuccess: (data) => {
-      if (data.approvedCount > 0) {
-        toast.success(`${data.approvedCount} article${data.approvedCount === 1 ? '' : 's'} approved — ready to schedule.`);
-      } else {
-        toast.info("All articles are already approved.");
-      }
       refetchArticles();
       refetchFull();
+      refetchBusiness();
+      const count = data.approvedCount > 0 ? data.approvedCount : totalCount;
+      setApprovedModalCount(count);
+      setShowApprovalModal(true);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -1010,7 +1038,7 @@ export default function ArticleReview() {
   return (
     <DashboardLayout>
     <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", background:"#faf9f5" }}>
-      <StageStepper currentStage={currentStage} activeStage={5} />
+      <StageStepper currentStage={allApproved ? Math.max(currentStage, 6) : currentStage} activeStage={allApproved ? 6 : 5} />
       <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       {/* ── Left sidebar: article list ─────────────────────────────────── */}
       <div className="w-72 min-w-[280px] border-r border-border flex flex-col bg-card overflow-y-auto">
@@ -1598,10 +1626,12 @@ export default function ArticleReview() {
                   >
                     {approve.isPending ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : approveJustSucceeded ? (
+                      <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" />
                     ) : (
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                     )}
-                    Approve &amp; Publish →
+                    {approveJustSucceeded ? "Approved ✓" : "Approve & Publish →"}
                   </Button>
                 </div>
               ) : selectedItem.status === "failed" ? (
@@ -2155,6 +2185,43 @@ export default function ArticleReview() {
       </div>
     </div>
     </div>
+      {/* ── All-articles-approved success modal ─────────────────────── */}
+      <Dialog open={showApprovalModal} onOpenChange={setShowApprovalModal}>
+        <DialogContent
+          className="max-w-md text-center"
+          showCloseButton={false}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="items-center">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle2 className="h-12 w-12 text-emerald-600" />
+            </div>
+            <DialogTitle className="text-2xl font-bold">All articles approved!</DialogTitle>
+            <DialogDescription className="text-base mt-2">
+              Your {approvedModalCount} article{approvedModalCount === 1 ? " is" : "s are"} ready to schedule and publish.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 flex-col gap-2 sm:flex-col">
+            <Button
+              className="w-full text-base py-6 font-bold"
+              style={{ background: "#7c3aed", color: "#fff" }}
+              onClick={() => {
+                setShowApprovalModal(false);
+                navigate("/publish");
+              }}
+            >
+              Set up publishing schedule <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full text-sm text-muted-foreground"
+              onClick={() => setShowApprovalModal(false)}
+            >
+              Stay on this page
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
