@@ -10,7 +10,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
-import { Loader2, Zap, CheckCircle2, Clock, AlertTriangle, BarChart2, RefreshCw } from "lucide-react";
+import { Loader2, Zap, CheckCircle2, Clock, AlertTriangle, BarChart2, RefreshCw, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 // Word count minimums per level (must match server)
@@ -88,6 +88,12 @@ export default function ArticleGeneration() {
     { enabled: !!businessId, refetchInterval: generating ? 3000 : false }
   );
 
+  // Fetch node count independently so we always know the total before articles are created
+  const { data: nodeCountData } = trpc.architecture.getOrCreate.useQuery(
+    { businessId },
+    { enabled: !!businessId }
+  );
+
   const regenerateSingleMutation = trpc.articles.regenerate.useMutation({
     onSuccess: () => {
       toast.success("Regenerating article… this may take a minute.");
@@ -133,7 +139,9 @@ export default function ArticleGeneration() {
     if (allDone) setGenerating(false);
   }, [articles]);
 
-  const totalCount = articles?.length ?? 0;
+  // Use node count as the source of truth for total — available before generation starts
+  const nodeTotal = nodeCountData?.nodes?.length ?? 0;
+  const totalCount = articles?.length ?? nodeTotal;
   const writtenCount = articles?.filter(a => ["generated","pending_approval","approved","published","scheduled","failed"].includes(a.status)).length ?? 0;
   const failedCount = articles?.filter(a => a.status === "failed").length ?? 0;
   const scoredCount = articles?.filter(a => a.internalScore !== null).length ?? 0;
@@ -142,9 +150,10 @@ export default function ArticleGeneration() {
     : null;
 
   // allWritten: all articles are in a terminal state (no longer generating/pending)
-  const allWritten = totalCount > 0 && writtenCount === totalCount;
+  const allWritten = totalCount > 0 && writtenCount === totalCount && !generating;
   const hasArticles = totalCount > 0;
-  const canGenerate = currentStage >= 4 && !generating;
+  // showGenerateButton: show the button (possibly disabled) whenever generation hasn't completed
+  const showGenerateButton = currentStage >= 4 && !allWritten;
 
   // Count articles under their word count target
   const underTargetCount = articles?.filter(a => {
@@ -194,13 +203,18 @@ export default function ArticleGeneration() {
               </p>
             </div>
             <div style={{ display:"flex", gap:10, flexShrink:0, marginTop:4 }}>
-              {canGenerate && (
+              {showGenerateButton && (
                 <button
                   className="btn-primary"
-                  onClick={() => generateMutation.mutate({ businessId })}
-                  disabled={generateMutation.isPending}
+                  onClick={() => !generating && !hasArticles ? generateMutation.mutate({ businessId }) : undefined}
+                  disabled={generating || generateMutation.isPending || hasArticles}
+                  style={{ opacity: (generating || hasArticles) ? 0.7 : 1 }}
                 >
-                  {generateMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Starting…</> : <><Zap style={{ width:14, height:14 }} /> Generate {totalCount || "6"} articles</>}
+                  {generating
+                    ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Generating articles…</>
+                    : generateMutation.isPending
+                    ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Starting…</>
+                    : <><Zap style={{ width:14, height:14 }} /> Generate {nodeTotal || totalCount || 5} articles</>}
                 </button>
               )}
               {hasArticles && underTargetCount > 0 && !generating && (
@@ -215,24 +229,14 @@ export default function ArticleGeneration() {
                     : <><RefreshCw style={{ width:13, height:13 }} /> Regenerate {underTargetCount} under target</>}
                 </button>
               )}
-              {allWritten && failedCount === 0 && (
-                <button className="btn-primary" onClick={() => setLocation("/review")}>
-                  Review articles →
-                </button>
-              )}
-              {allWritten && failedCount > 0 && (
-                <button className="btn-primary" onClick={() => setLocation("/review")}>
-                  Review {writtenCount - failedCount} articles →
-                </button>
-              )}
             </div>
           </div>
 
           {/* KPI cards */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:16, marginBottom:24 }}>
             {[
-              { label:"Articles written", value:`${writtenCount}`, denom:`/${totalCount}`, sub: writtenCount === 0 ? "Unlocks at stage 4" : "total articles", highlight: writtenCount > 0 },
-              { label:"Scored", value:`${scoredCount}`, denom:`/${totalCount}`, sub: scoredCount === 0 ? "Scored after generation" : "articles scored", highlight: false },
+              { label:"Articles written", value:`${writtenCount}`, denom:`/${nodeTotal || totalCount || "?"}`, sub: writtenCount === 0 ? "Unlocks at stage 4" : "total articles", highlight: writtenCount > 0 },
+              { label:"Scored", value:`${scoredCount}`, denom:`/${nodeTotal || totalCount || "?"}`, sub: scoredCount === 0 ? "Scored after generation" : "articles scored", highlight: false },
               { label:"Avg SEO score", value: avgScore ? `${avgScore}` : "—", denom: null, sub: avgScore ? `${scoredCount} articles scored` : "Waiting on first score", highlight: false },
             ].map(card => (
               <div key={card.label} className="kpi-card" style={{ background: card.highlight ? "#ede9ff" : "#fff" }}>
@@ -390,6 +394,44 @@ export default function ArticleGeneration() {
               </table>
             </div>
           </div>
+
+          {/* Completion banner */}
+          {allWritten && failedCount === 0 && (
+            <div style={{ marginTop:24, padding:"20px 24px", background:"#f0fdf4", border:"1.5px solid #86efac", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <CheckCircle2 style={{ width:22, height:22, color:"#16a34a", flexShrink:0 }} />
+                <div>
+                  <p style={{ fontSize:15, fontWeight:700, color:"#14532d", margin:0 }}>All {writtenCount} articles written — ready to review</p>
+                  <p style={{ fontSize:13, color:"#166534", margin:"2px 0 0" }}>Check scores, make edits, and schedule your posts.</p>
+                </div>
+              </div>
+              <button
+                className="btn-primary"
+                onClick={() => setLocation("/review")}
+                style={{ flexShrink:0, display:"flex", alignItems:"center", gap:6 }}
+              >
+                Review articles <ArrowRight style={{ width:14, height:14 }} />
+              </button>
+            </div>
+          )}
+          {allWritten && failedCount > 0 && (
+            <div style={{ marginTop:24, padding:"20px 24px", background:"#fffbeb", border:"1.5px solid #fcd34d", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <AlertTriangle style={{ width:22, height:22, color:"#b45309", flexShrink:0 }} />
+                <div>
+                  <p style={{ fontSize:15, fontWeight:700, color:"#78350f", margin:0 }}>{writtenCount - failedCount} of {writtenCount} articles written — {failedCount} failed</p>
+                  <p style={{ fontSize:13, color:"#92400e", margin:"2px 0 0" }}>You can retry failed articles or proceed to review the successful ones.</p>
+                </div>
+              </div>
+              <button
+                className="btn-primary"
+                onClick={() => setLocation("/review")}
+                style={{ flexShrink:0, display:"flex", alignItems:"center", gap:6 }}
+              >
+                Review articles <ArrowRight style={{ width:14, height:14 }} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
