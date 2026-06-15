@@ -299,24 +299,35 @@ function extractPass1Metrics(raw: Pass1DetailsRaw): Record<string, string> | nul
 }
 
 /** Build a specific keyword density label based on the stored metrics string, e.g. "4 mentions, 0.89% density" */
-function getKeywordDensityLabel(metrics: Record<string, string> | null): string {
+function getKeywordDensityLabel(metrics: Record<string, string> | null, level?: string | null): string {
+  const MAX_KEYWORD_MENTIONS_UI: Record<string, number> = {
+    cornerstone: 20,
+    pillar: 15,
+    cluster: 8,
+  };
+  const maxMentions = level ? (MAX_KEYWORD_MENTIONS_UI[level] ?? 20) : 20;
+
   const raw = metrics?.p1_keyword_density; // e.g. "4 mentions, 0.89% density"
-  if (!raw) return "Keyword density too low or too high (need 4+ mentions, 1–2.5%)";
+  if (!raw) return "Keyword density too low or too high (need 4+ mentions, 1\u20132.5%)";
   // Parse: "N mentions, X.XX% density"
   const mentionMatch = raw.match(/(\d+)\s+mention/);
   const densityMatch = raw.match(/([\d.]+)%\s+density/);
   const kwMatches = mentionMatch ? parseInt(mentionMatch[1]) : null;
   const kwDensityPct = densityMatch ? parseFloat(densityMatch[1]) : null;
+  // Check over-mention FIRST (takes priority over density % checks)
+  if (kwMatches !== null && kwMatches > maxMentions) {
+    return `Keyword used ${kwMatches} times \u2014 reduce to under ${maxMentions} mentions for natural reading`;
+  }
   if (kwMatches !== null && kwMatches < 4) {
-    return `Keyword used only ${kwMatches} time${kwMatches === 1 ? "" : "s"} — aim for 4+ mentions`;
+    return `Keyword used only ${kwMatches} time${kwMatches === 1 ? "" : "s"} \u2014 aim for 4+ mentions`;
   }
   if (kwDensityPct !== null && kwDensityPct > 2.5) {
-    return `Keyword density ${kwDensityPct.toFixed(1)}% — slightly over 2.5% ceiling`;
+    return `Keyword density ${kwDensityPct.toFixed(1)}% \u2014 slightly over 2.5% ceiling`;
   }
   if (kwDensityPct !== null && kwDensityPct < 1.0 && kwMatches !== null && kwMatches >= 4) {
-    return `Keyword density ${kwDensityPct.toFixed(2)}% — just under 1% target (mentions are fine)`;
+    return `Keyword density ${kwDensityPct.toFixed(2)}% \u2014 just under 1% target (mentions are fine)`;
   }
-  return `Keyword density ${kwDensityPct !== null ? kwDensityPct.toFixed(2) + "%" : ""} — outside 1–2.5% range`;
+  return `Keyword density ${kwDensityPct !== null ? kwDensityPct.toFixed(2) + "%" : ""} \u2014 outside 1\u20132.5% range`;
 }
 
 // Labels describe the PROBLEM (what is missing or wrong) — used in the failing-checks list.
@@ -1975,7 +1986,7 @@ export default function ArticleReview() {
                                 liveScore >= 15 ? "text-emerald-700" : liveScore >= 13 ? "text-muted-foreground" : "text-amber-600"
                               }`}>
                                 {k === "p1_keyword_density"
-                                  ? getKeywordDensityLabel(storedMetrics)
+                                  ? getKeywordDensityLabel(storedMetrics, selectedItem.level)
                                   : (PASS1_CHECK_LABELS[k as keyof Pass1Checks] ?? k)}
                               </span>
                             </div>

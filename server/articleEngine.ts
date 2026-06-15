@@ -593,7 +593,23 @@ Return a single JSON object with these exact fields:
 // AI fingerprint scrub pass (from scope Section 6.4)
 // ---------------------------------------------------------------------------
 
-export function buildScrubPrompt(bodyHtml: string, bodyMarkdown: string): string {
+export function buildScrubPrompt(
+  bodyHtml: string,
+  bodyMarkdown: string,
+  focusKeyword?: string,
+  level?: "cornerstone" | "pillar" | "cluster"
+): string {
+  const MAX_KEYWORD_MENTIONS_SCRUB: Record<string, number> = {
+    cornerstone: 20,
+    pillar: 15,
+    cluster: 8,
+  };
+  const maxMentionsScrub = level ? (MAX_KEYWORD_MENTIONS_SCRUB[level] ?? 20) : 20;
+
+  const keywordReductionInstruction = focusKeyword
+    ? `13. Check how many times the focus keyword '${focusKeyword}' appears. If it appears more than ${maxMentionsScrub} times, reduce repetition by:\n   - Replacing some instances with natural synonyms\n   - Using pronouns or descriptive references instead\n   - Restructuring sentences to avoid repeating the exact phrase\n   Do NOT remove the keyword from any section entirely — just reduce the total count to under ${maxMentionsScrub} mentions.`
+    : "";
+
   return `You are an AI content editor specialising in removing AI fingerprints from blog content.
 
 Review the article below and rewrite it to remove all AI tells. The result must be indistinguishable from content written by a specific human expert with a strong point of view.
@@ -610,7 +626,7 @@ SPECIFIC THINGS TO FIX:
 9. Remove any sentence that begins with 'It is important to' or 'It is crucial to' — rewrite as a direct statement.
 10. Ensure the article sounds like it was written by a specific human with a point of view, not a generic assistant
 11. Preserve ALL HTML tags, links, headings, and schema markup exactly — only change the prose text
-12. Do NOT remove any content, sections, or paragraphs — the output MUST be at least as long as the input
+12. Do NOT remove any content, sections, or paragraphs — the output MUST be at least as long as the input${keywordReductionInstruction ? "\n" + keywordReductionInstruction : ""}
 
 IMPORTANT: Do NOT change the meaning, facts, keyword placement, or structure. Only improve the human authenticity of the writing.
 
@@ -663,6 +679,14 @@ export function runPass1Scorer(params: {
     schemaPresent,
   } = params;
 
+  // Maximum keyword mention counts by level — prevents keyword stuffing even when density % is within range
+  const MAX_KEYWORD_MENTIONS: Record<string, number> = {
+    cornerstone: 20,
+    pillar: 15,
+    cluster: 8,
+  };
+  const maxMentions = MAX_KEYWORD_MENTIONS[level] ?? 20;
+
   const kw = primaryKeyword.toLowerCase();
   const bodyLower = bodyHtml.toLowerCase();
   const titleLower = title.toLowerCase();
@@ -696,8 +720,8 @@ export function runPass1Scorer(params: {
   const wc = WORD_COUNT_RULES[level];
 
   const points: Record<string, boolean> = {
-    // Pass if: 4+ mentions AND density ≥1% AND density ≤2.5% — AND logic (both conditions required)
-    p1_keyword_density: kwMatches >= 4 && kwDensity >= 0.01 && kwDensity <= 0.025,
+    // Pass if: 4+ mentions AND density ≥1% AND density ≤2.5% AND under max mention count (prevents stuffing)
+    p1_keyword_density: kwMatches >= 4 && kwMatches <= maxMentions && kwDensity >= 0.01 && kwDensity <= 0.025,
     p2_keyword_in_h1: h1Present,
     p3_keyword_in_h2: kwInH2,
     p4_keyword_in_h3: kwInH3,
@@ -1525,7 +1549,7 @@ Return ONLY the expanded article body as clean HTML, wrapped in these exact deli
 
   // --- Pass B: AI fingerprint scrub ---
   try {
-    const scrubPrompt = buildScrubPrompt(bodyHtml, bodyMarkdown);
+    const scrubPrompt = buildScrubPrompt(bodyHtml, bodyMarkdown, ctx.primaryKeyword, ctx.level);
     const scrubResult = await invokeLLMWithCost(
       {
         messages: [{ role: "user", content: scrubPrompt }],
