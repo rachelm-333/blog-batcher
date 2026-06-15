@@ -284,6 +284,21 @@ export const businessRouter = router({
 
       // ── Fetch website content ────────────────────────────────────────────────
       let websiteContent = "";
+      let metaTitle = "";
+      let metaDescription = "";
+
+      // Detect website builders that commonly block scrapers
+      const BUILDER_PATTERNS = [
+        { pattern: /\.wix\.com|wixsite\.com|x-wix-/i, name: "Wix" },
+        { pattern: /squarespace\.com|squarespace-cdn/i, name: "Squarespace" },
+        { pattern: /webflow\.io|webflow\.com/i, name: "Webflow" },
+        { pattern: /myshopify\.com|shopify\.com/i, name: "Shopify" },
+      ];
+      const detectedBuilder = BUILDER_PATTERNS.find((b) => b.pattern.test(input.websiteUrl));
+      if (detectedBuilder) {
+        console.warn(`[Scrape] Detected ${detectedBuilder.name} site — content may be limited:`, input.websiteUrl);
+      }
+
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -293,6 +308,14 @@ export const businessRouter = router({
         });
         clearTimeout(timeoutId);
         const html = await fetchRes.text();
+
+        // Extract <title> and <meta name="description"> as reliable fallback signals
+        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (titleMatch) metaTitle = titleMatch[1].trim();
+        const metaDescMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+          || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+        if (metaDescMatch) metaDescription = metaDescMatch[1].trim();
+
         // Strip HTML tags and collapse whitespace for a clean text payload
         websiteContent = html
           .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -305,6 +328,13 @@ export const businessRouter = router({
           .replace(/\s+/g, " ")
           .trim()
           .slice(0, 12000); // cap at ~12k chars to stay within token budget
+
+        // If the body content is very sparse (builder blocked body content),
+        // supplement with the meta signals so the LLM has something to work with
+        if (websiteContent.length < 200 && (metaTitle || metaDescription)) {
+          console.warn(`[Scrape] Sparse body content (${websiteContent.length} chars) — supplementing with meta tags`);
+          websiteContent = `Page title: ${metaTitle}\nMeta description: ${metaDescription}\n\n${websiteContent}`;
+        }
       } catch (fetchErr) {
         // Fetch failed (timeout, DNS error, etc.) — proceed with URL only
         console.warn("[Scrape] Website fetch failed, proceeding with URL only:", fetchErr);
@@ -386,6 +416,12 @@ Rules:
           parsed = JSON.parse(raw);
         } catch {
           parsed = {};
+        }
+
+        // Use meta description as UVP fallback if the LLM couldn't extract one
+        if (!parsed.uniqueValueProposition && metaDescription) {
+          console.warn("[Scrape] Using meta description as UVP fallback");
+          parsed.uniqueValueProposition = metaDescription;
         }
 
         // Cache the scrape result and mark complete

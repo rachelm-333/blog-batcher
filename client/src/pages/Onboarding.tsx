@@ -114,6 +114,18 @@ export default function Onboarding() {
     refetch();
   };
 
+  // Sanitise scraped string values — converts null, undefined, and the literal
+  // string "null" to empty string so form fields are never pre-filled with "null".
+  const cleanStr = (v: any): string =>
+    v == null || v === "null" || v === "undefined" ? "" : String(v);
+
+  // Detect a partially-failed scrape: key fields are all empty after scrape ran
+  const scrapePartiallyFailed =
+    scrapeData != null &&
+    !cleanStr(scrapeData?.industry) &&
+    !cleanStr(scrapeData?.location) &&
+    !cleanStr(scrapeData?.uniqueValueProposition);
+
   const handleBusinessCreated = (id: number) => {
     setBusinessId(id);
   };
@@ -191,15 +203,15 @@ export default function Onboarding() {
             key={`step1-${businessId}`}
             businessId={businessId}
             initial={{
-              name: bizData?.name ?? scrapeData?.name,
-              industry: bizData?.industry ?? scrapeData?.industry,
-              location: bizData?.location ?? scrapeData?.location,
-              serviceArea: bizData?.serviceArea ?? scrapeData?.serviceArea,
-              physicalAddress: bizData?.physicalAddress ?? undefined,
+              name: cleanStr(bizData?.name ?? scrapeData?.name),
+              industry: cleanStr(bizData?.industry ?? scrapeData?.industry),
+              location: cleanStr(bizData?.location ?? scrapeData?.location),
+              serviceArea: cleanStr(bizData?.serviceArea ?? scrapeData?.serviceArea),
+              physicalAddress: cleanStr(bizData?.physicalAddress) || undefined,
               isPhysicalLocation: bizData?.isPhysicalLocation ?? false,
-              abnBusinessRegistration: bizData?.abnBusinessRegistration ?? undefined,
+              abnBusinessRegistration: cleanStr(bizData?.abnBusinessRegistration) || undefined,
               uniqueValueProposition:
-                bizData?.uniqueValueProposition ?? scrapeData?.uniqueValueProposition,
+                cleanStr(bizData?.uniqueValueProposition ?? scrapeData?.uniqueValueProposition) || undefined,
               problemsSolved: bizData?.problemsSolved ?? undefined,
               keywordExclusions: bizData?.keywordExclusions ?? undefined,
               audiences: (
@@ -214,6 +226,7 @@ export default function Onboarding() {
                 description: a.description ?? "",
               })),
             }}
+            scrapePartiallyFailed={scrapePartiallyFailed}
             onNext={next}
             onBack={back}
           />
