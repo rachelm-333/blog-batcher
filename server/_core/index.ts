@@ -178,6 +178,18 @@ async function startServer() {
     serveStatic(app);
   }
 
+  // ── Global error handler: ensures Express NEVER returns an HTML error page ──
+  // Must be registered AFTER all routes and middleware.
+  app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("[GlobalErrorHandler]", err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Internal server error",
+        message: err.message,
+      });
+    }
+  });
+
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
 

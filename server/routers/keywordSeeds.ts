@@ -41,14 +41,20 @@ export const keywordSeedsRouter = router({
   getAll: protectedProcedure
     .input(z.object({ businessId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
-      await assertOwnership(ctx.user.id, input.businessId);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      return db
-        .select()
-        .from(keywordSeeds)
-        .where(eq(keywordSeeds.businessId, input.businessId))
-        .orderBy(asc(keywordSeeds.sortOrder));
+      try {
+        await assertOwnership(ctx.user.id, input.businessId);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        return db
+          .select()
+          .from(keywordSeeds)
+          .where(eq(keywordSeeds.businessId, input.businessId))
+          .orderBy(asc(keywordSeeds.sortOrder));
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywordSeeds.getAll] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to fetch keyword seeds" });
+      }
     }),
 
   // -------------------------------------------------------------------------
@@ -61,20 +67,26 @@ export const keywordSeedsRouter = router({
       seeds: z.array(z.string().min(1).max(255)).max(10),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertOwnership(ctx.user.id, input.businessId);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      await db.delete(keywordSeeds).where(eq(keywordSeeds.businessId, input.businessId));
-      if (input.seeds.length > 0) {
-        await db.insert(keywordSeeds).values(
-          input.seeds.map((kw, idx) => ({
-            businessId: input.businessId,
-            keyword: kw.trim(),
-            sortOrder: idx,
-          }))
-        );
+      try {
+        await assertOwnership(ctx.user.id, input.businessId);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await db.delete(keywordSeeds).where(eq(keywordSeeds.businessId, input.businessId));
+        if (input.seeds.length > 0) {
+          await db.insert(keywordSeeds).values(
+            input.seeds.map((kw, idx) => ({
+              businessId: input.businessId,
+              keyword: kw.trim(),
+              sortOrder: idx,
+            }))
+          );
+        }
+        return { saved: input.seeds.length };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywordSeeds.save] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to save keyword seeds" });
       }
-      return { saved: input.seeds.length };
     }),
 
   // -------------------------------------------------------------------------
@@ -85,6 +97,7 @@ export const keywordSeedsRouter = router({
   suggest: protectedProcedure
     .input(z.object({ businessId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      try {
       await assertOwnership(ctx.user.id, input.businessId);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
@@ -149,10 +162,20 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
         { userId: ctx.user.id, feature: "keyword_research" }
       );
 
-      const content = response?.choices?.[0]?.message?.content ?? '{"seeds":[]}';
-      const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content)) as { seeds: string[] };
-      const seeds = (parsed.seeds ?? []).slice(0, 10).map((s: string) => s.trim()).filter(Boolean);
-      return { seeds };
+      let parsedSeeds: string[] = [];
+      try {
+        const content = response?.choices?.[0]?.message?.content ?? '{"seeds":[]}';
+        const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content)) as { seeds: string[] };
+        parsedSeeds = (parsed.seeds ?? []).slice(0, 10).map((s: string) => s.trim()).filter(Boolean);
+      } catch (parseErr) {
+        console.warn("[keywordSeeds.suggest] Failed to parse LLM response:", parseErr);
+      }
+      return { seeds: parsedSeeds };
+    } catch (err) {
+      if (err instanceof TRPCError) throw err;
+      console.error("[keywordSeeds.suggest] Error:", err);
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to suggest keyword seeds" });
+    }
     }),
 
   // -------------------------------------------------------------------------
@@ -172,25 +195,31 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
       })).max(500),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertOwnership(ctx.user.id, input.businessId);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      // Delete existing selections for this business
-      await db.delete(selectedKeywords).where(eq(selectedKeywords.businessId, input.businessId));
-      if (input.keywords.length > 0) {
-        await db.insert(selectedKeywords).values(
-          input.keywords.map((kw, idx) => ({
-            businessId: input.businessId,
-            keyword: kw.keyword.trim(),
-            msv: kw.msv ?? null,
-            competitionLevel: kw.competition ?? null,
-            cpc: kw.cpc != null ? String(kw.cpc.toFixed(2)) : null,
-            seedKeyword: kw.seedKeyword ?? null,
-            sortOrder: idx,
-          }))
-        );
+      try {
+        await assertOwnership(ctx.user.id, input.businessId);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        // Delete existing selections for this business
+        await db.delete(selectedKeywords).where(eq(selectedKeywords.businessId, input.businessId));
+        if (input.keywords.length > 0) {
+          await db.insert(selectedKeywords).values(
+            input.keywords.map((kw, idx) => ({
+              businessId: input.businessId,
+              keyword: kw.keyword.trim(),
+              msv: kw.msv ?? null,
+              competitionLevel: kw.competition ?? null,
+              cpc: kw.cpc != null ? String(kw.cpc.toFixed(2)) : null,
+              seedKeyword: kw.seedKeyword ?? null,
+              sortOrder: idx,
+            }))
+          );
+        }
+        return { saved: input.keywords.length };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywordSeeds.saveSelectedKeywords] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to save selected keywords" });
       }
-      return { saved: input.keywords.length };
     }),
 
   // -------------------------------------------------------------------------
@@ -201,14 +230,20 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
   getSelectedKeywords: protectedProcedure
     .input(z.object({ businessId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
-      await assertOwnership(ctx.user.id, input.businessId);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      return db
-        .select()
-        .from(selectedKeywords)
-        .where(eq(selectedKeywords.businessId, input.businessId))
-        .orderBy(asc(selectedKeywords.sortOrder));
+      try {
+        await assertOwnership(ctx.user.id, input.businessId);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        return db
+          .select()
+          .from(selectedKeywords)
+          .where(eq(selectedKeywords.businessId, input.businessId))
+          .orderBy(asc(selectedKeywords.sortOrder));
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywordSeeds.getSelectedKeywords] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to fetch selected keywords" });
+      }
     }),
 
   // -------------------------------------------------------------------------
@@ -223,6 +258,7 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
       locationCode: z.number().int().optional().default(2036), // 2036 = Australia
     }))
     .mutation(async ({ ctx, input }) => {
+      try {
       await assertOwnership(ctx.user.id, input.businessId);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
@@ -353,5 +389,10 @@ Return JSON with key "seeds" containing an array of up to 10 keyword strings.`;
           ? `Found ${totalFound} keywords across ${seeds.length} seed${seeds.length !== 1 ? "s" : ""} — select the ones most relevant to your business.`
           : `No keyword data found. Try shorter, broader seed terms (e.g. "mental health" instead of "workplace mental health compliance").`,
       };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywordSeeds.searchDataForSEO] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Keyword search failed — please try again" });
+      }
     }),
 });

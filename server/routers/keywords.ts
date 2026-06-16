@@ -367,6 +367,7 @@ export const keywordsRouter = router({
   getAll: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .query(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -400,6 +401,11 @@ export const keywordsRouter = router({
         .orderBy(articleNodes.sortOrder);
 
       return rows;
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywords.getAll] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to fetch keywords" });
+      }
     }),
 
   // -------------------------------------------------------------------------
@@ -484,17 +490,23 @@ export const keywordsRouter = router({
   approveOne: protectedProcedure
     .input(z.object({ businessId: z.number(), keywordId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      try {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+        await assertBusinessOwnership(ctx.user.id, input.businessId);
 
-      await db
-        .update(keywords)
-        .set({ keywordApproved: true })
-        .where(and(eq(keywords.id, input.keywordId), eq(keywords.businessId, input.businessId)));
+        await db
+          .update(keywords)
+          .set({ keywordApproved: true })
+          .where(and(eq(keywords.id, input.keywordId), eq(keywords.businessId, input.businessId)));
 
-      return { approved: true };
+        return { approved: true };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywords.approveOne] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to approve keyword" });
+      }
     }),
 
   // -------------------------------------------------------------------------
@@ -505,6 +517,7 @@ export const keywordsRouter = router({
   approveAll: protectedProcedure
     .input(z.object({ businessId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -557,6 +570,11 @@ export const keywordsRouter = router({
         .where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatchAA)));
 
       return { approved: allKw.length };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywords.approveAll] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to approve all keywords" });
+      }
     }),
 
   // -------------------------------------------------------------------------
@@ -660,6 +678,7 @@ export const keywordsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -688,6 +707,11 @@ export const keywordsRouter = router({
       }
 
       return { approved: true, stageAdvanced: allApproved };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywords.approvePAA] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to approve PAA question" });
+      }
     }),
 
   // -------------------------------------------------------------------------
@@ -874,6 +898,7 @@ export const keywordsRouter = router({
   getSavedSelections: protectedProcedure
     .input(z.object({ businessId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
+      try {
       const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
       const activeBatch = biz.activeBatch ?? 1;
       const db = await getDb();
@@ -947,5 +972,10 @@ export const keywordsRouter = router({
           isAssigned: assignedNodeId !== null,
         };
       });
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[keywords.getSavedSelections] Error:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to fetch saved keyword selections" });
+      }
     }),
 });
