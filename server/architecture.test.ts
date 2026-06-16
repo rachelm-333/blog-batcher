@@ -129,6 +129,18 @@ describe("architectureRules.calcTotalArticles", () => {
     // 2 cornerstones + 6 pillars + 30 clusters = 38
     expect(calcTotalArticles(2, 3, 5)).toBe(38);
   });
+
+  it("calculates correctly for pillar-only mode: 1 pillar, 0 clusters = 1 article", () => {
+    expect(calcTotalArticles(0, 1, 0)).toBe(1);
+  });
+
+  it("calculates correctly for pillar-only mode: 2 pillars, 3 clusters each = 8 articles", () => {
+    expect(calcTotalArticles(0, 2, 3)).toBe(8);
+  });
+
+  it("calculates correctly for pillar-only mode: 4 pillars, 5 clusters each = 24 articles", () => {
+    expect(calcTotalArticles(0, 4, 5)).toBe(24);
+  });
 });
 
 // ─── calcBreakdown ────────────────────────────────────────────────────────────
@@ -200,7 +212,7 @@ describe("architectureRules.generateNodes", () => {
     });
   });
 
-  it("all cluster nodes have both cornerstoneIndex and pillarIndex", () => {
+  it("all cluster nodes have both cornerstoneIndex and pillarIndex (full hierarchy)", () => {
     const nodes = generateNodes(2, 3);
     const clusters = nodes.filter((n) => n.level === "cluster");
     clusters.forEach((n) => {
@@ -208,6 +220,42 @@ describe("architectureRules.generateNodes", () => {
       expect(n.pillarIndex).not.toBeNull();
       expect(n.clusterIndex).not.toBeNull();
     });
+  });
+
+  // ── Pillar-only mode (cornerstones = 0) ──────────────────────────────────
+
+  it("generates 1 pillar node for cornerstones=0, pillars=1, clusters=0", () => {
+    const nodes = generateNodes(0, 1, 0);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].level).toBe("pillar");
+    expect(nodes[0].cornerstoneIndex).toBe(0);
+    expect(nodes[0].pillarIndex).toBe(1);
+  });
+
+  it("generates correct nodes for cornerstones=0, pillars=2, clusters=3", () => {
+    const nodes = generateNodes(0, 2, 3);
+    const pillars = nodes.filter((n) => n.level === "pillar");
+    const clusters = nodes.filter((n) => n.level === "cluster");
+    expect(pillars).toHaveLength(2);
+    expect(clusters).toHaveLength(6); // 2 pillars × 3 clusters
+    expect(nodes).toHaveLength(8);
+    // All nodes have cornerstoneIndex=0
+    nodes.forEach((n) => expect(n.cornerstoneIndex).toBe(0));
+    // Clusters are parented to pillars
+    clusters.forEach((n) => expect(n.pillarIndex).not.toBeNull());
+  });
+
+  it("generates correct labels for pillar-only mode", () => {
+    const nodes = generateNodes(0, 2, 2);
+    expect(nodes.find((n) => n.label === "Pillar 1")).toBeTruthy();
+    expect(nodes.find((n) => n.label === "Pillar 2")).toBeTruthy();
+    expect(nodes.find((n) => n.label === "Cluster 1.1")).toBeTruthy();
+    expect(nodes.find((n) => n.label === "Cluster 2.2")).toBeTruthy();
+  });
+
+  it("generates 0 nodes for cornerstones=0, pillars=0, clusters=0 (edge case)", () => {
+    const nodes = generateNodes(0, 0, 0);
+    expect(nodes).toHaveLength(0);
   });
 });
 

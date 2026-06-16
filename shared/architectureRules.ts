@@ -235,7 +235,9 @@ export interface ArchitectureNode {
 /**
  * Generates the full flat list of article nodes for a given architecture config.
  * Strict hierarchy: cornerstones → pillars → clusters.
- * Clusters per pillar is variable (2–5).
+ * When cornerstones = 0, operates in pillar-only mode: standalone pillars, each
+ * optionally with cluster children (cornerstoneIndex = 0 for all nodes).
+ * Clusters per pillar is variable (0–5).
  */
 export function generateNodes(
   cornerstones: number,
@@ -243,6 +245,31 @@ export function generateNodes(
   clustersPerPillar: number = CLUSTERS_PER_PILLAR
 ): ArchitectureNode[] {
   const nodes: ArchitectureNode[] = [];
+
+  if (cornerstones === 0) {
+    // Pillar-only mode: standalone pillars (no cornerstone parent)
+    for (let p = 1; p <= pillarsPerCornerstone; p++) {
+      nodes.push({
+        level: "pillar",
+        cornerstoneIndex: 0,
+        pillarIndex: p,
+        clusterIndex: null,
+        defaultArticleType: "how_to",
+        label: `Pillar ${p}`,
+      });
+      for (let cl = 1; cl <= clustersPerPillar; cl++) {
+        nodes.push({
+          level: "cluster",
+          cornerstoneIndex: 0,
+          pillarIndex: p,
+          clusterIndex: cl,
+          defaultArticleType: "specialist_post",
+          label: `Cluster ${p}.${cl}`,
+        });
+      }
+    }
+    return nodes;
+  }
 
   for (let c = 1; c <= cornerstones; c++) {
     nodes.push({

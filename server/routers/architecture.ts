@@ -118,10 +118,12 @@ async function regenerateNodes(
     );
   insertedCornerstones.sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Pass 2: Pillars (strict hierarchy — always parented to a cornerstone)
+  // Pass 2: Pillars
+  // In pillar-only mode (cornerstones=0) pillars have no parent cornerstone.
   const pillarNodes = nodes.filter((n) => n.level === "pillar");
   for (const n of pillarNodes) {
-    const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
+    // cornerstoneIndex=0 means pillar-only mode — no parent cornerstone
+    const cornerstoneRow = n.cornerstoneIndex > 0 ? insertedCornerstones[n.cornerstoneIndex - 1] : undefined;
     await db.insert(articleNodes).values({
       architectureId,
       businessId,
@@ -150,26 +152,44 @@ async function regenerateNodes(
     );
   insertedPillars.sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Pass 3: Clusters (strict hierarchy — always parented to a cornerstone and pillar)
+  // Pass 3: Clusters
+  // In pillar-only mode (cornerstones=0) clusters are parented only to a pillar.
   const clusterNodes = nodes.filter((n) => n.level === "cluster");
   for (const n of clusterNodes) {
-    const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
-    if (!cornerstoneRow) continue;
-    const pillarsUnderCornerstone = insertedPillars.filter(
-      (p) => p.parentCornerstoneId === cornerstoneRow.id
-    );
-    const pillarRow = pillarsUnderCornerstone[n.pillarIndex! - 1];
-    if (!pillarRow) continue;
-    await db.insert(articleNodes).values({
-      architectureId,
-      businessId,
-      batchNumber,
-      level: "cluster",
-      articleType: n.defaultArticleType,
-      parentCornerstoneId: cornerstoneRow.id,
-      parentPillarId: pillarRow.id,
-      sortOrder: sortOrder++,
-    });
+    if (n.cornerstoneIndex === 0) {
+      // Pillar-only mode: find pillar by its position (pillarIndex is 1-based)
+      const pillarRow = insertedPillars[n.pillarIndex! - 1];
+      if (!pillarRow) continue;
+      await db.insert(articleNodes).values({
+        architectureId,
+        businessId,
+        batchNumber,
+        level: "cluster",
+        articleType: n.defaultArticleType,
+        parentCornerstoneId: null,
+        parentPillarId: pillarRow.id,
+        sortOrder: sortOrder++,
+      });
+    } else {
+      // Full hierarchy mode: cluster is parented to both cornerstone and pillar
+      const cornerstoneRow = insertedCornerstones[n.cornerstoneIndex - 1];
+      if (!cornerstoneRow) continue;
+      const pillarsUnderCornerstone = insertedPillars.filter(
+        (p) => p.parentCornerstoneId === cornerstoneRow.id
+      );
+      const pillarRow = pillarsUnderCornerstone[n.pillarIndex! - 1];
+      if (!pillarRow) continue;
+      await db.insert(articleNodes).values({
+        architectureId,
+        businessId,
+        batchNumber,
+        level: "cluster",
+        articleType: n.defaultArticleType,
+        parentCornerstoneId: cornerstoneRow.id,
+        parentPillarId: pillarRow.id,
+        sortOrder: sortOrder++,
+      });
+    }
   }
 }
 
@@ -395,6 +415,7 @@ export const architectureRouter = router({
         existing.push(newArch[0]);
       }
       const arch = existing[0];
+      console.log(`[Architecture.update] businessId=${input.businessId} activeBatch=${activeBatchU} archId=${arch.id} cornerstones=${input.cornerstones} pillars=${input.pillarsPerCornerstone} clusters=${input.clustersPerPillar ?? 'inherit'}`);
       if (arch.confirmed) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Architecture is locked after confirmation." });
       }

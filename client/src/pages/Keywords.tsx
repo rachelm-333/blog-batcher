@@ -365,10 +365,15 @@ export default function Keywords() {
   const [pendingSwapKw, setPendingSwapKw] = useState<string | null>(null);
 
   // Detect architecture mismatch: article nodes don't match current config
+  // Use the same formula as the server (handles pillar-only mode where cornerstones=0)
   const expectedArticleCount = archData?.architecture
     ? (() => {
         const a = archData.architecture;
         const clusters = (a as { clustersPerPillar?: number }).clustersPerPillar ?? 3;
+        if (a.cornerstoneCount === 0) {
+          // Pillar-only mode: pillars + pillars * clusters
+          return a.pillarCount + a.pillarCount * clusters;
+        }
         return a.cornerstoneCount + a.cornerstoneCount * a.pillarCount + a.cornerstoneCount * a.pillarCount * clusters;
       })()
     : null;
