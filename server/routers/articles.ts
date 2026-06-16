@@ -64,6 +64,11 @@ import { createArticleHeartbeat, cancelArticleHeartbeat } from "../schedulerServ
 import { COOKIE_NAME } from "../../shared/const";
 
 // ---------------------------------------------------------------------------
+// Owner account — unlimited free access, all credit gates bypassed
+// ---------------------------------------------------------------------------
+const OWNER_EMAIL = "rachel.m@noize.com.au";
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 function getArticleSessionToken(ctx: { req: { headers: { cookie?: string } } }): string {
@@ -250,7 +255,7 @@ export const articlesRouter = router({
         .where(eq(blogArchitectures.businessId, input.businessId))
         .limit(1);
       const isTrialBusiness = arch?.packSize === 0;
-      if (ctx.user.role !== 'admin') {
+      if (ctx.user.role !== 'admin' && ctx.user.email !== OWNER_EMAIL) {
       if (isTrialBusiness) {
         // Trial business: block if free trial already used
         const [userRow] = await db
@@ -344,7 +349,8 @@ export const articlesRouter = router({
       }
 
       // Capture trial flag for use in background task
-      const isTrialGen = isTrialBusiness;
+      // Owner account never consumes the free trial
+      const isTrialGen = isTrialBusiness && ctx.user.email !== OWNER_EMAIL;
       const trialUserId = ctx.user.id;
 
       // Run generation sequentially in background (non-blocking response)

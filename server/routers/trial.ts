@@ -30,6 +30,9 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { PRODUCTS } from "../stripe/products";
 
+// Owner account — unlimited free access, all credit gates bypassed
+const OWNER_EMAIL = "rachel.m@noize.com.au";
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -131,7 +134,7 @@ export const trialRouter = router({
         .where(eq(users.id, ctx.user.id))
         .limit(1);
 
-      if (user?.freeTrialUsed) {
+      if (user?.freeTrialUsed && ctx.user.email !== OWNER_EMAIL) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message:
