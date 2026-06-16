@@ -93,6 +93,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const articlesWritten = (sc.generated ?? 0) + (sc.pending_approval ?? 0) + (sc.approved ?? 0) + (sc.scheduled ?? 0) + (sc.published ?? 0);
   const approvedCount = (sc.approved ?? 0) + (sc.scheduled ?? 0) + (sc.published ?? 0);
   const publishedOrScheduled = (sc.scheduled ?? 0) + (sc.published ?? 0);
+  const totalArticles = sc.total ?? 0;
+  const isBatchComplete = totalArticles > 0 && publishedOrScheduled === totalArticles;
+  const activeBatch = Number(activeBiz?.activeBatch ?? 1);
 
   function isStageComplete(stageNum: number): boolean {
     if (stageNum === 1) return currentStage > 1;
@@ -208,6 +211,26 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
+        {/* Batch indicator */}
+        {activeBiz && (
+          <div className="px-3 py-1.5 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
+            <div
+              className="flex items-center justify-between px-2 py-1 rounded-md cursor-pointer"
+              style={{ background: isBatchComplete ? "#dcfce7" : "#f5f3ec" }}
+              onClick={() => isBatchComplete && setLocation("/batch-complete")}
+              title={isBatchComplete ? "View completed batch" : undefined}
+            >
+              <span className="text-xs font-semibold" style={{ color: isBatchComplete ? "#16a34a" : "#6b7280" }}>
+                Batch {activeBatch}
+              </span>
+              {isBatchComplete ? (
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ background: "#bbf7d0", color: "#15803d" }}>Complete ✓</span>
+              ) : (
+                <span className="text-xs" style={{ color: "#9ca3af" }}>In progress</span>
+              )}
+            </div>
+          </div>
+        )}
         {/* Scrollable nav */}
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {/* WORKFLOW */}
@@ -223,6 +246,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 key={item.path}
                 onClick={() => {
                   if (stageLocked) return;
+                  // If batch is complete, redirect all workflow clicks to batch-complete
+                  if (isBatchComplete) {
+                    setLocation("/batch-complete");
+                    return;
+                  }
                   // Business Profile: go to edit mode when stage 1 is already complete
                   if (item.stage === 1 && isStageComplete(1)) {
                     setLocation("/onboarding?edit=1");

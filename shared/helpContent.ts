@@ -50,6 +50,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   { id: "review-editing", label: "Review & Editing", description: "Reviewing, editing, and approving articles.", icon: "CheckSquare" },
   { id: "publishing-scheduling", label: "Publishing & Scheduling", description: "Connecting your CMS and scheduling posts.", icon: "Calendar" },
   { id: "account-billing", label: "Account & Billing", description: "Credits, plans, and account settings.", icon: "CreditCard" },
+  { id: "batches-workflow", label: "Batches & Workflow", description: "Understanding batches, starting new batches, and what happens when a batch is complete.", icon: "Grid3X3" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -563,6 +564,145 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { type: "tip", text: "If you don't receive the password reset email, check your spam folder. If it's not there, contact support." },
     ],
   },
+
+  // ── Batches & Workflow ──────────────────────────────────────────────────
+
+  {
+    id: 23,
+    topicId: "batches-workflow",
+    title: "How Blog Batcher works — the 6-stage pipeline",
+    slug: "how-blog-batcher-works-6-stages",
+    tags: ["overview", "pipeline", "stages", "getting started", "how it works", "6 stages", "batch"],
+    body: [
+      { type: "paragraph", text: "Blog Batcher turns your business information into a full library of SEO-optimised blog posts. It does this in 6 stages, and you move through them in order." },
+      { type: "heading", text: "Stage 1 — Business Profile" },
+      { type: "paragraph", text: "Tell Blog Batcher about your business: name, industry, location, target audience, and brand voice. This is set once and reused for every batch." },
+      { type: "heading", text: "Stage 2 — Blog Architecture" },
+      { type: "paragraph", text: "Choose how many articles you want and what type (Cornerstone, Pillar, Cluster). This defines the structure of your batch." },
+      { type: "heading", text: "Stage 3 — Keyword Research" },
+      { type: "paragraph", text: "Research real search data to find the best keywords for each article. PAA questions from Google become FAQ sections inside your articles." },
+      { type: "heading", text: "Stage 4 — Article Generation" },
+      { type: "paragraph", text: "Blog Batcher writes all your articles using the 16-point Authority Standard. Each article gets a quality score." },
+      { type: "heading", text: "Stage 5 — Review & Edit" },
+      { type: "paragraph", text: "Review each article, make edits, and approve it for publishing." },
+      { type: "heading", text: "Stage 6 — Publish & Schedule" },
+      { type: "paragraph", text: "Connect your CMS and schedule articles to publish automatically on the dates you set." },
+      { type: "tip", text: "Each batch is a set of articles. When your batch is published, start a new batch to keep growing." },
+    ],
+  },
+
+  {
+    id: 24,
+    topicId: "batches-workflow",
+    title: "Starting a new batch",
+    slug: "starting-a-new-batch",
+    tags: ["new batch", "batch", "start over", "next batch", "workflow reset"],
+    body: [
+      { type: "paragraph", text: "Your Business Profile is set once — you don't need to redo it for every batch. When you're ready to create more content, simply start a new batch." },
+      { type: "heading", text: "How to start a new batch" },
+      { type: "list", items: [
+        "Go to Dashboard and click \"Start New Batch\".",
+        "Or, when your current batch is complete, click \"Start New Batch →\" on the Batch Complete page.",
+        "The new batch starts at Stage 2 (Blog Architecture) — your business profile is already set.",
+      ]},
+      { type: "heading", text: "What happens to your previous batch?" },
+      { type: "paragraph", text: "Your previous batch stays complete and locked. All published articles remain live. You can view them from the Batch Complete page or the Dashboard." },
+      { type: "tip", text: "Each batch has its own keywords, content plan, and articles. Nothing from your previous batch is overwritten." },
+    ],
+  },
+
+  {
+    id: 25,
+    topicId: "keyword-research",
+    title: "Keywords — how to choose the right ones",
+    slug: "keywords-how-to-choose",
+    tags: ["keywords", "search volume", "PAA", "people also ask", "keyword selection"],
+    body: [
+      { type: "paragraph", text: "Choosing the right keywords is the most important step in the workflow. Here's how to do it well." },
+      { type: "heading", text: "One keyword per article" },
+      { type: "paragraph", text: "Select one primary focus keyword per article in your content plan. This is the keyword the article will be optimised for." },
+      { type: "heading", text: "Search volume" },
+      { type: "paragraph", text: "Choose keywords with a search volume above 100 searches per month. Lower volume keywords may not drive meaningful traffic." },
+      { type: "heading", text: "PAA questions" },
+      { type: "paragraph", text: "People Also Ask (PAA) questions are pulled directly from Google. These become FAQ sections inside your articles, which helps with featured snippets and voice search." },
+      { type: "warning", text: "Keywords are locked once you proceed to content planning. Choose carefully before advancing." },
+    ],
+  },
+
+  {
+    id: 26,
+    topicId: "batches-workflow",
+    title: "Content Plan — setting direction for your articles",
+    slug: "content-plan-direction",
+    tags: ["content plan", "direction", "AI angle", "article direction", "brief"],
+    body: [
+      { type: "paragraph", text: "The Direction field in your content plan is your chance to tell the AI what angle to take on each article." },
+      { type: "heading", text: "Be specific" },
+      { type: "list", items: [
+        "Mention the specific customer problem this article solves.",
+        "Include your point of difference or a specific example.",
+        "Name the target audience if it's different from your general audience.",
+      ]},
+      { type: "warning", text: "Vague direction = generic articles. The more specific your direction, the better the output." },
+      { type: "tip", text: "Example: \"This article is for small business owners who are confused about whether they need a trademark. Explain the difference between a trademark and a business name registration, and why the distinction matters for Australian businesses.\"" },
+    ],
+  },
+
+  {
+    id: 27,
+    topicId: "review-editing",
+    title: "Article scores explained",
+    slug: "article-scores-explained",
+    tags: ["scores", "checkpoint", "quality score", "16/16", "pass 2", "needs review", "keep and review"],
+    body: [
+      { type: "paragraph", text: "Every article is scored at two checkpoints before it's approved for publishing." },
+      { type: "heading", text: "Checkpoint 1 — SEO (16/16)" },
+      { type: "paragraph", text: "A score of 16/16 means all 16 SEO checkpoints passed. These include keyword density, word count, heading structure, meta title, meta description, internal links, and more." },
+      { type: "heading", text: "Checkpoint 2 — Writing Quality" },
+      { type: "paragraph", text: "A score of 70 or above is Excellent — the article is ready to publish. Below 70 means the article went through an automatic improvement pass." },
+      { type: "heading", text: "Needs Review badge" },
+      { type: "paragraph", text: "If an article has a \"Needs Review\" badge, it means it didn't pass the quality threshold automatically. You can read it and decide whether to approve it or regenerate it." },
+      { type: "tip", text: "Use \"Keep & Review\" on any article you want to approve manually — it won't be regenerated without your instruction." },
+    ],
+  },
+
+  {
+    id: 28,
+    topicId: "publishing-scheduling",
+    title: "Publishing to Wix and WordPress",
+    slug: "publishing-to-wix-wordpress",
+    tags: ["publishing", "wix", "wordpress", "CMS", "integrations", "google search console", "indexing"],
+    body: [
+      { type: "paragraph", text: "Blog Batcher can publish directly to your CMS. Here's how to set it up and what to do after publishing." },
+      { type: "heading", text: "Connecting your CMS" },
+      { type: "list", items: [
+        "Go to Stage 6 → Integrations.",
+        "Select your platform (Wix or WordPress).",
+        "Follow the connection steps — you'll need your site URL and an API key.",
+      ]},
+      { type: "heading", text: "What gets published" },
+      { type: "paragraph", text: "Articles publish with all metadata, schema markup, and internal links intact. The original publish date is preserved so existing rankings are not affected." },
+      { type: "heading", text: "After publishing" },
+      { type: "tip", text: "After publishing, submit your new article URLs to Google Search Console for faster indexing. This can significantly reduce the time it takes for Google to discover and rank your new content." },
+    ],
+  },
+
+  {
+    id: 29,
+    topicId: "batches-workflow",
+    title: "Contact & Help",
+    slug: "contact-and-help",
+    tags: ["contact", "support", "help", "email", "documentation"],
+    body: [
+      { type: "paragraph", text: "Need help? Here's how to reach us." },
+      { type: "heading", text: "Email support" },
+      { type: "paragraph", text: "Email us at support@blogbatcher.com and we'll get back to you within one business day." },
+      { type: "heading", text: "Contact form" },
+      { type: "paragraph", text: "Use the contact form at the bottom of this page to send a message directly. Include your business name and a description of the issue." },
+      { type: "tip", text: "For urgent issues, include your account email in the message so we can look up your account quickly." },
+    ],
+  },
+
 ];
 
 // ---------------------------------------------------------------------------
