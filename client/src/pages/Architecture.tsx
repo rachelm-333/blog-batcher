@@ -524,7 +524,7 @@ export default function Architecture() {
             />
 
             <SliderRow
-              label="Pillar Posts"
+              label="Pillar Posts (per cornerstone post)"
               subtitle="In-depth topic posts — 1,500–2,200 words. Each pillar links back to its cornerstone."
               value={localPillars}
               min={MIN_PILLARS_PER_CORNERSTONE}
@@ -535,7 +535,7 @@ export default function Architecture() {
             />
 
             <SliderRow
-              label="Cluster Articles"
+              label="Cluster Articles (per pillar post)"
               subtitle="Specific, focused posts — 800–1,200 words. Each cluster links back to its pillar and cornerstone."
               value={localClusters}
               min={MIN_CLUSTERS_PER_PILLAR}
