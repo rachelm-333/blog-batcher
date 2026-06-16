@@ -362,6 +362,22 @@ describe("AI fingerprint scrub pass", () => {
       "leverage",
       "synergy",
       "transformative",
+      // New AI-fingerprint / performative phrases
+      "non-negotiable",
+      "it's worth noting",
+      "the truth is",
+      "let's be honest",
+      "the reality is",
+      "this means that",
+      "game-changing",
+      "make no mistake",
+      "here's the thing",
+      "the fact is",
+      "simply put",
+      "it's no secret",
+      "spoiler alert",
+      "the good news is",
+      "the bad news is",
     ];
     for (const phrase of required) {
       expect(BANNED_PHRASES).toContain(phrase);

@@ -118,6 +118,32 @@ export const BANNED_PHRASES = [
   "as we all know",
   "the bottom line is",
   "at its core",
+  // New AI-fingerprint / performative phrases
+  "non-negotiable",
+  "minefield blindfolded",
+  "it's worth noting",
+  "it is worth noting",
+  "the truth is",
+  "let's be honest",
+  "let us be honest",
+  "the reality is",
+  "this means that",
+  "game-changing",
+  "this is a game",
+  "make no mistake",
+  "here's the thing",
+  "here is the thing",
+  "the fact is",
+  "simply put",
+  "put simply",
+  "in other words",
+  "to put it simply",
+  "to put it another way",
+  "it's no secret",
+  "it is no secret",
+  "spoiler alert",
+  "the good news is",
+  "the bad news is",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -569,10 +595,23 @@ Customise the H2 heading and body copy to match the article topic and brand voic
 - DO NOT invent URLs. Every link in the article must use a real, verifiable URL. For internal links, use only the batch slugs listed in point 12. For external links, use only well-known, verifiable domains (.gov.au, industry bodies, major publications). If no real external link is available for a claim, do not include one.
 - DO NOT use em dashes (—) excessively.
 - DO NOT open with a rhetorical question.
-- DO NOT use these phrases: "in today's world", "it's important to note", "delve into", "game-changer", "leverage", "synergy", "transformative".
+- DO NOT introduce sections with a bolded question followed by an answer paragraph — this is a formulaic AI pattern.
+- DO NOT use formulaic section structures where every H3 follows the exact same pattern.
+- DO NOT open paragraphs with "This means that...".
+- DO NOT use these phrases (banned): "in today's world", "it's important to note", "it's worth noting", "delve into", "game-changer", "game-changing", "leverage", "synergy", "transformative", "non-negotiable", "minefield blindfolded", "the truth is", "let's be honest", "the reality is", "make no mistake", "here's the thing", "the fact is", "simply put", "it's no secret", "spoiler alert", "the good news is", "the bad news is", "in other words", "to put it simply".
+- DO NOT use strong declarations that sound performative or designed to impress rather than inform.
 - DO NOT repeat sentence structures — vary sentence length, mixing short punchy sentences with longer explanatory ones.
-- Write as a specific human expert with a clear point of view, not as a generic AI assistant.
+- Write as a knowledgeable human practitioner who has actually done this work, not as an AI summarising a topic.
+- Use specific numbers, real examples, and concrete details rather than general statements.
+- Sections should feel like they were written by someone with direct experience — conversational but authoritative, like a trusted advisor explaining something, not a content farm.
 - Use Australian English spelling (e.g., "optimise" not "optimize", "colour" not "color").
+
+=== WRITING QUALITY SCORING CRITERIA ===
+This article will be scored on four dimensions after generation. Write to score 80+ on all four:
+1. CLARITY & FLOW: Ideas connect logically. Transitions feel natural, not mechanical. The reader never has to re-read a sentence.
+2. HUMAN AUTHENTICITY: Reads as written by a real human expert. No AI fingerprint patterns. No performative declarations. Specific, opinionated, direct.
+3. DEPTH & SPECIFICITY: Uses concrete numbers, named examples, real scenarios. Avoids vague generalisations. Demonstrates genuine subject-matter knowledge.
+4. ENGAGEMENT: Holds the reader's attention throughout. Varied rhythm. Strong opening. Sections that build on each other rather than repeating the same point.
 
 === REQUIRED OUTPUT FORMAT (JSON) ===
 Return a single JSON object with these exact fields:
@@ -1064,8 +1103,14 @@ ${!isFirst && !isCTA ? `CONTENT RULES:
 - Use Australian English spelling (optimise, colour, organise)
 - Vary sentence length — mix short punchy sentences with longer explanatory ones
 - Sound like a specific human expert, not a generic AI assistant
-- DO NOT use: "in today's world", "it's important to note", "delve into", "game-changer", "leverage", "synergy", "transformative"
-- DO NOT use em dashes (—) excessively` : ""}
+- DO NOT use em dashes (—) excessively
+- DO NOT introduce sections with a bolded question followed by an answer paragraph
+- DO NOT open paragraphs with "This means that..."
+- DO NOT use formulaic section structures where every H3 follows the exact same pattern
+- DO NOT use these phrases (banned): "in today's world", "it's important to note", "it's worth noting", "delve into", "game-changer", "game-changing", "leverage", "synergy", "transformative", "non-negotiable", "the truth is", "let's be honest", "the reality is", "make no mistake", "here's the thing", "the fact is", "simply put", "it's no secret", "the good news is", "the bad news is"
+- DO NOT use strong declarations that sound performative rather than informative
+- Write as a knowledgeable human practitioner with direct experience, not an AI summarising a topic
+- Use specific numbers, real examples, and concrete details rather than general statements` : ""}
 
 ${sectionIndex === 1 ? `EXTERNAL LINK RULE (Section 2 only): Include at least one hyperlink to a real, high-authority external source (.gov.au, industry body, or nationally recognised publication). Use descriptive anchor text.` : ""}
 
@@ -1171,7 +1216,7 @@ export async function generateSingleArticle(
               { role: "user" as const, content: outlinePrompt },
             ],
             response_format: { type: "json_object" },
-            max_tokens: 4096,
+            max_tokens: 12000,
           },
           { userId, feature: "article_generation" }
         );
@@ -1217,7 +1262,7 @@ export async function generateSingleArticle(
               { role: "system" as const, content: "You are an expert SEO content writer. Return ONLY the section HTML wrapped in <SECTION_HTML>...</SECTION_HTML> delimiters. No other text." },
               { role: "user" as const, content: sectionPrompt },
             ],
-            max_tokens: 8192,
+            max_tokens: 12000,
           },
           { userId, feature: "article_generation" }
         );
@@ -1904,16 +1949,24 @@ Return ONLY the full article HTML wrapped in:
   let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
   console.log(`[ArticleEngine] Pass 2 score: ${pass2.score} for node ${nodeId} — ${pass2.reason}`);
 
-  // --- Pass 2 quality floor: one improvement attempt if score < 70 ---
-  if (pass2.score < 70) {
-    console.log(`[ArticleEngine] Pass 2 quality floor triggered (score ${pass2.score} < 70) for node ${nodeId}. Running improvement pass...`);
+  // --- Pass 2 quality floor: one improvement attempt if score < 80 ---
+  if (pass2.score < 80) {
+    console.log(`[ArticleEngine] Pass 2 quality floor triggered (score ${pass2.score} < 80) for node ${nodeId}. Running improvement pass...`);
     try {
-      const improvementPrompt = `This article scored ${pass2.score}/100 on writing quality. The target is 70+. Improve it by:
-- Strengthening the opening to better match search intent
-- Adding more specific, authoritative detail in the weakest sections
-- Ensuring the human voice is consistent throughout
-- Do NOT change the structure, headings, keyword usage, or length
-- Do NOT make it sound more AI-generated — make it sound more expert
+      const improvementPrompt = `This article scored ${pass2.score}/100 on writing quality. The target is 80+. It will be scored on four dimensions:
+1. CLARITY & FLOW: Ideas connect logically. Transitions feel natural. The reader never has to re-read a sentence.
+2. HUMAN AUTHENTICITY: Reads as written by a real human expert. No AI fingerprint patterns. No performative declarations. Specific, opinionated, direct.
+3. DEPTH & SPECIFICITY: Uses concrete numbers, named examples, real scenarios. Avoids vague generalisations.
+4. ENGAGEMENT: Holds attention throughout. Varied rhythm. Strong opening. Sections build on each other.
+
+Improve it by:
+- Strengthening the opening to better match search intent and hook the reader immediately
+- Adding more specific, concrete details, numbers, and named examples in the weakest sections
+- Removing any remaining AI-fingerprint patterns (performative declarations, formulaic transitions, generic statements)
+- Ensuring the human voice is consistent and authoritative throughout
+- Varying sentence rhythm — break up any sections where every sentence has the same length/structure
+- Do NOT change the structure, headings, keyword usage, or overall length
+- Do NOT make it sound more AI-generated — make it sound more like a trusted human expert
 Return the improved article HTML body only, no explanation.
 
 ${bodyHtml}`;
