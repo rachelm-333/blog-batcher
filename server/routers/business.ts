@@ -185,6 +185,10 @@ export const businessRouter = router({
         currentStage: businesses.currentStage,
         cmsPlatform: businesses.cmsPlatform,
         createdAt: businesses.createdAt,
+        // CRITICAL: activeBatch must be included so the client always uses the
+        // correct batch number. Omitting it causes the client to default to 1,
+        // which makes all architecture/keyword queries read from the wrong batch.
+        activeBatch: businesses.activeBatch,
       })
       .from(businesses)
       .where(eq(businesses.userId, ctx.user.id))
