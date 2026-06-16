@@ -30,7 +30,7 @@ describe("architectureRules.validateArchitecture", () => {
   it("accepts 20-pack with 1 cornerstone × 1 pillar (minimum valid)", () => {
     const result = validateArchitecture(20, 1, 1);
     expect(result.valid).toBe(true);
-    expect(calcTotalArticles(1, 1)).toBe(5); // 1 + 1 + 3 = 5 ≤ 20
+    expect(calcTotalArticles(1, 1)).toBe(5); // 1 + 1 + 3 = 5 ≤ 20 (default 3 clusters)
   });
 
   it("auto-corrects 20-pack when total would exceed pack size", () => {
@@ -112,11 +112,21 @@ describe("architectureRules.calcTotalArticles", () => {
     expect(calcTotalArticles(4, 4)).toBe(68);
   });
 
-  it("always uses 3 clusters per pillar", () => {
+  it("defaults to 3 clusters per pillar", () => {
     expect(CLUSTERS_PER_PILLAR).toBe(3);
     const total = calcTotalArticles(2, 3);
     // 2 + 6 + 18 = 26
     expect(total).toBe(26);
+  });
+
+  it("calculates correctly with 2 clusters per pillar (min)", () => {
+    // 2 cornerstones + 6 pillars + 12 clusters = 20
+    expect(calcTotalArticles(2, 3, 2)).toBe(20);
+  });
+
+  it("calculates correctly with 5 clusters per pillar (max)", () => {
+    // 2 cornerstones + 6 pillars + 30 clusters = 38
+    expect(calcTotalArticles(2, 3, 5)).toBe(38);
   });
 });
 

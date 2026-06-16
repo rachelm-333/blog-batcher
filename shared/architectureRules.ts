@@ -4,19 +4,19 @@
  * Enforces the Cornerstone → Pillar → Cluster hierarchy rules:
  *  - Cornerstones: 1–4  (minimum 1 — strict hierarchy required)
  *  - Pillars per Cornerstone: 1–4  (minimum 1)
- *  - Clusters per Pillar: always 3
- *  - Minimum total: 1 cornerstone + 1 pillar + 3 clusters = 5 articles
+ *  - Clusters per Pillar: 2–5  (default 3)
+ *  - Minimum total: 1 cornerstone + 1 pillar + 2 clusters = 4 articles
  */
 
 export const PACK_SIZES = [20, 50] as const;
 export type PackSize = (typeof PACK_SIZES)[number];
 
-/** Always 3 clusters per pillar — fixed constant */
+/** Default clusters per pillar */
 export const CLUSTERS_PER_PILLAR = 3;
 /** Alias for backward compatibility */
 export const DEFAULT_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
-export const MIN_CLUSTERS_PER_PILLAR = 3;
-export const MAX_CLUSTERS_PER_PILLAR = 3;
+export const MIN_CLUSTERS_PER_PILLAR = 2;
+export const MAX_CLUSTERS_PER_PILLAR = 5;
 export const MIN_PILLARS_PER_CORNERSTONE = 1;
 export const MAX_PILLARS_PER_CORNERSTONE = 4;
 export const MIN_CORNERSTONES = 1;
@@ -120,7 +120,7 @@ export function calcBreakdown(
 
 /**
  * Enforces strict hierarchy dependencies.
- * Minimum: 1 cornerstone, 1 pillar per cornerstone, 3 clusters per pillar.
+ * Minimum: 1 cornerstone, 1 pillar per cornerstone, 2 clusters per pillar.
  */
 export function enforceDependencies(
   cornerstones: number,
@@ -154,7 +154,7 @@ export function validateArchitecture(
   const warnings: string[] = [];
   let cornerstones = proposedCornerstones;
   let pillarsPerCornerstone = proposedPillarsPerCornerstone;
-  const clustersPerPillar = CLUSTERS_PER_PILLAR; // always fixed at 3
+  let clustersPerPillar = Math.max(MIN_CLUSTERS_PER_PILLAR, Math.min(MAX_CLUSTERS_PER_PILLAR, proposedClustersPerPillar));
 
   // ── Clamp cornerstones ────────────────────────────────────────────────────
   if (cornerstones < MIN_CORNERSTONES) {
@@ -218,7 +218,7 @@ export interface ArchitectureNode {
 /**
  * Generates the full flat list of article nodes for a given architecture config.
  * Strict hierarchy: cornerstones → pillars → clusters.
- * Clusters per pillar is always fixed at 3.
+ * Clusters per pillar is variable (2–5).
  */
 export function generateNodes(
   cornerstones: number,
