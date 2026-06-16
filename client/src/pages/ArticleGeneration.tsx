@@ -85,13 +85,13 @@ export default function ArticleGeneration() {
 
   const { data: articles, isLoading: articlesLoading } = trpc.articles.getAll.useQuery(
     { businessId },
-    { enabled: !!businessId, refetchInterval: generating ? 3000 : false }
+    { enabled: !!businessId, staleTime: 0, refetchInterval: generating ? 3000 : false }
   );
 
   // Fetch node count independently so we always know the total before articles are created
   const { data: nodeCountData } = trpc.architecture.getOrCreate.useQuery(
     { businessId },
-    { enabled: !!businessId }
+    { enabled: !!businessId, staleTime: 0 }
   );
 
   const regenerateSingleMutation = trpc.articles.regenerate.useMutation({
@@ -139,9 +139,12 @@ export default function ArticleGeneration() {
     if (allDone) setGenerating(false);
   }, [articles]);
 
-  // Use node count as the source of truth for total — available before generation starts
+  // nodeTotal: how many article nodes exist for this batch (source of truth for expected count)
   const nodeTotal = nodeCountData?.nodes?.length ?? 0;
-  const totalCount = articles?.length ?? nodeTotal;
+  // hasArticles: true only when actual article DB rows exist (not just nodes)
+  const hasArticles = (articles?.length ?? 0) > 0;
+  // totalCount: use actual article count when articles exist, else fall back to nodeTotal
+  const totalCount = hasArticles ? articles!.length : nodeTotal;
   const writtenCount = articles?.filter(a => ["generated","pending_approval","approved","published","scheduled","failed"].includes(a.status)).length ?? 0;
   const failedCount = articles?.filter(a => a.status === "failed").length ?? 0;
   const scoredCount = articles?.filter(a => a.internalScore !== null).length ?? 0;
@@ -150,9 +153,8 @@ export default function ArticleGeneration() {
     : null;
 
   // allWritten: all articles are in a terminal state (no longer generating/pending)
-  const allWritten = totalCount > 0 && writtenCount === totalCount && !generating;
-  const hasArticles = totalCount > 0;
-  // showGenerateButton: show the button (possibly disabled) whenever generation hasn't completed
+  const allWritten = hasArticles && writtenCount === totalCount && !generating;
+  // showGenerateButton: show when stage is 4+ and generation hasn't completed
   const showGenerateButton = currentStage >= 4 && !allWritten;
 
   // Count articles under their word count target
@@ -206,7 +208,7 @@ export default function ArticleGeneration() {
               {showGenerateButton && (
                 <button
                   className="btn-primary"
-                  onClick={() => !generating && !hasArticles ? generateMutation.mutate({ businessId }) : undefined}
+                  onClick={() => { if (!generating && !hasArticles) generateMutation.mutate({ businessId }); }}
                   disabled={generating || generateMutation.isPending || hasArticles}
                   style={{ opacity: (generating || hasArticles) ? 0.7 : 1 }}
                 >

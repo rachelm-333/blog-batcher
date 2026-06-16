@@ -36,6 +36,9 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
   const { data: businesses, isLoading, refetch } = trpc.business.listAll.useQuery(undefined, {
     retry: false,
+    // staleTime:0 ensures currentStage and activeBatch are always fresh when navigating
+    // between stages — prevents stale stage values from hiding buttons or blocking actions.
+    staleTime: 0,
   });
 
   // Once businesses load, validate stored ID or fall back to first
