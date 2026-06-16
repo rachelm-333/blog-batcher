@@ -100,176 +100,210 @@ function ArticleTypeSelect({
   );
 }
 
-// ─── Tree Map ─────────────────────────────────────────────────────────────────
+// ─── Live Architecture Map ────────────────────────────────────────────────────
+// Purely client-side, driven by slider values. Re-renders on every slider change.
+// Pillar article-type dropdowns read from saved DB nodes (by position) when available,
+// and fall back to "how_to". Mutations still call setArticleType on the saved nodes.
 
-function TreeMap({
-  nodes,
+function LiveArchMap({
+  cornerstones,
+  pillars,
+  clusters,
+  savedNodes,
   onTypeChange,
   locked,
 }: {
-  nodes: ArchNode[];
+  cornerstones: number;
+  pillars: number;
+  clusters: number;
+  savedNodes: ArchNode[];
   onTypeChange: (nodeId: number, type: ArticleType) => void;
   locked: boolean;
 }) {
-  const cornerstones = nodes
-    .filter((n) => n.level === "cornerstone")
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  const pillarsOf = (csId: number) =>
-    nodes
-      .filter((n) => n.level === "pillar" && n.parentCornerstoneId === csId)
+  // Helper: find the saved DB node for a pillar by cornerstone+pillar index (1-based)
+  const savedPillarNode = (csIdx: number, pIdx: number): ArchNode | undefined => {
+    if (cornerstones === 0) {
+      // In pillar-only mode, savedNodes pillars have parentCornerstoneId = null
+      const savedPillars = savedNodes
+        .filter((n) => n.level === "pillar")
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      return savedPillars[pIdx];
+    }
+    const savedCornerstones = savedNodes
+      .filter((n) => n.level === "cornerstone")
       .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  const clustersOf = (pillarId: number) =>
-    nodes
-      .filter((n) => n.level === "cluster" && n.parentPillarId === pillarId)
+    const cs = savedCornerstones[csIdx];
+    if (!cs) return undefined;
+    const savedPillars = savedNodes
+      .filter((n) => n.level === "pillar" && n.parentCornerstoneId === cs.id)
       .sort((a, b) => a.sortOrder - b.sortOrder);
+    return savedPillars[pIdx];
+  };
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {cornerstones.map((cs, csIdx) => {
-        const pillars = pillarsOf(cs.id);
-        return (
-          <div key={cs.id} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {/* Cornerstone — full width */}
-            <div
+  // Render a single pillar column with its cluster children
+  const renderPillarColumn = (csIdx: number, pIdx: number) => {
+    const label = cornerstones === 0 ? `${pIdx + 1}` : `${csIdx + 1}.${pIdx + 1}`;
+    const saved = savedPillarNode(csIdx, pIdx);
+    const pillarType: ArticleType = (saved?.articleType as ArticleType) ?? "how_to";
+
+    return (
+      <div key={`p-${csIdx}-${pIdx}`} style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 140 }}>
+        {/* Pillar card */}
+        <div
+          style={{
+            background: "#f0f9ff",
+            border: "1.5px solid #bae6fd",
+            borderRadius: 8,
+            padding: "10px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <span
               style={{
-                background: "linear-gradient(135deg, #ede9ff 0%, #f5f3ff 100%)",
-                border: "1.5px solid #c4b5fd",
-                borderRadius: 10,
-                padding: "12px 18px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
+                background: "#0284c7",
+                color: "#fff",
+                fontSize: 9,
+                fontWeight: 700,
+                padding: "2px 7px",
+                borderRadius: 99,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                flexShrink: 0,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              Pillar {label}
+            </span>
+            <span style={{ fontSize: 10, color: "#0369a1", opacity: 0.7 }}>1,500–2,200 w</span>
+          </div>
+          {saved ? (
+            <ArticleTypeSelect
+              nodeId={saved.id}
+              level="pillar"
+              value={pillarType}
+              locked={locked}
+              onTypeChange={onTypeChange}
+            />
+          ) : (
+            <span style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>
+              {ARTICLE_TYPE_LABELS[pillarType]}
+            </span>
+          )}
+        </div>
+
+        {/* Cluster boxes under this pillar */}
+        {clusters > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 12 }}>
+            {Array.from({ length: clusters }, (_, clIdx) => (
+              <div
+                key={clIdx}
+                style={{
+                  background: "#f9fafb",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 6,
+                  padding: "8px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                }}
+              >
                 <span
                   style={{
-                    background: "#7c3aed",
+                    background: "#6b7280",
                     color: "#fff",
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: 700,
-                    padding: "2px 8px",
+                    padding: "2px 6px",
                     borderRadius: 99,
                     letterSpacing: "0.05em",
                     textTransform: "uppercase",
+                    flexShrink: 0,
                   }}
                 >
-                  Cornerstone {csIdx + 1}
+                  Cluster {label}.{clIdx + 1}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#4c1d95" }}>
-                  Cornerstone Guide
-                </span>
+                <span style={{ fontSize: 10, color: "#9ca3af" }}>800–1,200 w · Specialist Post</span>
               </div>
-              <span style={{ fontSize: 11, color: "#7c3aed", opacity: 0.7 }}>
-                2,800–3,200 words
-              </span>
-            </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
-            {/* Pillars row */}
-            {pillars.length > 0 && (
-              <div
+  // ── Pillar-only mode (cornerstones = 0) ──────────────────────────────────────
+  if (cornerstones === 0) {
+    return (
+      <div style={{ overflowX: "auto" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            minWidth: "max-content",
+            paddingBottom: 4,
+          }}
+        >
+          {Array.from({ length: pillars }, (_, pIdx) => renderPillarColumn(0, pIdx))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Standard hierarchy mode (cornerstones > 0) ───────────────────────────────
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, overflowX: "auto" }}>
+      {Array.from({ length: cornerstones }, (_, csIdx) => (
+        <div key={csIdx} style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: "max-content" }}>
+          {/* Cornerstone — full width */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, #ede9ff 0%, #f5f3ff 100%)",
+              border: "1.5px solid #c4b5fd",
+              borderRadius: 10,
+              padding: "12px 18px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${pillars.length}, 1fr)`,
-                  gap: 10,
-                  paddingLeft: 20,
+                  background: "#7c3aed",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: 99,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
                 }}
               >
-                {pillars.map((pillar, pIdx) => {
-                  const clusters = clustersOf(pillar.id);
-                  return (
-                    <div key={pillar.id} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {/* Pillar card */}
-                      <div
-                        style={{
-                          background: "#f0f9ff",
-                          border: "1.5px solid #bae6fd",
-                          borderRadius: 8,
-                          padding: "10px 14px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                          <span
-                            style={{
-                              background: "#0284c7",
-                              color: "#fff",
-                              fontSize: 9,
-                              fontWeight: 700,
-                              padding: "2px 7px",
-                              borderRadius: 99,
-                              letterSpacing: "0.05em",
-                              textTransform: "uppercase",
-                              flexShrink: 0,
-                            }}
-                          >
-                            Pillar {csIdx + 1}.{pIdx + 1}
-                          </span>
-                          <span style={{ fontSize: 10, color: "#0369a1", opacity: 0.7 }}>
-                            1,500–2,200 w
-                          </span>
-                        </div>
-                        <ArticleTypeSelect
-                          nodeId={pillar.id}
-                          level="pillar"
-                          value={pillar.articleType}
-                          locked={locked}
-                          onTypeChange={onTypeChange}
-                        />
-                      </div>
-
-                      {/* Clusters under this pillar */}
-                      {clusters.length > 0 && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 12 }}>
-                          {clusters.map((cluster, clIdx) => (
-                            <div
-                              key={cluster.id}
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: 6,
-                                padding: "8px 12px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: 8,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  background: "#6b7280",
-                                  color: "#fff",
-                                  fontSize: 9,
-                                  fontWeight: 700,
-                                  padding: "2px 6px",
-                                  borderRadius: 99,
-                                  letterSpacing: "0.05em",
-                                  textTransform: "uppercase",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                Cluster {csIdx + 1}.{pIdx + 1}.{clIdx + 1}
-                              </span>
-                              <span style={{ fontSize: 10, color: "#9ca3af" }}>
-                                800–1,300 w · Specialist Post
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                Cornerstone {csIdx + 1}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#4c1d95" }}>Cornerstone Guide</span>
+            </div>
+            <span style={{ fontSize: 11, color: "#7c3aed", opacity: 0.7 }}>2,800–3,200 words</span>
           </div>
-        );
-      })}
+
+          {/* Pillars row */}
+          {pillars > 0 && (
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                paddingLeft: 20,
+              }}
+            >
+              {Array.from({ length: pillars }, (_, pIdx) => renderPillarColumn(csIdx, pIdx))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -590,7 +624,7 @@ export default function Architecture() {
         </Card>
 
         {/* ── Visual Tree Map ───────────────────────────────────────────────── */}
-        {nodes.length > 0 && (
+        {liveBreakdown.total > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center gap-1.5">
@@ -598,15 +632,17 @@ export default function Architecture() {
                 <CardTitle className="text-base">Architecture Map</CardTitle>
               </div>
               <CardDescription>
-                Your content tree. Cornerstones span the full width; pillars sit side-by-side below each cornerstone; clusters stack under each pillar.
-                Select the article type for each Pillar — cornerstone and cluster types are fixed.
+                Your content structure — updates as you adjust the sliders above.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TreeMap
-                nodes={nodes}
+              <LiveArchMap
+                cornerstones={localCornerstones}
+                pillars={localPillars}
+                clusters={localClusters}
+                savedNodes={nodes}
                 locked={locked}
-                onTypeChange={(nodeId, type) =>
+                onTypeChange={(nodeId: number, type: ArticleType) =>
                   businessId &&
                   setArticleType.mutate({ businessId, nodeId, articleType: type })
                 }
@@ -616,7 +652,7 @@ export default function Architecture() {
         )}
 
         {/* ── Confirm Button ────────────────────────────────────────────────── */}
-        {nodes.length > 0 && !locked && (
+        {liveBreakdown.total > 0 && !locked && (
           <div className="flex justify-end">
             <Button
               size="lg"
