@@ -1282,13 +1282,11 @@ export default function ArticleReview() {
                       })()}
                       {item.pass2Score != null && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                          item.pass2Score >= 70
+                          item.pass2Score >= 75
                             ? "bg-emerald-500/15 text-emerald-500"
-                            : item.pass2Score >= 50
-                            ? "bg-amber-500/15 text-amber-500"
-                            : "bg-red-500/15 text-red-400"
+                            : "bg-amber-500/15 text-amber-500"
                         }`}>
-                          ✓2 {item.pass2Score}/100
+                          {item.pass2Score >= 75 ? "Excellent — ready to publish" : "Improving quality..."}
                         </span>
                       )}
                     </div>
@@ -2143,25 +2141,25 @@ export default function ArticleReview() {
                       <div className={`flex-1 rounded-lg border p-2 text-center ${
                         (selectedItem as any).pass2Score == null
                           ? "bg-muted/30 border-border"
-                          : (selectedItem as any).pass2Score >= 70
+                          : (selectedItem as any).pass2Score >= 75
                           ? "bg-emerald-500/10 border-emerald-500/30"
                           : "bg-amber-500/10 border-amber-500/30"
                       }`}>
                         <div className={`text-[11px] font-semibold leading-tight ${
                           (selectedItem as any).pass2Score == null
                             ? "text-muted-foreground"
-                            : (selectedItem as any).pass2Score >= 70
+                            : (selectedItem as any).pass2Score >= 75
                             ? "text-emerald-500"
                             : "text-amber-500"
                         }`}>
                           {(selectedItem as any).pass2Score == null
                             ? "—"
-                            : (selectedItem as any).pass2Score >= 70
+                            : (selectedItem as any).pass2Score >= 75
                             ? "Excellent — ready to publish"
                             : "Improving quality..."}
                         </div>
                         {(selectedItem as any).pass2Score != null &&
-                          (selectedItem as any).pass2Score < 70 &&
+                          (selectedItem as any).pass2Score < 75 &&
                           (selectedItem as any).pass2Details && (
                           <div className="text-[9px] text-muted-foreground/80 mt-1 leading-tight text-left px-0.5">
                             <span className="font-medium text-amber-500/80">Low score reason:</span>{" "}

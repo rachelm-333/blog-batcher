@@ -339,18 +339,19 @@ export default function ArticleGeneration() {
                                 </span>
                               );
                             })()}
-                            {/* Checkpoint 2 — Writing Quality */}
+                            {/* Checkpoint 2 — Writing Quality (label only, no score number) */}
                             {(article as any).pass2Score != null ? (() => {
                               const s = (article as any).pass2Score as number;
-                              const color = s >= 70 ? "#22c55e" : s >= 50 ? "#f59e0b" : "#ef4444";
-                              const bg = s >= 70 ? "#dcfce7" : s >= 50 ? "#fef9c3" : "#fee2e2";
+                              const isExcellent = s >= 75;
+                              const color = isExcellent ? "#22c55e" : "#f59e0b";
+                              const bg = isExcellent ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.12)";
                               return (
                                 <span style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:99, fontSize:10, fontWeight:600, background:bg, color, whiteSpace:"nowrap" }}>
-                                  ✓2 {s}/100
+                                  {isExcellent ? "Excellent — ready to publish" : "Improving quality..."}
                                 </span>
                               );
                             })() : (
-                              <span style={{ fontSize:10, color:"#9ca3af" }}>✓2 —</span>
+                              <span style={{ fontSize:10, color:"#9ca3af" }}>—</span>
                             )}
                           </div>
                         ) : <span style={{ color:"#9ca3af", fontSize:13 }}>—</span>}
