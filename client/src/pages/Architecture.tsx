@@ -432,7 +432,7 @@ export default function Architecture() {
   const confirmArch = trpc.architecture.confirm.useMutation({
     onSuccess: () => {
       refetchArch();
-      navigate("/dashboard");
+      navigate("/keywords");
     },
   });
 

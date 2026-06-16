@@ -617,18 +617,46 @@ export const architectureRouter = router({
         });
       }
 
+      // SINGLE SOURCE OF TRUTH: regenerate article nodes from current slider values.
+      // This deletes all existing nodes + keyword assignments for this batch, then
+      // inserts fresh nodes. Handles both first-time confirm and re-confirm after
+      // slider changes.
+      const finalClustersC = arch.clustersPerPillar ?? DEFAULT_CLUSTERS_PER_PILLAR;
+      const finalTotalC = calcTotalArticles(arch.cornerstoneCount, arch.pillarCount, finalClustersC);
+      await db
+        .update(blogArchitectures)
+        .set({ totalArticleCount: finalTotalC })
+        .where(eq(blogArchitectures.id, arch.id));
+      await regenerateNodes(
+        db,
+        arch.id,
+        input.businessId,
+        arch.cornerstoneCount,
+        arch.pillarCount,
+        finalClustersC,
+        activeBatchC
+      );
+      console.log(`[Architecture.confirm] businessId=${input.businessId} batch=${activeBatchC} archId=${arch.id} nodes=${finalTotalC}`);
+
       // Lock architecture
       await db
         .update(blogArchitectures)
         .set({ confirmed: true })
         .where(eq(blogArchitectures.id, arch.id));
 
-      // Advance business stage to 3
-      await db
-        .update(businesses)
-        .set({ currentStage: 3 })
-        .where(eq(businesses.id, input.businessId));
+      // Advance business stage to 3 (only if not already further along)
+      if (bizC.currentStage < 3) {
+        await db
+          .update(businesses)
+          .set({ currentStage: 3 })
+          .where(eq(businesses.id, input.businessId));
+      }
 
-      return { success: true };
+      const freshNodes = await db
+        .select()
+        .from(articleNodes)
+        .where(eq(articleNodes.architectureId, arch.id));
+
+      return { success: true, nodeCount: freshNodes.length };
     }),
 });

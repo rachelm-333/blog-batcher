@@ -418,11 +418,31 @@ describe("architecture.confirm", () => {
   });
 
   it("succeeds idempotently when architecture is already confirmed", async () => {
-    const db = makeDb({
-      limit: vi.fn()
-        .mockResolvedValueOnce([{ id: 10, userId: 1, currentStage: 3 }])
-        .mockResolvedValueOnce([{ id: 5, packSize: 20, cornerstoneCount: 2, pillarCount: 2, confirmed: true }]),
-    });
+    // confirm now calls regenerateNodes which does select().from().where() (no .limit).
+    // where() calls that are awaited directly must return a Promise resolving to an array.
+    // where() calls followed by .limit() must return an object with a limit mock.
+    const fakeArch = { id: 5, packSize: 20, cornerstoneCount: 2, pillarCount: 2, clustersPerPillar: 3, confirmed: true };
+    const db = makeDb({});
+    db.where = vi.fn()
+      // 1. assertBusinessOwnership → .limit()
+      .mockReturnValueOnce({ limit: vi.fn().mockResolvedValue([{ id: 10, userId: 1, currentStage: 3, activeBatch: 1 }]) })
+      // 2. select arch → .limit()
+      .mockReturnValueOnce({ limit: vi.fn().mockResolvedValue([fakeArch]) })
+      // 3. update blogArchitectures.set({totalArticleCount}) → update().set().where()
+      .mockResolvedValueOnce(undefined)
+      // 4. regenerateNodes: select existingNodes → awaited directly (no .limit)
+      .mockResolvedValueOnce([])
+      // 5. regenerateNodes: delete articleNodes → delete().where()
+      .mockResolvedValueOnce(undefined)
+      // 6. regenerateNodes: re-query insertedCornerstones → awaited directly
+      .mockResolvedValueOnce([])
+      // 7. regenerateNodes: re-query insertedPillars → awaited directly
+      .mockResolvedValueOnce([])
+      // 8. update blogArchitectures.set({confirmed:true}) → update().set().where()
+      .mockResolvedValueOnce(undefined)
+      // 9. currentStage=3 so no businesses update (skipped)
+      // 10. select freshNodes after regenerate → awaited directly
+      .mockResolvedValueOnce([]);
     vi.mocked(getDb).mockResolvedValue(db as any);
 
     const caller = appRouter.createCaller(makeCtx());
