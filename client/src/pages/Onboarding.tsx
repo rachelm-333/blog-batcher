@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import DashboardLayout from "@/components/DashboardLayout";
 import { useActiveBusiness } from "@/contexts/BusinessContext";
 import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
@@ -130,17 +131,26 @@ export default function Onboarding() {
     setBusinessId(id);
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="font-semibold text-lg tracking-tight">Blog Batcher</div>
-          <div className="text-sm text-muted-foreground">
-            Stage 1 of 5 — Business Profile
+  const innerContent = (
+    <div className={isEditMode ? "" : "min-h-screen bg-background"}>
+      {/* Header — only shown in standalone (new/first-time) mode */}
+      {!isEditMode && (
+        <div className="border-b bg-card">
+          <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="font-semibold text-lg tracking-tight">Blog Batcher</div>
+            <div className="text-sm text-muted-foreground">
+              Stage 1 of 5 — Business Profile
+            </div>
           </div>
         </div>
-      </div>
+      )}
+      {/* Edit mode page title */}
+      {isEditMode && (
+        <div className="border-b bg-card px-6 py-4">
+          <h1 className="text-lg font-semibold">Editing Business Profile</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Update your business details — changes apply to future article batches.</p>
+        </div>
+      )}
 
       {/* Progress stepper */}
       <div className="border-b bg-muted/30">
@@ -354,4 +364,9 @@ export default function Onboarding() {
       </div>
     </div>
   );
+
+  if (isEditMode) {
+    return <DashboardLayout>{innerContent}</DashboardLayout>;
+  }
+  return innerContent;
 }
