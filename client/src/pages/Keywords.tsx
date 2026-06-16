@@ -355,7 +355,7 @@ export default function Keywords() {
   );
   const { data: archData } = trpc.architecture.getOrCreate.useQuery(
     { businessId },
-    { enabled: !!businessId }
+    { enabled: !!businessId, staleTime: 0 }
   );
   const { data: savedSelections, isLoading: savedSelectionsLoading } = trpc.keywords.getSavedSelections.useQuery(
     { businessId },
@@ -363,6 +363,16 @@ export default function Keywords() {
   );
   const [showSelectionPanel, setShowSelectionPanel] = useState(false);
   const [pendingSwapKw, setPendingSwapKw] = useState<string | null>(null);
+
+  // Reset local state when the active business changes (belt-and-suspenders guard;
+  // the primary protection is the key={selectedBizId} in App.tsx which remounts
+  // this component entirely on business switch).
+  useEffect(() => {
+    setSubStage("assign");
+    setSwapTarget(null);
+    setShowSelectionPanel(false);
+    setPendingSwapKw(null);
+  }, [businessId]);
 
   // Detect architecture mismatch: article nodes don't match current config
   // Use the same formula as the server (handles pillar-only mode where cornerstones=0)
