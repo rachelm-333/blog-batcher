@@ -284,15 +284,21 @@ export default function ContentPlan() {
   const [isFlushing, setIsFlushing] = useState(false);
 
   // PAA status — check which nodes have PAA questions but haven't approved one
+  // staleTime:0 ensures we always read fresh paaApproved values from the DB,
+  // not a cached snapshot from the Keywords page that may not yet reflect the
+  // just-saved PAA selection.
   const kwQuery = trpc.keywords.getAll.useQuery(
     { businessId },
-    { enabled: !!businessId }
+    { enabled: !!businessId, staleTime: 0 }
   );
-  // A node needs PAA approval if: paaQuestions is a non-empty array AND paaApproved is false
-  const paaWarningNodes = (kwQuery.data ?? []).filter((k: { paaQuestions: unknown; paaApproved: boolean; primaryKeyword: string }) => {
-    const hasPaa = Array.isArray(k.paaQuestions) && (k.paaQuestions as unknown[]).length > 0;
-    return hasPaa && !k.paaApproved;
-  });
+  // A node needs PAA approval if: paaQuestions is a non-empty array AND paaApproved is false.
+  // Suppress the warning while the query is still loading to avoid a false-positive flash.
+  const paaWarningNodes = (!kwQuery.isLoading && kwQuery.data)
+    ? kwQuery.data.filter((k: { paaQuestions: unknown; paaApproved: boolean; primaryKeyword: string }) => {
+        const hasPaa = Array.isArray(k.paaQuestions) && (k.paaQuestions as unknown[]).length > 0;
+        return hasPaa && !k.paaApproved;
+      })
+    : [];
   const hasPaaWarning = paaWarningNodes.length > 0;
 
   // Refs to each ArticleCard so we can call flushPending on them
