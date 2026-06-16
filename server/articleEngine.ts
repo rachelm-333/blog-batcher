@@ -517,18 +517,20 @@ ${ctx.allBatchSlugs.slice(0, 20).join(", ")}
 
 === 16-POINT AUTHORITY STANDARD — ALL POINTS ARE MANDATORY ===
 
-1. PRIMARY KEYWORD DENSITY: The primary keyword "${ctx.primaryKeyword}" must appear a MINIMUM of 5 times in the body. Target density is 0.5%–2.5% of total word count. After drafting, count keyword appearances and total words. If density is below 0.5%, add the keyword naturally in headings or body paragraphs before finalising. Never stuff — every use must read naturally.
+1. PRIMARY KEYWORD DENSITY: The primary keyword "${ctx.primaryKeyword}" must appear a MINIMUM of 4 times across the full article (H1 title, H2 headings, and body text combined). HARD MAXIMUM: keyword density must not exceed 1% of total word count (e.g. for a 1,000-word article, no more than 10 mentions). After drafting, count keyword appearances and total words. If count is below 4, add the keyword naturally in headings or body paragraphs before finalising. Never stuff — every use must read naturally.
 2. KEYWORD IN H1: Primary keyword must appear verbatim in the H1 heading (the article title).
 3. KEYWORD IN H2: Primary keyword must appear verbatim in AT LEAST ONE <h2> heading. This is mandatory — not optional, not an H3. An H2.
-4. KEYWORD IN H3: Primary keyword should also appear in at least one H3 where H3s are used.
-5. KEYWORD IN FIRST 100 WORDS: Primary keyword must appear in the OPENING SENTENCE or within the first 50 words. Do not bury it. Place it naturally in the first paragraph.
+4. KEYWORD IN H3: If the article uses H3 subheadings, the primary keyword MUST appear in at least one H3. If the article has no H3 headings at all, this rule is automatically satisfied — do not force H3s just to satisfy it.
+5. KEYWORD IN FIRST 100 WORDS: Primary keyword must appear naturally within the first 100 words of body text (not counting the H1 title). Do not bury it — place it in the opening paragraph.
 6. KEYWORD IN URL SLUG: The URL slug is already set to /${ctx.urlSlug}. Ensure the H1 title reflects the same topic territory.
 7. META TITLE: Must include primary keyword verbatim. Maximum 60 characters. Written for click-through rate.
 8. META DESCRIPTION: Must include the EXACT primary keyword phrase "${ctx.primaryKeyword}" verbatim (do not insert extra words into the phrase). Exactly 140–160 characters. Written for CTR.
 9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
 10. EXTERNAL AUTHORITY LINK: You MUST include at least one hyperlink to a real, high-authority external source — a government website (.gov.au), an industry body, or a nationally recognised publication. Use descriptive anchor text (never a raw URL). This link must be genuine and relevant to the article topic. Examples: Australian Building Codes Board, Fair Work Commission, Australian Bureau of Statistics, relevant industry association.
 11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
-12. INTERNAL BLOG LINKS: Link to other articles in the batch using anchor text. No keyword cannibalization.
+12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs listed below — do NOT invent or guess URLs. Use descriptive anchor text. No keyword cannibalization.
+   Available batch article slugs (use these exact paths):
+   ${ctx.allBatchSlugs.slice(0, 20).join(", ")}
 13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
 14. E-E-A-T SIGNALS: Weave in Experience, Expertise, Authoritativeness, and Trustworthiness. Include social proof signals: ${ctx.socialProof || "mention industry experience"}.
 ${ctx.problemsSolved ? `
@@ -564,6 +566,7 @@ Customise the H2 heading and body copy to match the article topic and brand voic
 
 === ABSOLUTE RULES ===
 - DO NOT fabricate statistics, quotes, or data. If you reference a statistic, it must come from a real, citable source. Use the external authority link as the citation anchor.
+- DO NOT invent URLs. Every link in the article must use a real, verifiable URL. For internal links, use only the batch slugs listed in point 12. For external links, use only well-known, verifiable domains (.gov.au, industry bodies, major publications). If no real external link is available for a claim, do not include one.
 - DO NOT use em dashes (—) excessively.
 - DO NOT open with a rhetorical question.
 - DO NOT use these phrases: "in today's world", "it's important to note", "delve into", "game-changer", "leverage", "synergy", "transformative".
@@ -720,15 +723,16 @@ export function runPass1Scorer(params: {
   const wc = WORD_COUNT_RULES[level];
 
   const points: Record<string, boolean> = {
-    // Pass if: 4+ mentions AND density ≥1% AND density ≤2.5% AND under max mention count (prevents stuffing)
-    p1_keyword_density: kwMatches >= 4 && kwMatches <= maxMentions && kwDensity >= 0.01 && kwDensity <= 0.025,
+    // Pass if: 4+ mentions AND density ≤1% AND under max mention count (prevents stuffing)
+    // NOTE: no minimum density % — 4 mentions is the floor; 1% is the hard ceiling
+    p1_keyword_density: kwMatches >= 4 && kwMatches <= maxMentions && kwDensity <= 0.01,
     p2_keyword_in_h1: h1Present,
     p3_keyword_in_h2: kwInH2,
     p4_keyword_in_h3: kwInH3,
-    // P5: keyword in first 150 words — use ordered-words check to handle minor word insertions
+    // P5: keyword in first 100 words — use ordered-words check to handle minor word insertions
     p5_keyword_first_100: (() => {
-      const first150 = bodyText.split(/\s+/).slice(0, 150).join(" ");
-      return kwPresent(first150);
+      const first100 = bodyText.split(/\s+/).slice(0, 100).join(" ");
+      return kwPresent(first100);
     })(),
     // P6: all words in the keyword appear in the slug in order (words may have other words between them)
     p6_keyword_in_slug: (() => {
@@ -965,9 +969,9 @@ RULES (ALL MANDATORY — these map directly to the 16-point SEO checklist):
 - Each section's targetWords should be realistic for that section's depth
 - Use Australian English spelling
 - Plan for an external authority link (.gov.au or industry body) in section 2 [P10]
-- Plan for at least 2 internal blog links to other articles in the batch [P12]
+- Plan for AT LEAST 2 internal blog links to other articles in the batch using ONLY these real slugs: ${ctx.allBatchSlugs.slice(0, 10).join(", ")} [P12]
 - Plan for E-E-A-T signals (years experience, clients served, awards) in at least one section [P14]
-- Plan the outline so the focus keyword '${ctx.primaryKeyword}' can naturally appear in the opening paragraph, at least one H2 heading, at least one H3 heading (if the article uses H3s), and the conclusion section [P1]
+- Plan the outline so the focus keyword '${ctx.primaryKeyword}' can naturally appear in the opening paragraph (within the first 100 words of body text), at least one H2 heading, at least one H3 heading (only if the article uses H3s — do not force H3s), and the conclusion section [P1/P5]
 ${ctx.problemsSolved ? `- The outline MUST include at least one section that directly addresses this customer problem: "${ctx.problemsSolved}". Label that section with a heading like 'Why [problem occurs]' or 'The real cost of [problem]' or 'How to solve [problem]'` : ""}
 ${ctx.customerSituationBefore ? `- Plan at least one section using this customer scenario as the opening context: "${ctx.customerSituationBefore}"` : ""}
 ${ctx.customerFrustrations ? `- Plan at least one section that addresses these specific frustrations: "${ctx.customerFrustrations}"` : ""}
@@ -1041,7 +1045,7 @@ Section Notes: ${section.notes}
 ${isFirst ? `OPENING SECTION RULES:
 - Start with the H2 heading: <h2>${section.heading}</h2>
 - Immediately answer the most likely search question in 40–60 words (bold the question)
-- The primary keyword "${ctx.primaryKeyword}" MUST appear in the first 50 words
+- The primary keyword "${ctx.primaryKeyword}" MUST appear naturally within the first 100 words of this opening section
 - This is the featured snippet target — be direct and specific` : ""}
 
 ${isCTA ? `CTA SECTION RULES:
@@ -1067,7 +1071,7 @@ ${sectionIndex === 1 ? `EXTERNAL LINK RULE (Section 2 only): Include at least on
 
 ${sectionIndex === 2 ? `INTERNAL LINK RULE (Section 3 only): Include at least one internal link to a business service or page:\n${servicesText}\n${optionalPageLinks.length ? optionalPageLinks.join("\n") : ""}\nPrimary CTA: ${ctx.ctaText} → ${ctx.ctaUrl}` : ""}
 
-${internalLinkContext ? `INTERNAL BLOG LINKS (use naturally where relevant):\n${internalLinkContext}\nAll batch slugs: ${ctx.allBatchSlugs.slice(0, 15).join(", ")}` : ""}
+${internalLinkContext ? `INTERNAL BLOG LINKS (MANDATORY — minimum 2 across the full article):\n${internalLinkContext}\nAvailable batch slugs (use ONLY these exact paths — do NOT invent URLs): ${ctx.allBatchSlugs.slice(0, 15).join(", ")}` : `INTERNAL BLOG LINKS (MANDATORY — minimum 2 across the full article):\nAvailable batch slugs (use ONLY these exact paths — do NOT invent URLs): ${ctx.allBatchSlugs.slice(0, 15).join(", ")}`}
 
 PREVIOUS SECTIONS (for context and continuity — DO NOT repeat this content):
 ${previousSectionsHtml ? previousSectionsHtml.slice(-2000) : "(This is the first section)"}

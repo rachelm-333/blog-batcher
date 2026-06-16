@@ -192,14 +192,14 @@ describe("16-point Authority Standard in generation prompt", () => {
 
   it("Prompt includes primary keyword density rule (point 1)", () => {
     expect(prompt).toContain("PRIMARY KEYWORD DENSITY");
-    // Updated: minimum 5 mentions, density 0.5%–2.5%
-    expect(prompt).toContain("MINIMUM of 5 times");
-    expect(prompt).toContain("0.5%–2.5%");
+    // Updated: minimum 4 mentions, hard max 1% density
+    expect(prompt).toContain("MINIMUM of 4 times");
+    expect(prompt).toContain("1%");
   });
 
   it("Prompt instructs to count keyword appearances and enforce density before finalising", () => {
     expect(prompt).toContain("count keyword appearances");
-    expect(prompt).toContain("density is below 0.5%");
+    expect(prompt).toContain("count is below 4");
   });
 
   it("Prompt includes keyword in H1 rule (point 2)", () => {
@@ -212,9 +212,9 @@ describe("16-point Authority Standard in generation prompt", () => {
     expect(prompt).toContain("mandatory");
   });
 
-  it("Prompt instructs keyword in opening sentence / first 50 words — point 5", () => {
-    expect(prompt).toContain("OPENING SENTENCE");
-    expect(prompt).toContain("first 50 words");
+  it("Prompt instructs keyword within first 100 words of body text — point 5", () => {
+    expect(prompt).toContain("KEYWORD IN FIRST 100 WORDS");
+    expect(prompt).toContain("first 100 words");
   });
 
   it("Prompt includes meta title rule with 60 char limit (point 7)", () => {
@@ -246,8 +246,10 @@ describe("16-point Authority Standard in generation prompt", () => {
     expect(prompt).toContain("INTERNAL CTA LINK");
   });
 
-  it("Prompt includes internal blog links rule (point 12)", () => {
+  it("Prompt includes internal blog links rule (point 12) with minimum 2 and real slugs only", () => {
     expect(prompt).toContain("INTERNAL BLOG LINKS");
+    expect(prompt).toContain("at minimum 2 internal links");
+    expect(prompt).toContain("do NOT invent");
   });
 
   it("Prompt includes schema markup rule (point 13)", () => {
@@ -516,26 +518,27 @@ describe("Pass 1 scorer — rules-based", () => {
     expect(result.points.p10_external_link).toBe(false);
   });
 
-  it("p1_keyword_density passes when article has 4+ mentions AND density ≥1%", () => {
-    // 4 mentions in 200 words = 2.0% density — satisfies BOTH conditions (AND logic)
-    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney Services</h2><p>Our emergency plumber sydney team arrives fast. Call emergency plumber sydney now.</p>`;
-    const result = runPass1Scorer(makePass1Params({
-      bodyHtml: body,
-      wordCount: 200,
-      primaryKeyword: "emergency plumber sydney",
-    }));
-    expect(result.points.p1_keyword_density).toBe(true);
-  });
-
-  it("p1_keyword_density fails when 4+ mentions but density <1% (mention count alone is not enough)", () => {
-    // 4 mentions in 800 words = 0.5% density — has enough mentions but density too low
+  it("p1_keyword_density passes when article has 4+ mentions AND density ≤1%", () => {
+    // 4 mentions in 800 words = 0.5% density — satisfies both conditions (4+ mentions, density ≤1%)
     const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney Services</h2><p>Our emergency plumber sydney team arrives fast. Call emergency plumber sydney now.</p>`;
     const result = runPass1Scorer(makePass1Params({
       bodyHtml: body,
       wordCount: 800,
       primaryKeyword: "emergency plumber sydney",
     }));
-    // 4/800 = 0.5% density — below 1% threshold, so AND logic fails
+    // 4/800 = 0.5% density — 4+ mentions and under 1% ceiling, so passes
+    expect(result.points.p1_keyword_density).toBe(true);
+  });
+
+  it("p1_keyword_density fails when 4+ mentions but density >1% (over the hard ceiling)", () => {
+    // 4 mentions in 200 words = 2.0% density — over the 1% hard maximum
+    const body = `<p>emergency plumber sydney is available 24/7.</p><h2>Emergency Plumber Sydney Services</h2><p>Our emergency plumber sydney team arrives fast. Call emergency plumber sydney now.</p>`;
+    const result = runPass1Scorer(makePass1Params({
+      bodyHtml: body,
+      wordCount: 200,
+      primaryKeyword: "emergency plumber sydney",
+    }));
+    // 4/200 = 2.0% density — exceeds 1% ceiling, so fails
     expect(result.points.p1_keyword_density).toBe(false);
   });
 
