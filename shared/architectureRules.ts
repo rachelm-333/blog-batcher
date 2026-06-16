@@ -2,10 +2,10 @@
  * Blog Batcher — Architecture Rules Engine
  *
  * Enforces the Cornerstone → Pillar → Cluster hierarchy rules:
- *  - Cornerstones: 1–4  (minimum 1 — strict hierarchy required)
+ *  - Cornerstones: 0–4  (0 = pillar-only mode)
  *  - Pillars per Cornerstone: 1–4  (minimum 1)
- *  - Clusters per Pillar: 2–5  (default 3)
- *  - Minimum total: 1 cornerstone + 1 pillar + 2 clusters = 4 articles
+ *  - Clusters per Pillar: 0–5  (default 3)
+ *  - Minimum total: 0 cornerstones + 1 pillar + 0 clusters = 1 article (pillar-only mode)
  */
 
 export const PACK_SIZES = [20, 50] as const;
@@ -15,11 +15,11 @@ export type PackSize = (typeof PACK_SIZES)[number];
 export const CLUSTERS_PER_PILLAR = 3;
 /** Alias for backward compatibility */
 export const DEFAULT_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
-export const MIN_CLUSTERS_PER_PILLAR = 2;
+export const MIN_CLUSTERS_PER_PILLAR = 0;
 export const MAX_CLUSTERS_PER_PILLAR = 5;
 export const MIN_PILLARS_PER_CORNERSTONE = 1;
 export const MAX_PILLARS_PER_CORNERSTONE = 4;
-export const MIN_CORNERSTONES = 1;
+export const MIN_CORNERSTONES = 0;
 export const MAX_CORNERSTONES = 4;
 
 export const ARTICLE_TYPES = [
@@ -94,6 +94,11 @@ export function calcTotalArticles(
   pillarsPerCornerstone: number,
   clustersPerPillar: number = CLUSTERS_PER_PILLAR
 ): number {
+  if (cornerstones === 0) {
+    // Pillar-only mode: pillars are standalone, each may have clusters
+    const totalClusters = pillarsPerCornerstone * clustersPerPillar;
+    return pillarsPerCornerstone + totalClusters;
+  }
   const totalPillars = cornerstones * pillarsPerCornerstone;
   const totalClusters = totalPillars * clustersPerPillar;
   return cornerstones + totalPillars + totalClusters;
@@ -104,6 +109,18 @@ export function calcBreakdown(
   pillarsPerCornerstone: number,
   clustersPerPillar: number = CLUSTERS_PER_PILLAR
 ) {
+  if (cornerstones === 0) {
+    // Pillar-only mode: pillars are standalone posts
+    const totalClusters = pillarsPerCornerstone * clustersPerPillar;
+    return {
+      cornerstones: 0,
+      pillarsPerCornerstone,
+      clustersPerPillar,
+      totalPillars: pillarsPerCornerstone,
+      totalClusters,
+      total: pillarsPerCornerstone + totalClusters,
+    };
+  }
   const totalPillars = cornerstones * pillarsPerCornerstone;
   const totalClusters = totalPillars * clustersPerPillar;
   return {
@@ -120,7 +137,7 @@ export function calcBreakdown(
 
 /**
  * Enforces strict hierarchy dependencies.
- * Minimum: 1 cornerstone, 1 pillar per cornerstone, 2 clusters per pillar.
+ * Minimum: 0 cornerstones (pillar-only mode), 1 pillar per cornerstone, 0 clusters per pillar.
  */
 export function enforceDependencies(
   cornerstones: number,
@@ -158,7 +175,7 @@ export function validateArchitecture(
 
   // ── Clamp cornerstones ────────────────────────────────────────────────────
   if (cornerstones < MIN_CORNERSTONES) {
-    warnings.push(`Minimum 1 cornerstone required. Adjusted to ${MIN_CORNERSTONES}.`);
+    warnings.push(`Minimum ${MIN_CORNERSTONES} cornerstones required. Adjusted to ${MIN_CORNERSTONES}.`);
     cornerstones = MIN_CORNERSTONES;
   }
   if (cornerstones > MAX_CORNERSTONES) {

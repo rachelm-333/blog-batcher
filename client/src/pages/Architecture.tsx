@@ -326,8 +326,8 @@ export default function Architecture() {
   const [, navigate] = useLocation();
 
   // Local slider state (optimistic, before saving)
-  // Defaults match the minimum valid architecture: 1 cornerstone, 1 pillar, 3 clusters
-  const [localCornerstones, setLocalCornerstones] = useState(MIN_CORNERSTONES);
+  // Defaults: 1 cornerstone, 1 pillar, 3 clusters
+  const [localCornerstones, setLocalCornerstones] = useState(1);
   const [localPillars, setLocalPillars] = useState(MIN_PILLARS_PER_CORNERSTONE);
   const [localClusters, setLocalClusters] = useState(DEFAULT_CLUSTERS_PER_PILLAR);
   const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
@@ -524,7 +524,7 @@ export default function Architecture() {
             />
 
             <SliderRow
-              label="Pillar Posts (per cornerstone post)"
+              label={localCornerstones === 0 ? "Standalone Pillar Posts" : "Pillar Posts (per cornerstone post)"}
               subtitle="In-depth topic posts — 1,500–2,200 words. Each pillar links back to its cornerstone."
               value={localPillars}
               min={MIN_PILLARS_PER_CORNERSTONE}
@@ -547,10 +547,25 @@ export default function Architecture() {
 
             {/* Architecture summary sentence */}
             <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-4 py-3">
-              <strong>{localCornerstones}</strong> cornerstone{localCornerstones !== 1 ? "s" : ""}
-              {" × "}<strong>{localPillars}</strong> pillar{localPillars !== 1 ? "s" : ""} per cornerstone
-              {" × "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} per pillar
-              {" = "}<strong>{liveBreakdown.total} articles total</strong>
+              {localCornerstones === 0 && localClusters === 0 ? (
+                <>
+                  <strong>{localPillars}</strong> standalone pillar post{localPillars !== 1 ? "s" : ""}
+                  {" = "}<strong>{liveBreakdown.total} article{liveBreakdown.total !== 1 ? "s" : ""} total</strong>
+                </>
+              ) : localCornerstones === 0 ? (
+                <>
+                  <strong>{localPillars}</strong> pillar post{localPillars !== 1 ? "s" : ""}
+                  {" × "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} each
+                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
+                </>
+              ) : (
+                <>
+                  <strong>{localCornerstones}</strong> cornerstone{localCornerstones !== 1 ? "s" : ""}
+                  {" × "}<strong>{localPillars}</strong> pillar{localPillars !== 1 ? "s" : ""} per cornerstone
+                  {" × "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} per pillar
+                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
+                </>
+              )}
             </p>
 
             {!locked && (
@@ -696,6 +711,49 @@ export default function Architecture() {
               search engines understand the depth of your content and are more likely to rank your site as an authority in your niche.
               Blog Batcher SEO-optimises every article in this structure for you automatically.
             </p>
+          </div>
+
+          {/* ── Tips Panel ────────────────────────────────────────────── */}
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 16 }}>💡</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>Why architecture matters</span>
+            </div>
+
+            {/* Highlighted tip: Standalone post setup */}
+            <div style={{ background: "#faf5ff", border: "1.5px solid #c4b5fd", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed", background: "#ede9ff", padding: "2px 8px", borderRadius: 99 }}>
+                  ✦ "Standalone post" setup
+                </span>
+              </div>
+              <p style={{ fontSize: 12, color: "#4c1d95", lineHeight: 1.65, margin: "0 0 8px" }}>
+                Set <strong>Cornerstones to 0</strong>, <strong>Pillars to 1</strong>, <strong>Clusters to 0</strong>.
+              </p>
+              <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.65, margin: "0 0 8px" }}>
+                This generates a single focused article — ideal for comparative posts like
+                &ldquo;The 10 Best X in Y&rdquo; or &ldquo;X vs Y: Which Is Right for You?&rdquo;
+              </p>
+              <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.65, margin: 0, fontStyle: "italic" }}>
+                We recommend this for your first post on a new topic.
+              </p>
+            </div>
+
+            {/* General tips */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🏛</span>
+                <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.65, margin: 0 }}>
+                  <strong>Cornerstone posts are your authority hubs</strong> — build these first before adding pillars and clusters.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🔗</span>
+                <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.65, margin: 0 }}>
+                  Each cluster article <strong>links back to its pillar and cornerstone</strong>, building your internal link structure automatically.
+                </p>
+              </div>
+            </div>
           </div>
         </div>{/* end right column */}
 

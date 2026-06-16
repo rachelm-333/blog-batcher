@@ -51,10 +51,11 @@ describe("architectureRules.validateArchitecture", () => {
     expect(result.warnings.some((w) => w.includes("Maximum 4"))).toBe(true);
   });
 
-  it("clamps cornerstones to min 1", () => {
+  it("clamps cornerstones to min 0 (pillar-only mode is valid)", () => {
     const result = validateArchitecture(20, 0, 2);
-    expect(result.correctedCornerstones).toBe(1);
-    expect(result.warnings.some((w) => w.includes("Minimum 1 cornerstone"))).toBe(true);
+    // 0 cornerstones is valid (pillar-only mode) — no clamping needed
+    expect(result.correctedCornerstones).toBe(0);
+    expect(result.warnings).toHaveLength(0);
   });
 
   it("clamps pillars per cornerstone to max 4", () => {
