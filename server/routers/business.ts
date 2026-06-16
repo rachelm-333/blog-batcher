@@ -782,11 +782,11 @@ Rules:
         .limit(1);
       if (!biz) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
 
-      // Must have completed at least Stage 5 (Review) before starting a new batch
-      if (biz.currentStage < 5) {
+      // Must have reached at least Stage 4 (Publish & Schedule — the final stage) before starting a new batch
+      if (biz.currentStage < 4) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Complete the current batch (reach Stage 5) before starting a new one.",
+          message: "Complete the current batch (reach the Publish & Schedule stage) before starting a new one.",
         });
       }
 
