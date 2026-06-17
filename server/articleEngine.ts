@@ -596,7 +596,16 @@ The person publishing this article has added this specific direction:
 "${ctx.contentPlanDirection}"
 Follow this direction. If it specifies topics, examples, or angles to cover — include them. This takes priority over general guidelines.
 ` : ""}15. HUMAN AUTHENTICITY: No AI fingerprint patterns. Content must solve the reader's problem completely. Must be cohesive with the rest of the batch.
-16. ARTICLE TYPE STRUCTURE: Format and structure this as a ${typeLabel}. The title must signal specific territory ownership.
+   HARD RULES — HUMAN AUTHENTICITY:
+   - DO NOT make up statistics (e.g. "over 500 clients since 2018", "9 out of 10 businesses") without a real, citable source. If you cannot cite a real source, do not include the statistic.
+   - DO NOT use generic credibility claims such as "industry-leading", "trusted by thousands", "proven track record", or "years of expertise" without specific, verifiable backing.
+   - If citing business experience or client numbers, be specific and real — or omit entirely. Fabricated social proof is worse than no social proof.
+16. SEARCH INTENT RESOLUTION: The article title makes a promise to the reader. You MUST deliver on that promise.
+   HARD RULES — SEARCH INTENT RESOLUTION:
+   - If the title promises "how to start X", "how to do X", or "step-by-step guide to X" — deliver actual numbered step-by-step actionable instructions. Do NOT substitute framework overviews, general principles, or conceptual summaries.
+   - Every H2 section MUST contain at least one specific, actionable instruction the reader can execute today. Sections that only explain concepts without telling the reader what to DO are not acceptable.
+   - Actionable instructions must be concrete: name the tool, form, website, phone number, or exact action — not vague directions like "research your options" or "consider your goals".
+17. ARTICLE TYPE STRUCTURE: Format and structure this as a ${typeLabel}. The title must signal specific territory ownership.
 
 === CLOSING CTA SECTION (MANDATORY) ===
 Every article MUST end with a dedicated CTA section using this exact structure:
@@ -1967,57 +1976,93 @@ Return ONLY the full article HTML wrapped in:
   let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
   console.log(`[ArticleEngine] Pass 2 score: ${pass2.score} for node ${nodeId} — ${pass2.reason}`);
 
-  // --- Pass 2 quality floor: one improvement attempt if score < 80 ---
+  // --- Pass 2 quality floor: up to 3 improvement attempts if score < 80 ---
+  // Each attempt injects the EXACT scorer feedback so the model fixes the specific issues raised.
+  // If score reaches ≥80 at any point, the loop exits early.
+  // If still <80 after 3 attempts, statusBadge is forced to "needs_review" so the user knows manual editing is required.
+  const MAX_IMPROVEMENT_ATTEMPTS = 3;
+  let improvementAttempts = 0;
   if (pass2.score < 80) {
-    console.log(`[ArticleEngine] Pass 2 quality floor triggered (score ${pass2.score} < 80) for node ${nodeId}. Running improvement pass...`);
-    try {
-      const improvementPrompt = `This article scored ${pass2.score}/100 on writing quality. The target is 80+. It will be scored on four dimensions:
+    console.log(`[ArticleEngine] Pass 2 quality floor triggered (score ${pass2.score} < 80) for node ${nodeId}. Running up to ${MAX_IMPROVEMENT_ATTEMPTS} improvement attempts...`);
+    for (let attempt = 1; attempt <= MAX_IMPROVEMENT_ATTEMPTS; attempt++) {
+      if (pass2.score >= 80) break;
+      improvementAttempts = attempt;
+      console.log(`[ArticleEngine] Improvement attempt ${attempt}/${MAX_IMPROVEMENT_ATTEMPTS} for node ${nodeId} (current score: ${pass2.score})...`);
+      try {
+        const improvementPrompt = `This article scored ${pass2.score}/100 on writing quality. The target is 80+.
+
+The scorer gave this specific feedback:
+"${pass2.reason}"
+
+You MUST fix exactly the issues described in that feedback above. Do NOT rewrite the article from scratch.
+Instead, identify the specific sections, sentences, or patterns that caused the low score and fix only those.
+
+Scoring dimensions (for context):
 1. CLARITY & FLOW: Ideas connect logically. Transitions feel natural. The reader never has to re-read a sentence.
 2. HUMAN AUTHENTICITY: Reads as written by a real human expert. No AI fingerprint patterns. No performative declarations. Specific, opinionated, direct.
 3. DEPTH & SPECIFICITY: Uses concrete numbers, named examples, real scenarios. Avoids vague generalisations.
 4. ENGAGEMENT: Holds attention throughout. Varied rhythm. Strong opening. Sections build on each other.
 
-Improve it by:
-- Strengthening the opening to better match search intent and hook the reader immediately
-- Adding more specific, concrete details, numbers, and named examples in the weakest sections
-- Removing any remaining AI-fingerprint patterns (performative declarations, formulaic transitions, generic statements)
-- Ensuring the human voice is consistent and authoritative throughout
-- Varying sentence rhythm — break up any sections where every sentence has the same length/structure
+Rules for this improvement pass:
+- Fix the specific issues raised in the scorer feedback — do not make unrelated changes
 - Do NOT change the structure, headings, keyword usage, or overall length
+- Do NOT rewrite sections that are already working well
+- Do NOT add or remove internal links, schema markup, or the closing CTA section
 - Do NOT make it sound more AI-generated — make it sound more like a trusted human expert
-Return the improved article HTML body only, no explanation.
+- Use Australian English spelling
+
+Return the improved article HTML body only, wrapped in:
+<IMPROVED_HTML>
+...improved HTML here...
+</IMPROVED_HTML>
 
 ${bodyHtml}`;
 
-      const improvementResult = await invokeLLMWithCost(
-        {
-          messages: [{ role: "user", content: improvementPrompt }],
-          maxTokens: 12000,
-        },
-        { userId }
-      );
+        const improvementResult = await invokeLLMWithCost(
+          {
+            messages: [{ role: "user", content: improvementPrompt }],
+            max_tokens: TOKEN_LIMITS.improvement,
+          },
+          { userId, feature: "article_generation" }
+        );
 
-      const rawContent = improvementResult.choices[0]?.message?.content ?? "";
-      const improvedHtml = typeof rawContent === "string"
-        ? rawContent
-        : (rawContent as Array<{ type: string; text?: string }>)
-            .filter(b => b.type === "text")
-            .map(b => b.text ?? "")
-            .join("");
+        const rawContent = improvementResult.choices[0]?.message?.content ?? "";
+        const rawImprovement = typeof rawContent === "string"
+          ? rawContent
+          : (rawContent as Array<{ type: string; text?: string }>)
+              .filter(b => b.type === "text")
+              .map(b => b.text ?? "")
+              .join("");
 
-      if (improvedHtml && improvedHtml.trim().length > 100) {
-        bodyHtml = improvedHtml.trim();
-        const improvedPass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
-        console.log(`[ArticleEngine] Pass 2 quality floor: score after improvement attempt = ${improvedPass2.score} for node ${nodeId}`);
-        pass2 = improvedPass2;
+        // Extract from delimiters — fall back to raw if no delimiters found
+        const delimMatch = rawImprovement.match(/<IMPROVED_HTML>([\s\S]*?)<\/IMPROVED_HTML>/i);
+        const improvedHtml = delimMatch ? delimMatch[1].trim() : rawImprovement.trim();
+
+        if (improvedHtml && improvedHtml.length > 100) {
+          bodyHtml = improvedHtml;
+          const improvedPass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
+          console.log(`[ArticleEngine] Improvement attempt ${attempt}: score ${pass2.score} → ${improvedPass2.score} for node ${nodeId}`);
+          pass2 = improvedPass2;
+        } else {
+          console.warn(`[ArticleEngine] Improvement attempt ${attempt} returned no usable HTML for node ${nodeId} — keeping current`);
+        }
+      } catch (err) {
+        console.warn(`[ArticleEngine] Improvement attempt ${attempt} failed for node ${nodeId}:`, err);
       }
-    } catch (err) {
-      console.warn(`[ArticleEngine] Pass 2 quality floor improvement failed for node ${nodeId}:`, err);
+    }
+    if (pass2.score < 80) {
+      console.warn(`[ArticleEngine] Pass 2 quality floor: still ${pass2.score} after ${improvementAttempts} attempt(s) for node ${nodeId} — will store as needs_review`);
     }
   }
 
   // --- Derive badge ---
-  const { internalScore, statusBadge } = deriveStatusBadge(pass1.score, pass2.score);
+  // If Pass 2 score is still below 80 after all improvement attempts, force needs_review
+  // so the user knows manual editing is required regardless of Pass 1 score.
+  let { internalScore, statusBadge } = deriveStatusBadge(pass1.score, pass2.score);
+  if (pass2.score < 80 && improvementAttempts > 0) {
+    statusBadge = "needs_review";
+    console.log(`[ArticleEngine] Badge overridden to needs_review for node ${nodeId} (Pass 2 score ${pass2.score} after ${improvementAttempts} improvement attempt(s))`);
+  }
   console.log(`[ArticleEngine] Final score: ${internalScore} (${statusBadge}) for node ${nodeId}`);
 
   return {
