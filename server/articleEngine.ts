@@ -1396,8 +1396,9 @@ export async function generateSingleArticle(
             `WORD COUNT TOO SHORT (${wc} words, minimum is ${ctx.wordCountMin}): Add one focused paragraph to the most relevant existing section to reach the minimum. Do NOT rewrite existing text — only add new content.`
           );
         } else {
+          const overage = wc - ctx.wordCountMax;
           pass1FailureInstructions.push(
-            `WORD COUNT TOO LONG (${wc} words, maximum is ${ctx.wordCountMax}): Trim the least essential sentences to get under the maximum. Do NOT rewrite — just remove redundant sentences.`
+            `WORD COUNT TOO LONG (${wc} words, target maximum is ${ctx.wordCountMax} — overage of ${overage} words): Remove whole non-essential paragraphs and redundant sections to bring the article into the ${ctx.wordCountMin}–${ctx.wordCountMax} word range. Priority order for removal: (1) redundant recap paragraphs that repeat what was already said, (2) over-explained transitions between sections, (3) padding paragraphs that add no new information, (4) any sub-section that duplicates the content of another sub-section. RULES: Do NOT remove any heading. Do NOT remove any paragraph that contains the primary keyword. Do NOT remove the opening answer block, the FAQ section, or the closing CTA. Do NOT rewrite any paragraph — only delete whole paragraphs. Keep removing paragraphs until the word count is within the target range.`
           );
         }
       }
