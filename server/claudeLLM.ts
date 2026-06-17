@@ -1,11 +1,41 @@
-import Anthropic from "@anthropic-ai/sdk";
+/**
+ * claudeLLM.ts
+ *
+ * LLM transport layer — routes all Claude calls through OpenRouter's
+ * OpenAI-compatible endpoint instead of Anthropic directly.
+ *
+ * Drop-in replacement: exports the same function signatures as before.
+ * Only the HTTP transport changes; all prompts, scoring, and engine logic
+ * remain untouched.
+ */
+
+import OpenAI from "openai";
 import type { InvokeParams, InvokeResult } from "./_core/llm";
 import { getDb } from "./db";
 import { apiCostLog } from "../drizzle/schema";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+// ---------------------------------------------------------------------------
+// OpenRouter client (OpenAI-compatible)
+// ---------------------------------------------------------------------------
+
+const openrouter = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY ?? "",
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "HTTP-Referer": "https://blogbatcher-ewwkvhui.manus.space",
+    "X-Title": "Blog Batcher",
+  },
 });
+
+// ---------------------------------------------------------------------------
+// Model constant — change here to switch Claude versions globally
+// ---------------------------------------------------------------------------
+
+export const OPENROUTER_MODEL = "anthropic/claude-sonnet-4-5";
+
+// ---------------------------------------------------------------------------
+// Types (kept for backward compatibility with any callers)
+// ---------------------------------------------------------------------------
 
 export interface ClaudeMessage {
   role: "user" | "assistant";
@@ -26,100 +56,120 @@ export interface ClaudeLLMResponse {
   model: string;
 }
 
-/**
- * Invoke Claude 3.5 Sonnet for article generation.
- * Returns the text content and token usage for cost tracking.
- */
+// ---------------------------------------------------------------------------
+// Cost estimation (Claude Sonnet 4.5 pricing via OpenRouter)
+// ---------------------------------------------------------------------------
+
+const COST_PER_M_INPUT = 3.0;   // USD per million input tokens
+const COST_PER_M_OUTPUT = 15.0; // USD per million output tokens
+
+function estimateCost(inputTokens: number, outputTokens: number): number {
+  return (inputTokens / 1_000_000) * COST_PER_M_INPUT +
+    (outputTokens / 1_000_000) * COST_PER_M_OUTPUT;
+}
+
+// ---------------------------------------------------------------------------
+// invokeClaude — simple interface (used by testClaudeConnection)
+// ---------------------------------------------------------------------------
+
 export async function invokeClaude(
   options: ClaudeLLMOptions
 ): Promise<ClaudeLLMResponse> {
-  const model = options.model ?? "claude-sonnet-4-5";
+  const model = options.model ?? OPENROUTER_MODEL;
   const maxTokens = options.maxTokens ?? 8192;
 
-  const response = await anthropic.messages.create({
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+
+  if (options.system) {
+    messages.push({ role: "system", content: options.system });
+  }
+  for (const m of options.messages) {
+    messages.push({ role: m.role, content: m.content });
+  }
+
+  const response = await openrouter.chat.completions.create({
     model,
     max_tokens: maxTokens,
-    system: options.system,
-    messages: options.messages,
+    messages,
   });
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  const content = textBlock?.type === "text" ? textBlock.text : "";
+  const content = response.choices[0]?.message?.content ?? "";
+  const inputTokens = response.usage?.prompt_tokens ?? 0;
+  const outputTokens = response.usage?.completion_tokens ?? 0;
 
-  return {
-    content,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    model,
-  };
+  return { content, inputTokens, outputTokens, model };
 }
 
-/** Cost per million tokens in USD — Claude 3.5 Sonnet pricing */
-const CLAUDE_COST_PER_M_INPUT = 3.0;
-const CLAUDE_COST_PER_M_OUTPUT = 15.0;
-
-function estimateClaudeCost(inputTokens: number, outputTokens: number): number {
-  return (inputTokens / 1_000_000) * CLAUDE_COST_PER_M_INPUT +
-    (outputTokens / 1_000_000) * CLAUDE_COST_PER_M_OUTPUT;
-}
+// ---------------------------------------------------------------------------
+// Cost log context type
+// ---------------------------------------------------------------------------
 
 export type CostLogContext = {
   userId?: number | null;
   feature?: typeof apiCostLog.$inferInsert["feature"];
 };
 
-/**
- * Drop-in replacement for invokeLLMWithCost that uses Claude 3.5 Sonnet.
- * Returns the same InvokeResult shape so articleEngine.ts needs minimal changes.
- * Logs cost to api_cost_log asynchronously.
- */
+// ---------------------------------------------------------------------------
+// invokeClaudeWithCost — drop-in for articleEngine.ts
+// Accepts InvokeParams, returns InvokeResult, logs cost asynchronously.
+// ---------------------------------------------------------------------------
+
 export async function invokeClaudeWithCost(
   params: InvokeParams,
   ctx: CostLogContext = {}
 ): Promise<InvokeResult> {
-  const model = "claude-sonnet-4-5";
+  const model = OPENROUTER_MODEL;
 
-  // Convert InvokeParams messages to Anthropic format
-  // Extract system message if present, convert rest to user/assistant
-  let systemPrompt: string | undefined;
-  const anthropicMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
+  // Build OpenAI-format messages array
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
   for (const msg of params.messages) {
-    const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+    const content =
+      typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+
     if (msg.role === "system") {
-      systemPrompt = systemPrompt ? `${systemPrompt}\n\n${content}` : content;
+      // Merge multiple system messages into one (OpenRouter accepts only one)
+      const existing = messages.find((m) => m.role === "system");
+      if (existing && typeof existing.content === "string") {
+        existing.content = `${existing.content}\n\n${content}`;
+      } else {
+        messages.unshift({ role: "system", content });
+      }
     } else if (msg.role === "user" || msg.role === "assistant") {
-      anthropicMessages.push({ role: msg.role, content });
+      messages.push({ role: msg.role, content });
     }
   }
 
-  // Ensure there's at least one user message
-  if (anthropicMessages.length === 0) {
-    anthropicMessages.push({ role: "user", content: "Continue." });
+  // Ensure at least one user message
+  if (!messages.some((m) => m.role === "user")) {
+    messages.push({ role: "user", content: "Continue." });
   }
 
-  // If response_format is json_object, add instruction to system prompt
+  // If json_object format requested, add instruction to system prompt
   if (params.response_format?.type === "json_object") {
-    const jsonInstruction = "Return ONLY a valid JSON object. No markdown, no code fences, no explanation.";
-    systemPrompt = systemPrompt ? `${systemPrompt}\n\n${jsonInstruction}` : jsonInstruction;
+    const jsonInstruction =
+      "Return ONLY a valid JSON object. No markdown, no code fences, no explanation.";
+    const sys = messages.find((m) => m.role === "system");
+    if (sys && typeof sys.content === "string") {
+      sys.content = `${sys.content}\n\n${jsonInstruction}`;
+    } else {
+      messages.unshift({ role: "system", content: jsonInstruction });
+    }
   }
 
-  const maxTokens = params.max_tokens ?? 8192;
+  const maxTokens = params.max_tokens ?? params.maxTokens ?? 8192;
 
-  const response = await anthropic.messages.create({
+  const response = await openrouter.chat.completions.create({
     model,
     max_tokens: maxTokens,
-    ...(systemPrompt ? { system: systemPrompt } : {}),
-    messages: anthropicMessages,
+    messages,
   });
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  const content = textBlock?.type === "text" ? textBlock.text : "";
+  const content = response.choices[0]?.message?.content ?? "";
+  const inputTokens = response.usage?.prompt_tokens ?? 0;
+  const outputTokens = response.usage?.completion_tokens ?? 0;
 
-  const inputTokens = response.usage.input_tokens;
-  const outputTokens = response.usage.output_tokens;
-
-  // Log cost asynchronously
+  // Log cost asynchronously — non-blocking
   setImmediate(async () => {
     try {
       const db = await getDb();
@@ -129,7 +179,7 @@ export async function invokeClaudeWithCost(
         model,
         inputTokens,
         outputTokens,
-        estimatedCostUsd: estimateClaudeCost(inputTokens, outputTokens).toFixed(6),
+        estimatedCostUsd: estimateCost(inputTokens, outputTokens).toFixed(6),
         feature: ctx.feature ?? "other",
       });
     } catch (err) {
@@ -137,10 +187,10 @@ export async function invokeClaudeWithCost(
     }
   });
 
-  // Return InvokeResult shape
+  // Return InvokeResult shape (same as before)
   return {
     id: response.id,
-    created: Math.floor(Date.now() / 1000),
+    created: response.created,
     model,
     choices: [
       {
@@ -149,7 +199,7 @@ export async function invokeClaudeWithCost(
           role: "assistant",
           content,
         },
-        finish_reason: response.stop_reason === "end_turn" ? "stop" : (response.stop_reason ?? "stop"),
+        finish_reason: response.choices[0]?.finish_reason ?? "stop",
       },
     ],
     usage: {
@@ -160,10 +210,10 @@ export async function invokeClaudeWithCost(
   };
 }
 
-/**
- * Quick connectivity test — calls Claude with a minimal prompt.
- * Returns true if the API key is valid and the model responds.
- */
+// ---------------------------------------------------------------------------
+// testClaudeConnection — validates the OpenRouter key is working
+// ---------------------------------------------------------------------------
+
 export async function testClaudeConnection(): Promise<boolean> {
   try {
     const result = await invokeClaude({
