@@ -714,14 +714,22 @@ export function runPass1Scorer(params: {
 // Pass 2 — AI quality scorer
 // ---------------------------------------------------------------------------
 
-export async function runPass2Scorer(bodyHtml: string, primaryKeyword: string, userId?: number | null): Promise<{ score: number; reason: string }> {
+export async function runPass2Scorer(bodyHtml: string, primaryKeyword: string, userId?: number | null, hasSiblings?: boolean): Promise<{ score: number; reason: string }> {
+  // When no sibling/cluster articles exist in the batch, Batch Cohesion cannot be
+  // fairly evaluated — the article has nothing to link to. In that case, score out
+  // of 80 (4 criteria × 20 pts) and normalise to 100 so the article isn't penalised
+  // for a structural constraint outside its control.
+  const batchCohesionLine = hasSiblings
+    ? "5. BATCH COHESION (20 pts): Does it feel like part of a coherent content strategy? Does it cross-link to related articles where appropriate?"
+    : "5. BATCH COHESION: NOT APPLICABLE — this article has no sibling or cluster articles to link to in this batch. Award full 20 points for this criterion automatically.";
+
   const prompt = `You are an SEO content quality auditor. Score the following article on these 5 criteria (each worth 20 points, total 100):
 
 1. SEARCH INTENT RESOLUTION (20 pts): Does it fully resolve what the searcher is looking for?
 2. HUMAN AUTHENTICITY (20 pts): Does it read as written by a real human expert, not AI?
 3. TITLE TERRITORY (20 pts): Does the title own a specific territory and signal clear value?
 4. E-E-A-T AUTHORITY (20 pts): Does it demonstrate Experience, Expertise, Authoritativeness, Trustworthiness?
-5. BATCH COHESION (20 pts): Does it feel like part of a coherent content strategy?
+${batchCohesionLine}
 
 Primary keyword: ${primaryKeyword}
 
@@ -1333,6 +1341,73 @@ export async function generateSingleArticle(
     }
 
     // =========================================================================
+    // STEP 2.5 — PRE-SCORE WORD COUNT TRIM (fires before scoring if over max)
+    // =========================================================================
+    if (wordCount > ctx.wordCountMax) {
+      const trimStart = Date.now();
+      const overage = wordCount - ctx.wordCountMax;
+      console.log(`[ArticleEngine] Pre-score trim triggered for node ${nodeId}: ${wordCount} words, max is ${ctx.wordCountMax} (overage: ${overage} words)`);
+
+      const preTrimPrompt = `You are trimming an article that is too long. The article is currently ${wordCount} words and must be reduced to between ${ctx.wordCountMin} and ${ctx.wordCountMax} words (overage: ${overage} words).
+
+Remove whole non-essential paragraphs and redundant sections in this priority order:
+1. Redundant recap paragraphs that repeat what was already said earlier in the article
+2. Over-explained transitions between sections
+3. Padding paragraphs that add no new information
+4. Any sub-section that duplicates the content of another sub-section
+
+STRICT RULES:
+- Do NOT remove any heading (<h2>, <h3>)
+- Do NOT remove any paragraph that contains the exact phrase "${ctx.primaryKeyword}"
+- Do NOT remove the opening answer block (the first paragraph after the H1)
+- Do NOT remove the FAQ section
+- Do NOT remove the closing CTA section
+- Do NOT rewrite any paragraph — only delete whole paragraphs
+- Keep removing paragraphs until the word count is within ${ctx.wordCountMin}–${ctx.wordCountMax} words
+- Keep the article coherent — if removing a paragraph creates an abrupt transition, remove the transition too
+
+Return the trimmed article HTML wrapped in:
+<TRIMMED_HTML>
+...trimmed article HTML here...
+</TRIMMED_HTML>
+
+HERE IS THE CURRENT ARTICLE HTML:
+${bodyHtml}`;
+
+      try {
+        const trimResult = await invokeLLMWithCost(
+          {
+            messages: [
+              {
+                role: "system" as const,
+                content: "You are a precise HTML editor. Remove only whole paragraphs as instructed. Return the complete trimmed article HTML.",
+              },
+              { role: "user" as const, content: preTrimPrompt },
+            ],
+            max_tokens: TOKEN_LIMITS.improvement,
+          },
+          { userId, feature: "article_generation" }
+        );
+
+        const rawTrim = trimResult.choices[0]?.message?.content ?? "";
+        const rawTrimStr = typeof rawTrim === "string" ? rawTrim : JSON.stringify(rawTrim);
+        const trimMatch = rawTrimStr.match(/<TRIMMED_HTML>([\s\S]*?)<\/TRIMMED_HTML>/i);
+        const trimmedHtml = trimMatch ? trimMatch[1].trim() : "";
+
+        if (trimmedHtml && trimmedHtml.length > 100) {
+          const prevWordCount = wordCount;
+          bodyHtml = trimmedHtml;
+          wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+          console.log(`[ArticleEngine] Pre-score trim done for node ${nodeId}: ${prevWordCount} → ${wordCount} words in ${((Date.now() - trimStart) / 1000).toFixed(1)}s`);
+        } else {
+          console.warn(`[ArticleEngine] Pre-score trim returned no usable HTML for node ${nodeId} — keeping original`);
+        }
+      } catch (err) {
+        console.warn(`[ArticleEngine] Pre-score trim failed for node ${nodeId}:`, err);
+      }
+    }
+
+    // =========================================================================
     // STEP 3 — PASS 1 SCORER (rules-based, synchronous)
     // =========================================================================
     const pass1 = runPass1Scorer({
@@ -1355,7 +1430,8 @@ export async function generateSingleArticle(
     // =========================================================================
     // STEP 4 — PASS 2 SCORER (AI quality)
     // =========================================================================
-    let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
+    const hasSiblings = (ctx.siblingUrls?.length ?? 0) > 0;
+    let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId, hasSiblings);
     const pass2Done = Date.now();
     console.log(`[ArticleEngine] Pass 2 done for node ${nodeId}: ${pass2.score}/100 — "${pass2.reason}" (${((pass2Done - writeDone) / 1000).toFixed(1)}s)`);
 
@@ -1564,7 +1640,7 @@ ${bodyHtml}`;
         if (improvedHtml && improvedHtml.length > 100) {
           bodyHtml = improvedHtml;
           wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-          const improvedPass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
+          const improvedPass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId, hasSiblings);
           console.log(`[ArticleEngine] Pass 2 fix: score ${pass2.score} → ${improvedPass2.score} for node ${nodeId}`);
           pass2 = improvedPass2;
         } else {
