@@ -655,6 +655,7 @@ export const articlesRouter = router({
       status: z.enum(["generated", "pending_approval", "approved"]),
     }))
     .mutation(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -684,6 +685,11 @@ export const articlesRouter = router({
         .where(eq(articles.id, input.articleId));
 
       return { updated: true };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error('[updateStatus] Unexpected error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err instanceof Error ? err.message : 'Update failed — please try again' });
+      }
     }),
 
   // ---------------------------------------------------------------------------
@@ -706,6 +712,7 @@ export const articlesRouter = router({
       imageUrl: z.string().url().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -764,6 +771,11 @@ export const articlesRouter = router({
       }
 
       return { updated: true };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error('[updateSeoFields] Unexpected error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err instanceof Error ? err.message : 'Update failed — please try again' });
+      }
     }),
 
   /**
@@ -777,6 +789,7 @@ export const articlesRouter = router({
       bodyMarkdown: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      try {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -803,6 +816,11 @@ export const articlesRouter = router({
       }).where(eq(articles.id, input.articleId));
 
       return { updated: true, wordCount };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error('[updateBody] Unexpected error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err instanceof Error ? err.message : 'Update failed — please try again' });
+      }
     }),
 
   /**
@@ -855,13 +873,19 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
 ...full updated HTML here...
 </EDITED_HTML>`;
 
-      const result = await invokeLLM({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `EDITING INSTRUCTION: ${input.instruction}\n\nARTICLE:\n${article.bodyHtml}` },
-        ],
-        max_tokens: 12000,
-      });
+      let result;
+      try {
+        result = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `EDITING INSTRUCTION: ${input.instruction}\n\nARTICLE:\n${article.bodyHtml}` },
+          ],
+          max_tokens: 12000,
+        });
+      } catch (llmErr) {
+        console.error('[aiEditInstruction] LLM call failed:', llmErr);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI edit failed — please try again' });
+      }
 
       const rawContent = result.choices[0]?.message?.content ?? "";
       const raw = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);

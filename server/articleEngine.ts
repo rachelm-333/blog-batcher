@@ -37,6 +37,22 @@ import { invokeClaudeWithCost as invokeLLMWithCost } from "./claudeLLM";
 import { getDb } from "./db";
 
 // ---------------------------------------------------------------------------
+// Token limits per generation pass (single source of truth)
+// ---------------------------------------------------------------------------
+export const TOKEN_LIMITS = {
+  outline: 4096,       // Outline JSON: small structured call
+  section: 12000,      // Section HTML: longest single call
+  scrub: 12000,        // AI fingerprint scrub
+  improvement: 12000,  // Pass 2 quality improvement
+  condensation: 12000, // Word-count condensation
+  expansion: 12000,    // Word-count expansion
+  recovery: 12000,     // Section recovery retry
+  titleRewrite: 2048,  // Title/meta rewrite
+  schema: 2048,        // FAQ schema JSON
+  pass2: 4096,         // Pass 2 quality scorer
+} as const;
+
+// ---------------------------------------------------------------------------
 // Word count rules (from scope Table 4)
 // ---------------------------------------------------------------------------
 export const WORD_COUNT_RULES = {
@@ -886,6 +902,7 @@ Return JSON: { "score": <0-100 integer>, "reason": "<one sentence explaining the
         {
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
+          max_tokens: TOKEN_LIMITS.pass2,
         },
         { userId, feature: "seo_analysis" }
       ),
@@ -1172,6 +1189,7 @@ export async function generateSingleArticle(
   allOrderedNodes: OrderedNode[],
   userId?: number | null
 ): Promise<GenerationResult> {
+  try {
   const ctx = await buildArticleContext(businessId, nodeId, allOrderedNodes);
 
   // =========================================================================
@@ -1216,7 +1234,7 @@ export async function generateSingleArticle(
               { role: "user" as const, content: outlinePrompt },
             ],
             response_format: { type: "json_object" },
-            max_tokens: 12000,
+            max_tokens: TOKEN_LIMITS.outline,
           },
           { userId, feature: "article_generation" }
         );
@@ -1262,7 +1280,7 @@ export async function generateSingleArticle(
               { role: "system" as const, content: "You are an expert SEO content writer. Return ONLY the section HTML wrapped in <SECTION_HTML>...</SECTION_HTML> delimiters. No other text." },
               { role: "user" as const, content: sectionPrompt },
             ],
-            max_tokens: 12000,
+            max_tokens: TOKEN_LIMITS.section,
           },
           { userId, feature: "article_generation" }
         );
@@ -1317,7 +1335,7 @@ Return ONLY the raw JSON-LD string (no markdown, no code fences, no explanation)
       const schemaResult = await invokeLLMWithCost(
         {
           messages: [{ role: "user" as const, content: schemaPrompt }],
-          max_tokens: 2048,
+          max_tokens: TOKEN_LIMITS.schema,
         },
         { userId, feature: "article_generation" }
       );
@@ -1357,7 +1375,7 @@ Return ONLY the raw JSON-LD string (no markdown, no code fences, no explanation)
                 content: `Rewrite this article title to naturally include the focus keyword.\nFocus keyword: "${ctx.primaryKeyword}"\nOriginal title: "${title}"\nRules: Keep the meaning. Sound like a real article title a human would write. Do not just prepend the keyword. Max 70 characters. Return ONLY the new title text, nothing else.`,
               },
             ],
-            max_tokens: 100,
+            max_tokens: TOKEN_LIMITS.titleRewrite,
           },
           { userId, feature: "article_generation" }
         );
@@ -1489,7 +1507,7 @@ Return ONLY the condensed article body as clean HTML, wrapped in these exact del
               { role: "system", content: "You are an expert SEO content editor. Condense the article as instructed. Preserve all headings, key points, examples, internal links, keyword mentions, and schema markup. Use Australian English spelling." },
               { role: "user", content: condensationPrompt + "\n\n" + bodyHtml },
             ],
-            max_tokens: 12000,
+            max_tokens: TOKEN_LIMITS.condensation,
           },
           { userId, feature: "article_generation" }
         );
@@ -1582,7 +1600,7 @@ Return ONLY the expanded article body as clean HTML, wrapped in these exact deli
             { role: "system", content: expansionSystemPrompt },
             { role: "user", content: bodyHtml },
           ],
-          max_tokens: 12000,
+          max_tokens: TOKEN_LIMITS.expansion,
         },
         { userId, feature: "article_generation" }
       );
@@ -1616,7 +1634,7 @@ Return ONLY the expanded article body as clean HTML, wrapped in these exact deli
       {
         messages: [{ role: "user", content: scrubPrompt }],
         // No json_object mode — we use plain HTML delimiters to avoid JSON encoding issues
-        max_tokens: 12000,
+        max_tokens: TOKEN_LIMITS.scrub,
       },
       { userId, feature: "article_generation" }
     );
@@ -1669,7 +1687,7 @@ Return ONLY the expanded HTML wrapped in:
               { role: "system", content: recoverySystemPrompt },
               { role: "user", content: bodyHtml },
             ],
-            max_tokens: 12000,
+            max_tokens: TOKEN_LIMITS.recovery,
           },
           { userId, feature: "article_generation" }
         );
@@ -1719,7 +1737,7 @@ Return ONLY the full article HTML wrapped in:
               { role: "user", content: targetedScrubPrompt },
               { role: "user", content: bodyHtml },
             ],
-            max_tokens: 12000,
+            max_tokens: TOKEN_LIMITS.recovery,
           },
           { userId, feature: "article_generation" }
         );
@@ -2019,4 +2037,9 @@ ${bodyHtml}`;
     pass2Score: pass2.score,
     pass2Reason: pass2.reason,
   };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[ArticleEngine] generateSingleArticle failed for businessId=${businessId} nodeId=${nodeId}:`, message);
+    throw err;
+  }
 }
