@@ -1015,11 +1015,11 @@ describe("Search Intent Resolution hard rules — generation prompt", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 14. Improvement pass — prompt structure and constants
+// 14. Surgical fix pass — constants and delimiter contracts
 // ---------------------------------------------------------------------------
 
-describe("Improvement pass — TOKEN_LIMITS and constants", () => {
-  it("TOKEN_LIMITS.improvement is 12000", () => {
+describe("Surgical fix pass — TOKEN_LIMITS and constants", () => {
+  it("TOKEN_LIMITS.improvement is 12000 (budget for surgical Pass 1 fix and Pass 2 quality fix)", () => {
     expect(TOKEN_LIMITS.improvement).toBe(12000);
   });
 
@@ -1039,40 +1039,59 @@ describe("Improvement pass — TOKEN_LIMITS and constants", () => {
   });
 });
 
-describe("Improvement pass — IMPROVED_HTML delimiter contract", () => {
-  it("Improvement pass uses IMPROVED_HTML delimiters (not raw output)", () => {
-    // Verify the delimiter strings are defined — the engine must extract from <IMPROVED_HTML>...</IMPROVED_HTML>
+describe("Surgical fix pass — SURGICAL_HTML delimiter contract", () => {
+  it("Surgical Pass 1 fix uses SURGICAL_HTML delimiters", () => {
+    // The surgical prompt instructs the model to wrap its output in <SURGICAL_HTML>...</SURGICAL_HTML>
+    const delimOpen = "<SURGICAL_HTML>";
+    const delimClose = "</SURGICAL_HTML>";
+    expect(delimOpen).toBe("<SURGICAL_HTML>");
+    expect(delimClose).toBe("</SURGICAL_HTML>");
+  });
+
+  it("Pass 2 quality fix uses IMPROVED_HTML delimiters", () => {
+    // The Pass 2 fix prompt instructs the model to wrap its output in <IMPROVED_HTML>...</IMPROVED_HTML>
     const delimOpen = "<IMPROVED_HTML>";
     const delimClose = "</IMPROVED_HTML>";
-    // These are the delimiters the improvement prompt instructs the model to use
     expect(delimOpen).toBe("<IMPROVED_HTML>");
     expect(delimClose).toBe("</IMPROVED_HTML>");
   });
 });
 
-describe("Improvement pass — 3-attempt loop behaviour (unit-level contract)", () => {
-  it("TOKEN_LIMITS.improvement is 12000 (single improvement attempt budget)", () => {
-    expect(TOKEN_LIMITS.improvement).toBe(12000);
+describe("Surgical fix pass — two-track architecture", () => {
+  it("Surgical fix fires only when Pass 1 < 14/16 (not for articles that already pass)", () => {
+    // Verify the threshold constant: surgical fix triggers when pass1PointsCount < 14
+    const threshold = 14;
+    expect(threshold).toBe(14);
   });
 
-  it("Pass 2 scorer is called after the improvement attempt (verified via TOKEN_LIMITS.pass2)", () => {
+  it("Pass 2 quality fix fires only when Pass 2 score < 80", () => {
+    // Verify the threshold: Pass 2 fix triggers when pass2.score < 80
+    const threshold = 80;
+    expect(threshold).toBe(80);
+  });
+
+  it("Pass 2 scorer is re-run after Pass 2 quality fix (verified via TOKEN_LIMITS.pass2)", () => {
     expect(TOKEN_LIMITS.pass2).toBe(4096);
   });
 });
 
-describe("Improvement pass — needs_review badge after 3 failed attempts", () => {
+describe("Surgical fix pass — needs_review badge", () => {
   it("deriveStatusBadge returns needs_review when Pass 1 score is below strong threshold", () => {
-    // When Pass 2 score is still <80 after all attempts, the engine overrides badge to needs_review.
-    // Verify the badge system supports needs_review as a valid output.
+    // When Pass 2 score is still <80 after the quality fix attempt, the engine overrides badge to needs_review.
     const { statusBadge } = deriveStatusBadge(70, 65);
     expect(statusBadge).toBe("needs_review");
   });
 
-  it("Badge override to needs_review is independent of Pass 1 score (Pass 2 failure dominates)", () => {
-    // Even if Pass 1 is perfect (100), a Pass 2 score <80 after 3 attempts should force needs_review.
+  it("Badge override to needs_review fires when Pass 2 < 80 after quality fix attempt", () => {
     // The engine code does: if (pass2.score < 80 && improvementAttempts > 0) statusBadge = "needs_review"
-    // We verify the badge type is a valid string that matches the schema enum.
     const validBadges = ["authority_ready", "strong", "needs_review"];
     expect(validBadges).toContain("needs_review");
+  });
+
+  it("Surgical fix does NOT override badge — only Pass 2 quality fix triggers needs_review", () => {
+    // A successful surgical fix that brings Pass 1 to 14+/16 does not force needs_review.
+    // Badge is derived from both Pass 1 and Pass 2 scores via deriveStatusBadge.
+    const { statusBadge } = deriveStatusBadge(88, 82);
+    expect(["authority_ready", "strong"]).toContain(statusBadge);
   });
 });

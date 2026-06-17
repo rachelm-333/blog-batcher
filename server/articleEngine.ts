@@ -1360,40 +1360,173 @@ export async function generateSingleArticle(
     console.log(`[ArticleEngine] Pass 2 done for node ${nodeId}: ${pass2.score}/100 — "${pass2.reason}" (${((pass2Done - writeDone) / 1000).toFixed(1)}s)`);
 
     // =========================================================================
-    // STEP 5 — ONE IMPROVEMENT ATTEMPT (if needed)
+    // STEP 5A — SURGICAL PASS 1 FIX (targeted edits only, no regeneration)
     // =========================================================================
-    const pass1PointsCount = Object.values(pass1.points).filter(Boolean).length;
-    const needsImprovement = pass1PointsCount < 14 || pass2.score < 80;
+    let pass1PointsCount = Object.values(pass1.points).filter(Boolean).length;
+    let surgicalFixApplied = false;
+
+    if (pass1PointsCount < 14) {
+      // Build a precise list of failing checks with human-readable instructions
+      const pass1FailureInstructions: string[] = [];
+
+      if (!pass1.points.kwInH2) {
+        pass1FailureInstructions.push(
+          `KEYWORD IN H2: Find the most relevant existing <h2> heading and minimally edit it to include the exact phrase "${ctx.primaryKeyword}" naturally. Change ONLY that one heading line — nothing else in the article.`
+        );
+      }
+      if (!pass1.points.kwInH3) {
+        pass1FailureInstructions.push(
+          `KEYWORD IN H3: If <h3> subheadings exist, edit one to include the exact phrase "${ctx.primaryKeyword}" naturally. If no <h3> exists, add one or two <h3> subheadings inside the longest <h2> section to break it up — do NOT rewrite the paragraphs under it.`
+        );
+      }
+      if (!pass1.points.kwInFirst100) {
+        pass1FailureInstructions.push(
+          `KEYWORD IN FIRST 100 WORDS: The exact phrase "${ctx.primaryKeyword}" must appear naturally within the first 100 words of body text. Edit the opening paragraph minimally to include it — change as few words as possible.`
+        );
+      }
+      if (!pass1.points.kwDensity) {
+        pass1FailureInstructions.push(
+          `KEYWORD DENSITY: The phrase "${ctx.primaryKeyword}" must appear at least 4 times across the full article. Find the sections where it is absent and add it naturally — do not stuff it, just weave it in where it fits.`
+        );
+      }
+      if (!pass1.points.wordCount) {
+        const wc = wordCount;
+        if (wc < ctx.wordCountMin) {
+          pass1FailureInstructions.push(
+            `WORD COUNT TOO SHORT (${wc} words, minimum is ${ctx.wordCountMin}): Add one focused paragraph to the most relevant existing section to reach the minimum. Do NOT rewrite existing text — only add new content.`
+          );
+        } else {
+          pass1FailureInstructions.push(
+            `WORD COUNT TOO LONG (${wc} words, maximum is ${ctx.wordCountMax}): Trim the least essential sentences to get under the maximum. Do NOT rewrite — just remove redundant sentences.`
+          );
+        }
+      }
+      // For other failing checks (meta, slug, external link, etc.) — collect as advisory
+      const otherFailures = Object.entries(pass1.points)
+        .filter(([checkId, passed]) => !passed && ![
+          "kwInH2", "kwInH3", "kwInFirst100", "kwDensity", "wordCount"
+        ].includes(checkId))
+        .map(([checkId]) => `- ${checkId}: ${pass1.details[checkId] ?? checkId}`);
+
+      if (otherFailures.length > 0) {
+        pass1FailureInstructions.push(
+          `OTHER FAILURES (fix these too if possible without restructuring):\n${otherFailures.join("\n")}`
+        );
+      }
+
+      if (pass1FailureInstructions.length > 0) {
+        console.log(`[ArticleEngine] Surgical Pass 1 fix triggered for node ${nodeId} (${pass1PointsCount}/16 checks passed, ${pass1FailureInstructions.length} fix instructions)...`);
+
+        const surgicalPrompt = `You are making SURGICAL TARGETED EDITS to an existing article. You must NOT rewrite, restructure, or change anything that is not listed below.
+
+PRIMARY KEYWORD: "${ctx.primaryKeyword}"
+
+MAKE ONLY THESE SPECIFIC EDITS:
+${pass1FailureInstructions.map((inst, i) => `${i + 1}. ${inst}`).join("\n\n")}
+
+CRITICAL RULES:
+- Every word, sentence, paragraph, and section NOT mentioned above must remain byte-for-byte identical.
+- Do NOT change any heading that already passes.
+- Do NOT rewrite any paragraph that is not listed above.
+- Do NOT change the overall structure, order of sections, or length beyond what is required.
+- Do NOT add or remove schema markup, the closing CTA section, or any links.
+- Use Australian English spelling.
+- Make the minimum possible change to satisfy each instruction.
+
+Return the full article HTML with ONLY the listed edits applied, wrapped in:
+<SURGICAL_HTML>
+...full article HTML with only the listed edits applied...
+</SURGICAL_HTML>
+
+HERE IS THE CURRENT ARTICLE HTML:
+${bodyHtml}`;
+
+        try {
+          const surgicalResult = await invokeLLMWithCost(
+            {
+              messages: [
+                {
+                  role: "system" as const,
+                  content: "You are a precise HTML editor. Make only the specific edits listed. Return the complete article HTML with those changes applied and everything else identical.",
+                },
+                { role: "user" as const, content: surgicalPrompt },
+              ],
+              max_tokens: TOKEN_LIMITS.improvement,
+            },
+            { userId, feature: "article_generation" }
+          );
+
+          const rawSurgical = surgicalResult.choices[0]?.message?.content ?? "";
+          const rawSurgicalStr = typeof rawSurgical === "string" ? rawSurgical : JSON.stringify(rawSurgical);
+          const surgicalMatch = rawSurgicalStr.match(/<SURGICAL_HTML>([\s\S]*?)<\/SURGICAL_HTML>/i);
+          const surgicalHtml = surgicalMatch ? surgicalMatch[1].trim() : "";
+
+          if (surgicalHtml && surgicalHtml.length > 100) {
+            const prevBodyHtml = bodyHtml;
+            bodyHtml = surgicalHtml;
+            wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+            surgicalFixApplied = true;
+
+            // Re-run Pass 1 to see how many checks now pass
+            const pass1After = runPass1Scorer({
+              bodyHtml,
+              bodyMarkdown,
+              title,
+              metaTitle,
+              metaDescription,
+              urlSlug: ctx.urlSlug,
+              wordCount,
+              level: ctx.level,
+              primaryKeyword: ctx.primaryKeyword,
+              externalLinkPresent: bodyHtml.includes("http"),
+              internalCtaLinkPresent: bodyHtml.includes(ctx.ctaUrl),
+              internalBlogLinksPresent: ctx.allBatchSlugs.some(slug => bodyHtml.includes(slug)),
+              schemaPresent: schemaMarkup.length > 0,
+            });
+            const pass1AfterCount = Object.values(pass1After.points).filter(Boolean).length;
+            console.log(`[ArticleEngine] Surgical fix: Pass 1 ${pass1PointsCount}/16 → ${pass1AfterCount}/16 for node ${nodeId}`);
+
+            // Only keep the surgical result if it improved Pass 1 (or at least didn't regress)
+            if (pass1AfterCount >= pass1PointsCount) {
+              // Accept the surgical fix
+              pass1PointsCount = pass1AfterCount;
+              // Update pass1 reference for badge derivation
+              Object.assign(pass1.points, pass1After.points);
+              Object.assign(pass1.details, pass1After.details);
+              (pass1 as { score: number }).score = pass1After.score;
+            } else {
+              // Surgical fix made things worse — revert
+              console.warn(`[ArticleEngine] Surgical fix regressed Pass 1 (${pass1AfterCount} < ${pass1PointsCount}) for node ${nodeId} — reverting`);
+              bodyHtml = prevBodyHtml;
+              wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+              surgicalFixApplied = false;
+            }
+          } else {
+            console.warn(`[ArticleEngine] Surgical fix returned no usable HTML for node ${nodeId} — keeping original`);
+          }
+        } catch (err) {
+          console.warn(`[ArticleEngine] Surgical Pass 1 fix failed for node ${nodeId}:`, err);
+        }
+      }
+    }
+
+    // =========================================================================
+    // STEP 5B — PASS 2 QUALITY FIX (if Pass 2 < 80)
+    // =========================================================================
     let improvementAttempts = 0;
 
-    if (needsImprovement) {
+    if (pass2.score < 80) {
       improvementAttempts = 1;
-      // Collect Pass 1 failures for the prompt
-      const pass1Failures = Object.entries(pass1.points)
-        .filter(([, passed]) => !passed)
-        .map(([checkId]) => {
-          const detail = pass1.details[checkId] ?? checkId;
-          return `- ${checkId}: ${detail}`;
-        })
-        .join("\n");
+      console.log(`[ArticleEngine] Pass 2 quality fix triggered for node ${nodeId} (Pass 2: ${pass2.score}/100)...`);
 
-      console.log(`[ArticleEngine] Improvement pass triggered for node ${nodeId} (Pass 1: ${pass1PointsCount}/16, Pass 2: ${pass2.score}/100)...`);
-
-      const improvementPrompt = `This article needs improvement. Here are the exact issues identified:
-
-PASS 1 FAILURES (SEO rules not met):
-${pass1Failures || "None — all Pass 1 checks passed"}
-
-PASS 2 QUALITY SCORE: ${pass2.score}/100
-The scorer gave this specific feedback:
+      const pass2FixPrompt = `This article scored ${pass2.score}/100 on a quality assessment. The scorer gave this specific feedback:
 "${pass2.reason}"
 
-You MUST fix exactly the issues described above. Do NOT rewrite the article from scratch.
-Identify the specific sections, sentences, or patterns that caused the failures and fix only those.
+You MUST fix exactly the issues described in the scorer feedback above. Do NOT rewrite the article from scratch.
+Identify the specific sections, sentences, or patterns that caused the low score and fix only those.
 
-Rules for this improvement pass:
-- Fix the specific Pass 1 failures listed above (keyword placement, meta fields, link requirements)
-- Fix the specific Pass 2 issues raised in the scorer feedback
+Rules:
+- Fix the specific quality issues raised in the scorer feedback
 - Do NOT change the structure, headings, or overall length
 - Do NOT rewrite sections that are already working well
 - Do NOT add or remove schema markup or the closing CTA section
@@ -1410,7 +1543,7 @@ ${bodyHtml}`;
       try {
         const improvementResult = await invokeLLMWithCost(
           {
-            messages: [{ role: "user", content: improvementPrompt }],
+            messages: [{ role: "user" as const, content: pass2FixPrompt }],
             max_tokens: TOKEN_LIMITS.improvement,
           },
           { userId, feature: "article_generation" }
@@ -1430,15 +1563,14 @@ ${bodyHtml}`;
         if (improvedHtml && improvedHtml.length > 100) {
           bodyHtml = improvedHtml;
           wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-          // Re-score Pass 2 after improvement
           const improvedPass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
-          console.log(`[ArticleEngine] Improvement pass: Pass 2 score ${pass2.score} → ${improvedPass2.score} for node ${nodeId}`);
+          console.log(`[ArticleEngine] Pass 2 fix: score ${pass2.score} → ${improvedPass2.score} for node ${nodeId}`);
           pass2 = improvedPass2;
         } else {
-          console.warn(`[ArticleEngine] Improvement pass returned no usable HTML for node ${nodeId} — keeping original`);
+          console.warn(`[ArticleEngine] Pass 2 fix returned no usable HTML for node ${nodeId} — keeping original`);
         }
       } catch (err) {
-        console.warn(`[ArticleEngine] Improvement pass failed for node ${nodeId}:`, err);
+        console.warn(`[ArticleEngine] Pass 2 fix failed for node ${nodeId}:`, err);
       }
     }
 
