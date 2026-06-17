@@ -963,13 +963,13 @@ export function deriveStatusBadge(pass1Score: number, pass2Score: number): {
 }
 
 // ---------------------------------------------------------------------------
-// Outline-first section-by-section generation helpers
+// Single-pass article generation helpers (kept for export compatibility)
 // ---------------------------------------------------------------------------
 
 export interface OutlineSection {
-  heading: string;       // H2 heading text
-  targetWords: number;   // target word count for this section
-  notes: string;         // brief instruction for what this section should cover
+  heading: string;
+  targetWords: number;
+  notes: string;
 }
 
 export interface ArticleOutline {
@@ -982,196 +982,20 @@ export interface ArticleOutline {
 }
 
 /**
- * Step 1: Ask the LLM to plan the full article structure.
- * This is a small, fast call that always completes — no truncation risk.
- */
-export function buildOutlinePrompt(ctx: ArticleContext): string {
-  const isCornerstoneOrPillar = ctx.level === "cornerstone" || ctx.level === "pillar";
-  const articleTypeLabel: Record<string, string> = {
-    cornerstone_guide: "Cornerstone Guide",
-    top_10_list: "Top 10 List",
-    how_to: "How-To Article",
-    the_why: "The Why Article",
-    comparison: "Comparison Article",
-    myth_busting: "Myth-Busting Article",
-    specialist_post: "Specialist Post",
-  };
-  const typeLabel = articleTypeLabel[ctx.articleType] ?? ctx.articleType;
-
-  return `You are an expert SEO content strategist. Plan the full structure for a ${typeLabel} article.
-
-Business: ${ctx.businessName} (${ctx.industry}, ${ctx.location})
-Primary Keyword: ${ctx.primaryKeyword}
-Secondary Keywords: ${ctx.secondaryKeywords.join(", ") || "None"}
-PAA Question: ${ctx.paaQuestion || "Answer the most likely search intent question"}
-Article Type: ${typeLabel}
-URL Slug: /${ctx.urlSlug}
-Total Word Count Target: ${ctx.wordCountMin}–${ctx.wordCountMax} words
-Level: ${ctx.level}
-
-TITLE RULES — these are mandatory:
-- Never write a title that starts with 'What Is' or 'What Are'
-- Never write a title that is purely definitional (e.g. 'What Is Branding', 'What Is SEO', 'Understanding X')
-- Every title must have a specific angle, audience, or outcome:
-  WEAK: 'What Is Brand Strategy?'
-  STRONG: 'Brand Strategy for Small Businesses: Where to Start'
-  WEAK: 'What Are Psychosocial Hazards?'
-  STRONG: 'Psychosocial Hazards: Your Legal Obligations as an Australian Employer'
-- Titles must create curiosity or signal a specific benefit
-- Include the focus keyword naturally — do not just prepend it
-- For Australian businesses, include 'Australia' or the location in the title where it fits naturally
-- The title must make someone stop scrolling and want to read
-
-RULES (ALL MANDATORY — these map directly to the 16-point SEO checklist):
-- H1 title MUST contain the exact primary keyword verbatim [P2]
-- Meta title MUST contain the primary keyword and be ≤60 characters [P7]
-- Meta description MUST contain the exact primary keyword phrase and be EXACTLY 140–160 characters [P8]
-- Plan ${Math.ceil(ctx.wordCountMin / 250)} to ${Math.ceil(ctx.wordCountMax / 200)} H2 sections so the total hits ${ctx.wordCountMin}–${ctx.wordCountMax} words [P16]
-- AT LEAST ONE H2 heading must contain the primary keyword verbatim [P3]
-- The FIRST section must be an "Opening Answer Block" (40–60 words) that directly answers the search query with a bold question [P9]
-- The LAST section must be a CTA section titled "Ready to Take the Next Step?" or similar (50–80 words) with a link to ${ctx.ctaUrl} [P11]
-- ${isCornerstoneOrPillar ? "Include a FAQ section (3–5 questions) near the end" : "DO NOT include a FAQ section (Cluster articles only)"}
-- Each section's targetWords should be realistic for that section's depth
-- Use Australian English spelling
-- Plan for an external authority link (.gov.au or industry body) in section 2 [P10]
-- Plan for AT LEAST 2 internal blog links to other articles in the batch using ONLY these real slugs: ${ctx.allBatchSlugs.slice(0, 10).join(", ")} [P12]
-- Plan for E-E-A-T signals (years experience, clients served, awards) in at least one section [P14]
-- Plan the outline so the focus keyword '${ctx.primaryKeyword}' can naturally appear in the opening paragraph (within the first 100 words of body text), at least one H2 heading, at least one H3 heading (only if the article uses H3s — do not force H3s), and the conclusion section [P1/P5]
-${ctx.problemsSolved ? `- The outline MUST include at least one section that directly addresses this customer problem: "${ctx.problemsSolved}". Label that section with a heading like 'Why [problem occurs]' or 'The real cost of [problem]' or 'How to solve [problem]'` : ""}
-${ctx.customerSituationBefore ? `- Plan at least one section using this customer scenario as the opening context: "${ctx.customerSituationBefore}"` : ""}
-${ctx.customerFrustrations ? `- Plan at least one section that addresses these specific frustrations: "${ctx.customerFrustrations}"` : ""}
-${ctx.contentPlanDirection ? `- Publisher direction for this specific article: "${ctx.contentPlanDirection}"
-  Build the outline around this direction.` : ""}
-
-Return a single JSON object:
-{
-  "title": "H1 title (contains primary keyword verbatim)",
-  "metaTitle": "SEO meta title (≤60 chars, contains primary keyword)",
-  "metaDescription": "SEO meta description (140–160 chars, contains exact primary keyword phrase)",
-  "sections": [
-    { "heading": "H2 heading text", "targetWords": 200, "notes": "What this section covers in 1 sentence" }
-  ],
-  "schemaMarkupInstructions": "Brief note on what schema types to include: Article + Breadcrumb${isCornerstoneOrPillar ? " + FAQ" : ""}",
-  "faqItems": ${isCornerstoneOrPillar ? '[{"question": "...", "answer": "..."}] — 3–5 items' : "null"}
-}`;
-}
-
-/**
- * Step 2: Write a single section of the article.
- * Each section is a separate LLM call — no single call can be truncated mid-article.
- */
-export function buildSectionPrompt(
-  ctx: ArticleContext,
-  section: OutlineSection,
-  sectionIndex: number,
-  totalSections: number,
-  articleTitle: string,
-  previousSectionsHtml: string
-): string {
-  const isFirst = sectionIndex === 0;
-  const isLast = sectionIndex === totalSections - 1;
-  const isCTA = isLast;
-
-  const internalLinkContext = [
-    ctx.parentCornerstoneUrl ? `Parent Cornerstone URL: ${ctx.parentCornerstoneUrl}` : null,
-    ctx.parentPillarUrl ? `Parent Pillar URL: ${ctx.parentPillarUrl}` : null,
-    ctx.siblingUrls?.length ? `Sibling Cluster URLs for cross-linking: ${ctx.siblingUrls.join(", ")}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const optionalPageLinks: string[] = [];
-  if (ctx.contactPageUrl) optionalPageLinks.push(`Contact Page: ${ctx.contactPageUrl}`);
-  if (ctx.bookingsPageUrl) optionalPageLinks.push(`Bookings/Appointments Page: ${ctx.bookingsPageUrl}`);
-  if (ctx.testimonialsPageUrl) optionalPageLinks.push(`Testimonials/Reviews Page: ${ctx.testimonialsPageUrl}`);
-  if (ctx.shopUrl) optionalPageLinks.push(`Shop/E-commerce Page: ${ctx.shopUrl}`);
-  if (ctx.otherInternalLinks?.length) {
-    ctx.otherInternalLinks.forEach(l => optionalPageLinks.push(`${l.label}: ${l.url}`));
-  }
-
-  const servicesText = ctx.services
-    .map(s => `- ${s.name}${s.pageUrl ? ` (${s.pageUrl})` : ""}`)
-    .join("\n");
-
-  return `You are an expert SEO content writer. Write ONE section of a blog article.
-
-ARTICLE CONTEXT:
-Business: ${ctx.businessName} (${ctx.industry}, ${ctx.location})
-Article Title (H1): ${articleTitle}
-Primary Keyword: ${ctx.primaryKeyword}
-Brand Voice: ${ctx.voiceBrief || "Professional, authoritative, helpful. Sound like a real human expert."}
-Section ${sectionIndex + 1} of ${totalSections}
-
-THIS SECTION TO WRITE:
-H2 Heading: ${section.heading}
-Target Word Count: ${section.targetWords} words (write AT LEAST ${Math.round(section.targetWords * 0.9)} words)
-Section Notes: ${section.notes}
-
-${isFirst ? `OPENING SECTION RULES:
-- Start with the H2 heading: <h2>${section.heading}</h2>
-- Immediately answer the most likely search question in 40–60 words (bold the question)
-- The primary keyword "${ctx.primaryKeyword}" MUST appear naturally within the first 100 words of this opening section
-- This is the featured snippet target — be direct and specific` : ""}
-
-${isCTA ? `CTA SECTION RULES:
-- Start with <h2>${section.heading}</h2>
-- Write 1–2 sentences summarising the value the reader gained
-- Include a CTA link: <a href="${ctx.ctaUrl}">${ctx.ctaText}</a>
-- Keep it to ${section.targetWords} words` : ""}
-
-${!isFirst && !isCTA ? `CONTENT RULES:
-- The focus keyword is: "${ctx.primaryKeyword}". This section MUST include the focus keyword at least once, used naturally in a sentence. Do not force it — find a place where it fits the meaning of the sentence.
-- Start with <h2>${section.heading}</h2>
-- Write ${section.targetWords} words of specific, practical, expert-level content
-- Use H3 subheadings where appropriate to break up the content
-- Include bullet lists or numbered lists where they add clarity
-- DO NOT fabricate statistics — only cite real, verifiable facts
-- Use Australian English spelling (optimise, colour, organise)
-- Vary sentence length — mix short punchy sentences with longer explanatory ones
-- Sound like a specific human expert, not a generic AI assistant
-- DO NOT use em dashes (—) excessively
-- DO NOT introduce sections with a bolded question followed by an answer paragraph
-- DO NOT open paragraphs with "This means that..."
-- DO NOT use formulaic section structures where every H3 follows the exact same pattern
-- DO NOT use these phrases (banned): "in today's world", "it's important to note", "it's worth noting", "delve into", "game-changer", "game-changing", "leverage", "synergy", "transformative", "non-negotiable", "the truth is", "let's be honest", "the reality is", "make no mistake", "here's the thing", "the fact is", "simply put", "it's no secret", "the good news is", "the bad news is"
-- DO NOT use strong declarations that sound performative rather than informative
-- Write as a knowledgeable human practitioner with direct experience, not an AI summarising a topic
-- Use specific numbers, real examples, and concrete details rather than general statements` : ""}
-
-${sectionIndex === 1 ? `EXTERNAL LINK RULE (Section 2 only): Include at least one hyperlink to a real, high-authority external source (.gov.au, industry body, or nationally recognised publication). Use descriptive anchor text.` : ""}
-
-${sectionIndex === 2 ? `INTERNAL LINK RULE (Section 3 only): Include at least one internal link to a business service or page:\n${servicesText}\n${optionalPageLinks.length ? optionalPageLinks.join("\n") : ""}\nPrimary CTA: ${ctx.ctaText} → ${ctx.ctaUrl}` : ""}
-
-${internalLinkContext ? `INTERNAL BLOG LINKS (MANDATORY — minimum 2 across the full article):\n${internalLinkContext}\nAvailable batch slugs (use ONLY these exact paths — do NOT invent URLs): ${ctx.allBatchSlugs.slice(0, 15).join(", ")}` : `INTERNAL BLOG LINKS (MANDATORY — minimum 2 across the full article):\nAvailable batch slugs (use ONLY these exact paths — do NOT invent URLs): ${ctx.allBatchSlugs.slice(0, 15).join(", ")}`}
-
-PREVIOUS SECTIONS (for context and continuity — DO NOT repeat this content):
-${previousSectionsHtml ? previousSectionsHtml.slice(-2000) : "(This is the first section)"}
-
-Return ONLY the HTML for this section, wrapped in these exact delimiters:
-<SECTION_HTML>
-...section HTML here (h2, h3, p, ul, ol, li, a, strong, em, blockquote tags only — no inline styles)...
-</SECTION_HTML>`;
-}
-
-/**
  * Detect if an HTML body has a trailing empty heading (truncation signature).
- * Returns true if the last heading tag has no meaningful content after it.
  */
 export function hasTrailingEmptyHeading(bodyHtml: string): boolean {
-  // Find all headings and their positions
   const headingMatches = Array.from(bodyHtml.matchAll(/<h[2-6][^>]*>([^<]+)<\/h[2-6]>/gi));
   if (headingMatches.length === 0) return false;
   const lastHeading = headingMatches[headingMatches.length - 1];
   const lastHeadingEnd = (lastHeading.index ?? 0) + lastHeading[0].length;
   const afterLastHeading = bodyHtml.slice(lastHeadingEnd).replace(/<[^>]+>/g, " ").trim();
-  // If there are fewer than 10 words after the last heading, it's likely truncated
-  // (10 is low enough to avoid false positives on short CTA/conclusion sections)
   const wordsAfter = afterLastHeading.split(/\s+/).filter(Boolean).length;
   return wordsAfter < 10;
 }
 
 // ---------------------------------------------------------------------------
-// Single article generation (one at a time)
+// Single article generation — single-call engine
 // ---------------------------------------------------------------------------
 
 export interface GenerationResult {
@@ -1192,822 +1016,503 @@ export interface GenerationResult {
   pass2Reason: string;
 }
 
+/**
+ * Build the single comprehensive prompt that asks the model to write the
+ * complete article in one call and return a structured JSON response.
+ */
+function buildSinglePassPrompt(ctx: ArticleContext, currentYear: number): string {
+  const articleTypeLabel: Record<string, string> = {
+    cornerstone_guide: "Cornerstone Guide",
+    top_10_list: "Top 10 List",
+    how_to: "How-To Article",
+    the_why: "The Why Article",
+    comparison: "Comparison Article",
+    myth_busting: "Myth-Busting Article",
+    specialist_post: "Specialist Post",
+  };
+  const typeLabel = articleTypeLabel[ctx.articleType] ?? ctx.articleType;
+  const isCornerstoneOrPillar = ctx.level === "cornerstone" || ctx.level === "pillar";
+
+  const servicesText = ctx.services
+    .map(s => `- ${s.name}${s.pageUrl ? ` (${s.pageUrl})` : ""}`)
+    .join("\n");
+
+  const competitorText = ctx.competitors.length
+    ? ctx.competitors.map(c => `- ${c.name}${c.url ? ` (${c.url})` : ""}`).join("\n")
+    : "None provided";
+
+  const internalLinkContext = [
+    ctx.parentCornerstoneUrl ? `Parent Cornerstone URL: ${ctx.parentCornerstoneUrl}` : null,
+    ctx.parentPillarUrl ? `Parent Pillar URL: ${ctx.parentPillarUrl}` : null,
+    ctx.siblingUrls?.length ? `Sibling Cluster URLs for cross-linking: ${ctx.siblingUrls.join(", ")}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const optionalPageLinks: string[] = [];
+  if (ctx.contactPageUrl) optionalPageLinks.push(`Contact Page: ${ctx.contactPageUrl}`);
+  if (ctx.bookingsPageUrl) optionalPageLinks.push(`Bookings/Appointments Page: ${ctx.bookingsPageUrl}`);
+  if (ctx.testimonialsPageUrl) optionalPageLinks.push(`Testimonials/Reviews Page: ${ctx.testimonialsPageUrl}`);
+  if (ctx.shopUrl) optionalPageLinks.push(`Shop/E-commerce Page: ${ctx.shopUrl}`);
+  if (ctx.otherInternalLinks?.length) {
+    ctx.otherInternalLinks.forEach(l => optionalPageLinks.push(`${l.label}: ${l.url}`));
+  }
+  const optionalLinksText = optionalPageLinks.length ? optionalPageLinks.join("\n") : null;
+
+  return `You are an expert SEO content writer producing a high-authority blog article for an Australian business.
+
+=== YEAR ===
+The current year is ${currentYear}. Never reference any year before ${currentYear} as "current" or "this year". Do not use years older than ${currentYear} in statistics or examples unless explicitly quoting a historical event.
+
+=== BUSINESS CONTEXT ===
+Business Name: ${ctx.businessName}
+Industry: ${ctx.industry}
+Location: ${ctx.location}
+Unique Value Proposition: ${ctx.uvp}
+Social Proof: ${ctx.socialProof || "Not provided"}
+${(ctx.linkedinUrl || ctx.facebookUrl || ctx.instagramHandle) ? `Social Presence: This business has verified social profiles:\n${ctx.linkedinUrl ? `- LinkedIn: ${ctx.linkedinUrl}\n` : ""}${ctx.facebookUrl ? `- Facebook: ${ctx.facebookUrl}\n` : ""}${ctx.instagramHandle ? `- Instagram: ${ctx.instagramHandle}\n` : ""}These can be referenced as evidence of established business presence.` : ""}
+Target Audiences: ${ctx.audiences.join(", ") || "General audience"}
+
+Services/Products (use these for internal CTA links):
+${servicesText || "No services listed"}
+
+Primary CTA: ${ctx.ctaText} → ${ctx.ctaUrl}
+${optionalLinksText ? `\nAdditional internal pages you may link to naturally:\n${optionalLinksText}` : ""}
+${!ctx.bookingsPageUrl ? "IMPORTANT: Do NOT mention bookings, appointments, or scheduling — this business has not provided a bookings URL." : ""}
+
+Competitors (for Comparison articles only):
+${competitorText}
+
+=== VOICE BRIEF ===
+${ctx.voiceBrief || "Write in a professional, authoritative, and helpful tone. Sound like a real human expert."}
+
+=== ARTICLE SPECIFICATION ===
+Article Type: ${typeLabel}
+URL Slug: /${ctx.urlSlug}
+Primary Keyword: ${ctx.primaryKeyword}
+Secondary Keywords: ${ctx.secondaryKeywords.join(", ") || "None"}
+PAA Question to Answer: ${ctx.paaQuestion || "Not specified — answer the most likely search intent question"}
+Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (MINIMUM: ${ctx.wordCountMin} words — you MUST write at least ${ctx.wordCountMin} words; HARD MAXIMUM: ${ctx.wordCountMax} words — do not exceed).
+
+=== INTERNAL LINK CONTEXT ===
+${internalLinkContext || "No parent/sibling articles yet — this is a Cornerstone."}
+
+All article slugs in this batch (use for internal blog links):
+${ctx.allBatchSlugs.slice(0, 20).join(", ")}
+
+=== 16-POINT AUTHORITY STANDARD — ALL POINTS ARE MANDATORY ===
+
+1. PRIMARY KEYWORD DENSITY: The primary keyword "${ctx.primaryKeyword}" must appear a MINIMUM of 4 times across the full article. HARD MAXIMUM: keyword density must not exceed 1% of total word count. Every use must read naturally.
+2. KEYWORD IN H1: Primary keyword must appear verbatim in the H1 heading (the article title).
+3. KEYWORD IN H2: Primary keyword must appear verbatim in AT LEAST ONE <h2> heading.
+4. KEYWORD IN H3: If the article uses H3 subheadings, the primary keyword MUST appear in at least one H3.
+5. KEYWORD IN FIRST 100 WORDS: Primary keyword must appear naturally within the first 100 words of body text.
+6. KEYWORD IN URL SLUG: The URL slug is already set to /${ctx.urlSlug}. Ensure the H1 title reflects the same topic territory.
+7. META TITLE: Must include primary keyword verbatim. Maximum 60 characters. Written for click-through rate.
+8. META DESCRIPTION: Must include the EXACT primary keyword phrase "${ctx.primaryKeyword}" verbatim. Exactly 140–160 characters. Written for CTR.
+9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
+10. EXTERNAL AUTHORITY LINK: You MUST include at least one hyperlink to a real, high-authority external source — a government website (.gov.au), an industry body, or a nationally recognised publication. Use descriptive anchor text. This link must be genuine and relevant to the article topic.
+11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
+12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs listed above — do NOT invent or guess URLs.
+13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
+14. E-E-A-T SIGNALS: Weave in Experience, Expertise, Authoritativeness, and Trustworthiness. Include social proof signals: ${ctx.socialProof || "mention industry experience"}.
+${ctx.problemsSolved ? `
+CUSTOMER INTELLIGENCE — USE THIS TO WRITE LIKE A HUMAN WHO KNOWS THESE CUSTOMERS:
+What the customer's situation was BEFORE finding this business:
+"${ctx.customerSituationBefore ?? 'not provided'}"
+What they were frustrated with or had already tried:
+"${ctx.customerFrustrations ?? 'not provided'}"
+What changed or became possible after working with this business:
+"${ctx.customerTransformation ?? 'not provided'}"
+Summary (use for CTA and closing sections):
+"${ctx.problemsSolved}"
+WRITING RULES BASED ON THIS INTELLIGENCE:
+- Use the customer's actual situation (field 1) to open the first body section
+- Use the frustrations (field 2) when writing any section about common mistakes or what to avoid
+- Use the transformation (field 3) in the conclusion and CTA
+- Pull specific words and phrases from these answers where they fit naturally
+` : ""}${ctx.contentPlanDirection ? `
+WRITER DIRECTION FROM PUBLISHER:
+The person publishing this article has added this specific direction:
+"${ctx.contentPlanDirection}"
+Follow this direction. It takes priority over general guidelines.
+` : ""}15. HUMAN AUTHENTICITY: No AI fingerprint patterns. Content must solve the reader's problem completely.
+   HARD RULES — HUMAN AUTHENTICITY:
+   - DO NOT make up statistics (e.g. "over 500 clients since 2018", "9 out of 10 businesses") without a real, citable source.
+   - DO NOT use generic credibility claims such as "industry-leading", "trusted by thousands", "proven track record", or "years of expertise" without specific, verifiable backing.
+   - If citing business experience or client numbers, be specific and real — or omit entirely. Fabricated social proof is worse than no social proof.
+16. SEARCH INTENT RESOLUTION: The article title makes a promise to the reader. You MUST deliver on that promise.
+   HARD RULES — SEARCH INTENT RESOLUTION:
+   - If the title promises "how to start X", "how to do X", or "step-by-step guide to X" — deliver actual numbered step-by-step actionable instructions. Do NOT substitute framework overviews.
+   - Every H2 section MUST contain at least one specific, actionable instruction the reader can execute today.
+   - Actionable instructions must be concrete: name the tool, form, website, phone number, or exact action.
+
+=== PASS 2 QUALITY SCORING — WRITE TO SCORE 80+ ON ALL FIVE ===
+This article will be scored on these five dimensions. Write to score 80+ on all five:
+1. SEARCH INTENT RESOLUTION: Fully resolves what the searcher is looking for. Delivers on the title's promise.
+2. HUMAN AUTHENTICITY: Reads as written by a real human expert. No AI fingerprint patterns. Specific, opinionated, direct.
+3. TITLE TERRITORY: The title owns a specific territory and signals clear value.
+4. E-E-A-T AUTHORITY: Demonstrates Experience, Expertise, Authoritativeness, Trustworthiness.
+5. BATCH COHESION: Feels like part of a coherent content strategy.
+
+=== TITLE RULES ===
+- Never write a title that starts with "What Is" or "What Are"
+- Never write a purely definitional title — every title must have a specific angle, audience, or outcome
+- Include the focus keyword naturally
+- For Australian businesses, include "Australia" or the location where it fits naturally
+
+=== CLOSING CTA SECTION (MANDATORY) ===
+Every article MUST end with a dedicated CTA section:
+<h2>Ready to Take the Next Step?</h2>
+<p>[1–2 sentences summarising the value the reader has just gained and why acting now makes sense.]</p>
+<p>${ctx.ctaText}: <a href="${ctx.ctaUrl}">${ctx.ctaText}</a></p>
+Customise the H2 heading and body copy to match the article topic and brand voice. The CTA link MUST point to ${ctx.ctaUrl}.
+
+=== ABSOLUTE RULES ===
+- DO NOT fabricate statistics, quotes, or data.
+- DO NOT invent URLs. Every link must use a real, verifiable URL.
+- DO NOT use em dashes (—) excessively.
+- DO NOT open with a rhetorical question.
+- DO NOT introduce sections with a bolded question followed by an answer paragraph.
+- DO NOT use formulaic section structures where every H3 follows the exact same pattern.
+- DO NOT open paragraphs with "This means that...".
+- DO NOT use these phrases (banned): "in today's world", "it's important to note", "it's worth noting", "delve into", "game-changer", "game-changing", "leverage", "synergy", "transformative", "non-negotiable", "minefield blindfolded", "the truth is", "let's be honest", "the reality is", "make no mistake", "here's the thing", "the fact is", "simply put", "it's no secret", "spoiler alert", "the good news is", "the bad news is", "in other words", "to put it simply".
+- Use Australian English spelling (e.g., "optimise" not "optimize", "colour" not "color").
+- Write as a knowledgeable human practitioner who has actually done this work.
+- Use specific numbers, real examples, and concrete details rather than general statements.
+- Vary sentence length — mix short punchy sentences with longer explanatory ones.
+
+=== REQUIRED OUTPUT FORMAT (JSON) ===
+Return a single JSON object with these exact fields:
+{
+  "title": "H1 title of the article (contains primary keyword verbatim)",
+  "metaTitle": "SEO meta title (max 60 chars, includes primary keyword)",
+  "metaDescription": "SEO meta description (140–160 chars exactly, includes exact primary keyword phrase)",
+  "bodyHtml": "Full article body as clean HTML. Use h2, h3, p, ul, ol, li, a, strong, em, blockquote tags — no inline styles. BULLET LISTS: Every <li> must be a direct child of <ul> or <ol>. Add a blank line between each <li> item. FAQ SECTION: If the article includes a FAQ, format each Q&A pair as: <div class=\\"faq-item\\"><hr><p><strong>Q: [question]</strong></p><p>A: [answer]</p></div>. The FAQ section must start with <h2>Frequently Asked Questions</h2>.",
+  "bodyMarkdown": "Full article body as Markdown (convert the HTML to clean Markdown)",
+  "schemaMarkup": "JSON-LD schema as a string (Article + Breadcrumb${isCornerstoneOrPillar ? " + FAQ" : ""})",
+  "faqItems": ${isCornerstoneOrPillar ? '[{"question": "...", "answer": "..."}] — include 3–5 FAQ items' : "null — Cluster articles do not get FAQ"},
+  "wordCount": <integer — actual word count of bodyHtml>,
+  "externalLinkPresent": <boolean>,
+  "internalCtaLinkPresent": <boolean>,
+  "internalBlogLinksPresent": <boolean>,
+  "schemaPresent": <boolean>
+}`;
+}
+
+/**
+ * Apply mechanical (non-LLM) post-processing: banned-phrase regex scrub,
+ * line-spacing normalisation, and word-count recompute.
+ */
+function mechanicalPostProcess(bodyHtml: string): { bodyHtml: string; wordCount: number } {
+  let html = bodyHtml;
+
+  // Regex-replace banned phrases with neutral alternatives (fast, no LLM)
+  const BANNED_REPLACEMENTS: [RegExp, string][] = [
+    [/\bin today's world\b/gi, "today"],
+    [/\bit's important to note\b/gi, "notably"],
+    [/\bit is important to note\b/gi, "notably"],
+    [/\bit's worth noting\b/gi, "notably"],
+    [/\bit is worth noting\b/gi, "notably"],
+    [/\bdelve into\b/gi, "explore"],
+    [/\bgame-changer\b/gi, "significant shift"],
+    [/\bgame changer\b/gi, "significant shift"],
+    [/\bgame-changing\b/gi, "significant"],
+    [/\bleverage\b/gi, "use"],
+    [/\bsynergy\b/gi, "collaboration"],
+    [/\btransformative\b/gi, "meaningful"],
+    [/\bnon-negotiable\b/gi, "essential"],
+    [/\bminefield blindfolded\b/gi, "complex challenge"],
+    [/\bthe truth is\b/gi, "in practice"],
+    [/\blet's be honest\b/gi, "to be direct"],
+    [/\blet us be honest\b/gi, "to be direct"],
+    [/\bthe reality is\b/gi, "in practice"],
+    [/\bmake no mistake\b/gi, "clearly"],
+    [/\bhere's the thing\b/gi, ""],
+    [/\bhere is the thing\b/gi, ""],
+    [/\bthe fact is\b/gi, ""],
+    [/\bsimply put\b/gi, ""],
+    [/\bput simply\b/gi, ""],
+    [/\bin other words\b/gi, ""],
+    [/\bto put it simply\b/gi, ""],
+    [/\bto put it another way\b/gi, ""],
+    [/\bit's no secret\b/gi, ""],
+    [/\bit is no secret\b/gi, ""],
+    [/\bspoiler alert\b/gi, ""],
+    [/\bthe good news is\b/gi, ""],
+    [/\bthe bad news is\b/gi, ""],
+    [/\bin conclusion,\b/gi, ""],
+    [/\bto summarize,\b/gi, ""],
+    [/\bto summarise,\b/gi, ""],
+    [/\bultimately,\b/gi, ""],
+    [/\bessentially,\b/gi, ""],
+    [/\bfurthermore,\b/gi, ""],
+    [/\bmoreover,\b/gi, ""],
+    [/\bat the end of the day\b/gi, ""],
+    [/\baccording to research\b/gi, "research indicates"],
+    [/\bstudies show\b/gi, "evidence shows"],
+    [/\bit has been shown\b/gi, "evidence shows"],
+    [/\bnavigating the complexities\b/gi, "managing the complexity"],
+    [/\bnavigate the ever-changing\b/gi, "adapt to the changing"],
+    [/\bin today's competitive landscape\b/gi, "in a competitive market"],
+    [/\bin today's fast-paced\b/gi, "in a fast-paced"],
+    [/\bin today's digital\b/gi, "in the digital"],
+    [/\blook no further\b/gi, ""],
+    [/\bcutting-edge\b/gi, "advanced"],
+    [/\bstate-of-the-art\b/gi, "modern"],
+    [/\bseamlessly\b/gi, "smoothly"],
+    [/\brobust solution\b/gi, "practical solution"],
+    [/\btailored solutions\b/gi, "targeted solutions"],
+    [/\btailored to your needs\b/gi, "suited to your situation"],
+    [/\bunlock your potential\b/gi, "reach your goals"],
+    [/\bunlock the power\b/gi, "use the full capability"],
+    [/\bempower your\b/gi, "help your"],
+    [/\belevate your\b/gi, "improve your"],
+    [/\btake your business to the next level\b/gi, "grow your business"],
+    [/\bat its core\b/gi, "fundamentally"],
+    [/\bit's crucial to\b/gi, "you need to"],
+    [/\bit is crucial to\b/gi, "you need to"],
+    [/\bone of the most important\b/gi, "a key"],
+    [/\bthis means that\b/gi, ""],
+  ];
+
+  for (const [pattern, replacement] of BANNED_REPLACEMENTS) {
+    html = html.replace(pattern, replacement);
+  }
+
+  // Normalise line spacing between block-level elements
+  html = html
+    .replace(/([^\n])<(h[1-6]|p|ul|ol|blockquote|div|figure|table|pre)([\s>])/g, "$1\n<$2$3")
+    .replace(/<\/(h[1-6]|p|ul|ol|blockquote|div|figure|table|pre)>([^\n])/g, "</$1>\n$2")
+    .replace(/\n{3,}/g, "\n\n");
+
+  const wordCount = html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  return { bodyHtml: html, wordCount };
+}
+
+/**
+ * Enforce meta title: ≤60 chars, contains keyword.
+ */
+function enforceMetaTitle(metaTitle: string, primaryKeyword: string): string {
+  let mt = metaTitle;
+  // Enforce keyword presence
+  if (!kwPresentInText(primaryKeyword.toLowerCase(), mt.toLowerCase())) {
+    const capitalised = primaryKeyword.charAt(0).toUpperCase() + primaryKeyword.slice(1);
+    mt = `${capitalised}: ${mt}`;
+  }
+  // Enforce length
+  if (mt.length > 60) {
+    const trimmed = mt.slice(0, 57);
+    const lastSp = trimmed.lastIndexOf(" ");
+    mt = (lastSp > 30 ? trimmed.slice(0, lastSp) : trimmed) + "...";
+  }
+  return mt;
+}
+
+/**
+ * Enforce meta description: 140–160 chars, contains keyword.
+ */
+function enforceMetaDescription(metaDescription: string, primaryKeyword: string, businessName: string): string {
+  let md = metaDescription;
+  // Enforce keyword presence
+  if (!kwPresentInText(primaryKeyword.toLowerCase(), md.toLowerCase())) {
+    const capitalised = primaryKeyword.charAt(0).toUpperCase() + primaryKeyword.slice(1);
+    md = `${capitalised}: ${md}`;
+  }
+  // Enforce length
+  if (md.length > 160) {
+    const trimmed = md.slice(0, 157);
+    const lastSp = trimmed.lastIndexOf(" ");
+    md = (lastSp > 120 ? trimmed.slice(0, lastSp) : trimmed) + "...";
+  } else if (md.length < 140 && md.length > 0) {
+    const pad = ` Get expert advice from ${businessName}.`;
+    if ((md + pad).length <= 160) md = md + pad;
+  }
+  return md;
+}
+
+/**
+ * Enforce slug: contains all keyword words.
+ */
+function enforceSlug(urlSlug: string, primaryKeyword: string, nodeId: number): string {
+  const kwLower = primaryKeyword.toLowerCase();
+  const slugLower = urlSlug.toLowerCase();
+  const kwWords = kwLower.split(/\s+/);
+  const allWordsInSlug = kwWords.every(w => slugLower.includes(w));
+  if (!allWordsInSlug) {
+    const kwSlug = kwLower.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    if (!slugLower.includes(kwSlug)) {
+      const newSlug = `${kwSlug}-${urlSlug}`.replace(/--+/g, "-").slice(0, 80);
+      console.log(`[ArticleEngine] P6 slug enforcement: set slug to "${newSlug}" for node ${nodeId}`);
+      return newSlug;
+    }
+  }
+  return urlSlug;
+}
+
+/**
+ * Main entry point — single-call generation engine.
+ *
+ * Steps:
+ *   1. Build context (unchanged)
+ *   2. Single LLM call — write the complete article + meta + schema in one JSON response
+ *   3. Mechanical post-process (regex scrub, line spacing, word count)
+ *   4. Enforce slug, meta title, meta description
+ *   5. Pass 1 (rules-based scorer) — unchanged
+ *   6. Pass 2 (AI quality scorer) — unchanged
+ *   7. One improvement attempt if Pass 1 < 14/16 OR Pass 2 < 80
+ *   8. Derive badge, return GenerationResult
+ */
 export async function generateSingleArticle(
   businessId: number,
   nodeId: number,
   allOrderedNodes: OrderedNode[],
   userId?: number | null
 ): Promise<GenerationResult> {
+  const totalStart = Date.now();
   try {
-  const ctx = await buildArticleContext(businessId, nodeId, allOrderedNodes);
+    const ctx = await buildArticleContext(businessId, nodeId, allOrderedNodes);
+    const currentYear = new Date().getFullYear();
 
-  // =========================================================================
-  // Pass A: Outline-first + section-by-section generation
-  //
-  // WHY: A single LLM call for a full 2,000–3,000 word article risks hitting
-  // the token limit mid-article, producing a truncated article with an empty
-  // last heading. The outline-first approach splits the work:
-  //   Step 1 — Outline: plan all H2 sections + word targets (tiny call, always completes)
-  //   Step 2 — Sections: write each section in its own LLM call (~200–400 words each)
-  //   Step 3 — Assemble: concatenate all sections into the final bodyHtml
-  // No single call can be cut off mid-article.
-  // =========================================================================
+    // --- Enforce slug before generation so the prompt uses the correct slug ---
+    ctx.urlSlug = enforceSlug(ctx.urlSlug, ctx.primaryKeyword, nodeId);
 
-  // --- Pre-Step 1: Enforce slug BEFORE outline so all section-level links use the correct slug ---
-  // (Prompt 4 FIX2: slug enforcement moved before outline generation)
-  {
-    const kwLower = ctx.primaryKeyword.toLowerCase();
-    const slugLower = ctx.urlSlug.toLowerCase();
-    const kwWords = kwLower.split(/\s+/);
-    const allWordsInSlug = kwWords.every((w) => slugLower.includes(w));
-    if (!allWordsInSlug) {
-      const kwSlug = kwLower.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-      if (!slugLower.includes(kwSlug)) {
-        ctx.urlSlug = `${kwSlug}-${ctx.urlSlug}`.replace(/--+/g, "-").slice(0, 80);
-        console.log(`[ArticleEngine] Pre-outline P6 slug enforcement: set slug to "${ctx.urlSlug}" for node ${nodeId}`);
-      }
-    }
-  }
+    // =========================================================================
+    // STEP 1 — SINGLE-PASS WRITE
+    // =========================================================================
+    const writeStart = Date.now();
+    console.log(`[ArticleEngine] Write start for node ${nodeId} (${ctx.level}, target ${ctx.wordCountMin}–${ctx.wordCountMax} words, keyword: "${ctx.primaryKeyword}")`);
 
-  // --- Step 1: Get article outline ---
-  const outlinePrompt = buildOutlinePrompt(ctx);
-  let outline: ArticleOutline;
-  {
-    let outlineParsed: Record<string, unknown> | null = null;
+    const prompt = buildSinglePassPrompt(ctx, currentYear);
+
+    let rawArticle: Record<string, unknown> | null = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const outlineResult = await invokeLLMWithCost(
-          {
-            messages: [
-              { role: "system" as const, content: "You are an expert SEO content strategist. Return only a valid JSON object. No markdown, no code fences." },
-              { role: "user" as const, content: outlinePrompt },
-            ],
-            response_format: { type: "json_object" },
-            max_tokens: TOKEN_LIMITS.outline,
-          },
-          { userId, feature: "article_generation" }
-        );
-        const raw = outlineResult.choices[0]?.message?.content ?? "";
-        const stripped = (typeof raw === "string" ? raw : JSON.stringify(raw))
-          .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-        outlineParsed = JSON.parse(stripped);
-        break;
-      } catch (err) {
-        if (attempt === 2) throw new Error(`Article outline generation failed after 2 attempts: ${err}`);
-        console.warn(`[ArticleEngine] Outline attempt ${attempt} failed — retrying...`);
-      }
-    }
-    const parsed = outlineParsed!;
-    const rawSections = Array.isArray(parsed.sections) ? (parsed.sections as OutlineSection[]) : [];
-    // Validate sections — must have at least 3
-    if (rawSections.length < 3) {
-      throw new Error(`Article outline returned too few sections (${rawSections.length}) for node ${nodeId}`);
-    }
-    outline = {
-      title: (parsed.title as string) || "",
-      metaTitle: (parsed.metaTitle as string) || "",
-      metaDescription: (parsed.metaDescription as string) || "",
-      sections: rawSections,
-      schemaMarkup: "",
-      faqItems: Array.isArray(parsed.faqItems) ? (parsed.faqItems as Array<{ question: string; answer: string }>) : null,
-    };
-    console.log(`[ArticleEngine] Outline for node ${nodeId}: "${outline.title}" — ${outline.sections.length} sections planned (target: ${ctx.wordCountMin}–${ctx.wordCountMax} words)`);
-  }
-
-  // --- Step 2: Write each section ---
-  const sectionHtmlParts: string[] = [];
-  for (let i = 0; i < outline.sections.length; i++) {
-    const section = outline.sections[i];
-    const previousHtml = sectionHtmlParts.join("\n");
-    const sectionPrompt = buildSectionPrompt(ctx, section, i, outline.sections.length, outline.title, previousHtml);
-    let sectionHtml = "";
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const sectionResult = await invokeLLMWithCost(
-          {
-            messages: [
-              { role: "system" as const, content: "You are an expert SEO content writer. Return ONLY the section HTML wrapped in <SECTION_HTML>...</SECTION_HTML> delimiters. No other text." },
-              { role: "user" as const, content: sectionPrompt },
-            ],
-            max_tokens: TOKEN_LIMITS.section,
-          },
-          { userId, feature: "article_generation" }
-        );
-        const finishReason = sectionResult.choices[0]?.finish_reason;
-        const rawSection = sectionResult.choices[0]?.message?.content ?? "";
-        const rawStr = typeof rawSection === "string" ? rawSection : JSON.stringify(rawSection);
-        // Check for truncation
-        if (finishReason === "length") {
-          console.warn(`[ArticleEngine] Section ${i + 1} truncated (finish_reason=length) for node ${nodeId} — retrying with shorter target`);
-          // Reduce target and retry with a note to be more concise
-          outline.sections[i] = { ...section, targetWords: Math.round(section.targetWords * 0.7), notes: section.notes + " (be concise)" };
-          if (attempt === 2) {
-            // Accept whatever we got — extract partial content
-            const partialMatch = rawStr.match(/<SECTION_HTML>([\s\S]*)/i);
-            sectionHtml = partialMatch ? partialMatch[1].trim() : rawStr.trim();
-            console.warn(`[ArticleEngine] Section ${i + 1} still truncated after retry — using partial content`);
-            break;
-          }
-          continue;
-        }
-        const delimMatch = rawStr.match(/<SECTION_HTML>([\s\S]*?)<\/SECTION_HTML>/i);
-        sectionHtml = delimMatch ? delimMatch[1].trim() : rawStr.trim();
-        if (sectionHtml.length > 50) break;
-        if (attempt === 2) console.warn(`[ArticleEngine] Section ${i + 1} returned very short content for node ${nodeId}`);
-      } catch (err) {
-        if (attempt === 2) {
-          console.warn(`[ArticleEngine] Section ${i + 1} failed after 2 attempts for node ${nodeId}:`, err);
-          sectionHtml = `<h2>${section.heading}</h2><p>Section content unavailable.</p>`;
-        }
-      }
-    }
-    sectionHtmlParts.push(sectionHtml);
-    const sectionWc = sectionHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-    console.log(`[ArticleEngine] Section ${i + 1}/${outline.sections.length} written: "${section.heading}" — ${sectionWc} words for node ${nodeId}`);
-  }
-
-  // --- Step 3: Assemble final article ---
-  // Generate schema markup in a separate small call
-  let schemaMarkup = "";
-  {
-    const isCornerstoneOrPillar = ctx.level === "cornerstone" || ctx.level === "pillar";
-    const schemaPrompt = `Generate JSON-LD schema markup for this blog article. Include Article schema and Breadcrumb schema${isCornerstoneOrPillar ? " and FAQ schema" : ""}.
-
-Title: ${outline.title}
-URL: https://example.com/${ctx.urlSlug}
-Business: ${ctx.businessName}
-Primary Keyword: ${ctx.primaryKeyword}
-${outline.faqItems ? `FAQ Items: ${JSON.stringify(outline.faqItems)}` : ""}
-
-Return ONLY the raw JSON-LD string (no markdown, no code fences, no explanation).`;
-    try {
-      const schemaResult = await invokeLLMWithCost(
-        {
-          messages: [{ role: "user" as const, content: schemaPrompt }],
-          max_tokens: TOKEN_LIMITS.schema,
-        },
-        { userId, feature: "article_generation" }
-      );
-      const rawSchema = schemaResult.choices[0]?.message?.content ?? "";
-      schemaMarkup = (typeof rawSchema === "string" ? rawSchema : JSON.stringify(rawSchema))
-        .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    } catch (err) {
-      console.warn(`[ArticleEngine] Schema generation failed for node ${nodeId}:`, err);
-    }
-  }
-
-  let bodyHtml = sectionHtmlParts.join("\n\n");
-  const bodyMarkdown = ""; // Markdown not generated in section-by-section mode
-  let title = outline.title;
-  let metaTitle = outline.metaTitle;
-  let metaDescription = outline.metaDescription;
-  const faqItems = outline.faqItems;
-  let wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-
-  // Check for trailing empty heading (truncation signature) — safety net
-  if (hasTrailingEmptyHeading(bodyHtml)) {
-    console.warn(`[ArticleEngine] Trailing empty heading detected for node ${nodeId} — article may be incomplete. Word count: ${wordCount}`);
-  }
-
-  // --- Pre-pass: P2 enforcement — keyword must appear in article title ---
-  // If the LLM omitted the keyword from the title, rewrite the title via LLM (not prepend).
-  {
-    const kwLower = ctx.primaryKeyword.toLowerCase();
-    const titleLower = title.toLowerCase();
-    if (!kwPresentInText(kwLower, titleLower)) {
-      try {
-        const titleRewriteResult = await invokeLLMWithCost(
+        const result = await invokeLLMWithCost(
           {
             messages: [
               {
-                role: "user",
-                content: `Rewrite this article title to naturally include the focus keyword.\nFocus keyword: "${ctx.primaryKeyword}"\nOriginal title: "${title}"\nRules: Keep the meaning. Sound like a real article title a human would write. Do not just prepend the keyword. Max 70 characters. Return ONLY the new title text, nothing else.`,
+                role: "system" as const,
+                content: "You are an expert SEO content writer. Return ONLY a valid JSON object matching the specified schema. No markdown, no code fences, no explanation.",
               },
+              { role: "user" as const, content: prompt },
             ],
-            max_tokens: TOKEN_LIMITS.titleRewrite,
+            response_format: { type: "json_object" },
+            max_tokens: TOKEN_LIMITS.section, // 12000 tokens
           },
           { userId, feature: "article_generation" }
         );
-        const rewrittenTitle = (titleRewriteResult.choices[0]?.message?.content ?? "").toString().trim().replace(/^"|"$/g, "");
-        if (rewrittenTitle && rewrittenTitle.length > 5 && rewrittenTitle.length <= 80) {
-          title = rewrittenTitle;
-          // Also patch the H1 in bodyHtml
-          const h1Match = bodyHtml.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-          if (h1Match) {
-            bodyHtml = bodyHtml.replace(h1Match[0], h1Match[0].replace(h1Match[1], rewrittenTitle));
-          }
-          console.log(`[ArticleEngine] P2 enforcement: LLM rewrote title to include keyword for node ${nodeId}: "${rewrittenTitle}"`);
-        } else {
-          // Fallback: prepend if LLM rewrite fails
-          const capitalised = ctx.primaryKeyword.charAt(0).toUpperCase() + ctx.primaryKeyword.slice(1);
-          const h1Match = bodyHtml.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-          if (h1Match && !kwPresentInText(kwLower, h1Match[1].toLowerCase())) {
-            const newH1 = `${capitalised}: ${h1Match[1]}`;
-            bodyHtml = bodyHtml.replace(h1Match[0], h1Match[0].replace(h1Match[1], newH1));
-            console.log(`[ArticleEngine] P2 enforcement: fallback prepend keyword into H1 for node ${nodeId}`);
-          }
-        }
-      } catch (err) {
-        console.warn(`[ArticleEngine] P2 title rewrite failed for node ${nodeId}:`, err);
-      }
-    }
-  }
-
-  // --- Pre-pass: P6 enforcement — keyword must appear in URL slug ---
-  {
-    const kwLower = ctx.primaryKeyword.toLowerCase();
-    const slugLower = ctx.urlSlug.toLowerCase();
-    const kwWords = kwLower.split(/\s+/);
-    const allWordsInSlug = kwWords.every(w => slugLower.includes(w));
-    if (!allWordsInSlug) {
-      // Prepend keyword words to slug (e.g. "psychosocial-hazards-examples-guide")
-      const kwSlug = kwLower.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      // Only prepend if not already present as a substring
-      if (!slugLower.includes(kwSlug)) {
-        ctx.urlSlug = `${kwSlug}-${ctx.urlSlug}`.replace(/--+/g, '-').slice(0, 80);
-        console.log(`[ArticleEngine] P6 enforcement: prepended keyword to slug for node ${nodeId}: ${ctx.urlSlug}`);
-      }
-    }
-  }
-
-  // Enforce meta title length: must be ≤60 chars
-  if (metaTitle.length > 60) {
-    // Trim to last word boundary at or before 57 chars, then add ellipsis
-    const trimmedTitle = metaTitle.slice(0, 57);
-    const lastSpaceTitle = trimmedTitle.lastIndexOf(" ");
-    metaTitle = (lastSpaceTitle > 30 ? trimmedTitle.slice(0, lastSpaceTitle) : trimmedTitle) + "...";
-    console.log(`[ArticleEngine] Meta title trimmed to ${metaTitle.length} chars for node ${nodeId}`);
-  }
-
-  // --- P7 enforcement: keyword must appear in meta title ---
-  {
-    const kwLower = ctx.primaryKeyword.toLowerCase();
-    if (!kwPresentInText(kwLower, metaTitle.toLowerCase())) {
-      // Prepend keyword to meta title, then re-enforce length
-      const capitalised = ctx.primaryKeyword.charAt(0).toUpperCase() + ctx.primaryKeyword.slice(1);
-      metaTitle = `${capitalised}: ${metaTitle}`;
-      // Re-trim if now over 60 chars
-      if (metaTitle.length > 60) {
-        const trimmed = metaTitle.slice(0, 57);
-        const lastSp = trimmed.lastIndexOf(" ");
-        metaTitle = (lastSp > 30 ? trimmed.slice(0, lastSp) : trimmed) + "...";
-      }
-      console.log(`[ArticleEngine] P7 enforcement: injected keyword into meta title for node ${nodeId}: "${metaTitle}"`);
-    }
-  }
-
-  // Enforce meta description length: must be 140–160 chars
-  if (metaDescription.length > 160) {
-    // Trim to last word boundary at or before 157 chars, then add ellipsis
-    const trimmed = metaDescription.slice(0, 157);
-    const lastSpace = trimmed.lastIndexOf(" ");
-    metaDescription = (lastSpace > 120 ? trimmed.slice(0, lastSpace) : trimmed) + "...";
-    console.log(`[ArticleEngine] Meta description trimmed to ${metaDescription.length} chars for node ${nodeId}`);
-  } else if (metaDescription.length < 140 && metaDescription.length > 0) {
-    // If too short, append a generic CTA to pad it to 140+
-    const pad = ` Get expert advice from ${ctx.businessName}.`;
-    if ((metaDescription + pad).length <= 160) {
-      metaDescription = metaDescription + pad;
-    }
-    console.log(`[ArticleEngine] Meta description padded to ${metaDescription.length} chars for node ${nodeId}`);
-  }
-
-  // --- P8 enforcement: keyword must appear in meta description ---
-  {
-    const kwLower = ctx.primaryKeyword.toLowerCase();
-    if (!kwPresentInText(kwLower, metaDescription.toLowerCase())) {
-      // Prepend a keyword-containing phrase, then re-enforce length
-      const capitalised = ctx.primaryKeyword.charAt(0).toUpperCase() + ctx.primaryKeyword.slice(1);
-      const prefix = `${capitalised}: `;
-      metaDescription = prefix + metaDescription;
-      // Re-enforce length after injection
-      if (metaDescription.length > 160) {
-        const trimmed2 = metaDescription.slice(0, 157);
-        const lastSp2 = trimmed2.lastIndexOf(" ");
-        metaDescription = (lastSp2 > 120 ? trimmed2.slice(0, lastSp2) : trimmed2) + "...";
-      } else if (metaDescription.length < 140) {
-        const pad2 = ` Learn more from ${ctx.businessName}.`;
-        if ((metaDescription + pad2).length <= 160) metaDescription = metaDescription + pad2;
-      }
-      console.log(`[ArticleEngine] P8 enforcement: injected keyword into meta description for node ${nodeId} (${metaDescription.length} chars)`);
-    }
-  }
-
-  // --- Pass A1: Word count condensation (if over maximum) ---
-  // Retry loop: up to MAX_CONDENSATION_ATTEMPTS passes until the article is under the max.
-  const MAX_CONDENSATION_ATTEMPTS = 3;
-  wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-  if (wordCount > ctx.wordCountMax) {
-    for (let condensationAttempt = 1; condensationAttempt <= MAX_CONDENSATION_ATTEMPTS; condensationAttempt++) {
-      if (wordCount <= ctx.wordCountMax) break;
-      const currentWordCount = wordCount;
-      console.log(`[ArticleEngine] Condensation attempt ${condensationAttempt}/${MAX_CONDENSATION_ATTEMPTS} for node ${nodeId}: ${currentWordCount} words (max: ${ctx.wordCountMax})`);
-      try {
-        const condensationPrompt = `This article is ${currentWordCount} words. The maximum for a ${ctx.level} article is ${ctx.wordCountMax} words. Condense it to under ${ctx.wordCountMax} words. Remove redundant sentences, shorten over-explained sections, and cut any padding. Do not remove headings, key points, or examples — only cut filler.
-
-Return ONLY the condensed article body as clean HTML, wrapped in these exact delimiters:
-<CONDENSED_HTML>
-...full condensed HTML here...
-</CONDENSED_HTML>`;
-
-        const condensationResult = await invokeLLMWithCost(
-          {
-            messages: [
-              { role: "system", content: "You are an expert SEO content editor. Condense the article as instructed. Preserve all headings, key points, examples, internal links, keyword mentions, and schema markup. Use Australian English spelling." },
-              { role: "user", content: condensationPrompt + "\n\n" + bodyHtml },
-            ],
-            max_tokens: TOKEN_LIMITS.condensation,
-          },
-          { userId, feature: "article_generation" }
-        );
-        const condensationContent = condensationResult.choices[0]?.message?.content ?? "";
-        const rawCondensation = typeof condensationContent === "string" ? condensationContent : JSON.stringify(condensationContent);
-        const condensationMatch = rawCondensation.match(/<CONDENSED_HTML>([\s\S]*?)<\/CONDENSED_HTML>/i);
-        const condensedHtml = condensationMatch ? condensationMatch[1].trim() : rawCondensation.trim();
-        if (condensedHtml && condensedHtml.length > 100) {
-          const condensedWordCount = condensedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-          if (condensedWordCount < currentWordCount && condensedWordCount >= ctx.wordCountMin) {
-            bodyHtml = condensedHtml;
-            wordCount = condensedWordCount;
-            if (condensedWordCount <= ctx.wordCountMax) {
-              console.log(`[ArticleEngine] Condensation attempt ${condensationAttempt} successful for node ${nodeId}: ${currentWordCount} → ${condensedWordCount} words`);
-              break;
-            } else {
-              console.log(`[ArticleEngine] Condensation attempt ${condensationAttempt} partial for node ${nodeId}: ${currentWordCount} → ${condensedWordCount} words (still over max)`);
-            }
-          } else {
-            console.warn(`[ArticleEngine] Condensation attempt ${condensationAttempt} unusable for node ${nodeId}: ${condensedWordCount} words (original: ${currentWordCount}) — keeping current`);
-          }
-        }
-      } catch (err) {
-        console.warn(`[ArticleEngine] Condensation pass failed for node ${nodeId}:`, err);
+        const raw = result.choices[0]?.message?.content ?? "";
+        const stripped = (typeof raw === "string" ? raw : JSON.stringify(raw))
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/\s*```$/i, "")
+          .trim();
+        rawArticle = JSON.parse(stripped);
         break;
-      }
-    }
-    if (wordCount > ctx.wordCountMax) {
-      console.warn(`[ArticleEngine] WARNING: node ${nodeId} still ${wordCount} words after ${MAX_CONDENSATION_ATTEMPTS} condensation attempts (max: ${ctx.wordCountMax})`);
-    }
-  }
-
-  // --- Pass A2: Word count expansion loop (guaranteed minimum) ---
-  // Keeps expanding until the article meets the minimum word count or 4 attempts are exhausted.
-  // This is deterministic enforcement — not prompt-based hoping.
-  const MAX_EXPANSION_ATTEMPTS = 4;
-  for (let expansionAttempt = 1; expansionAttempt <= MAX_EXPANSION_ATTEMPTS; expansionAttempt++) {
-    const currentWc = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-    wordCount = currentWc;
-    if (currentWc >= ctx.wordCountMin - WORD_COUNT_TOLERANCE) {
-      if (expansionAttempt > 1) console.log(`[ArticleEngine] Word count met after ${expansionAttempt - 1} expansion pass(es): ${currentWc} words for node ${nodeId}`);
-      if (currentWc < ctx.wordCountMin) console.log(`[ArticleEngine] Word count ${currentWc} is within ${WORD_COUNT_TOLERANCE}-word tolerance of minimum ${ctx.wordCountMin} — passing for node ${nodeId}`);
-      break;
-    }
-    const wordsNeeded = ctx.wordCountMin - currentWc;
-    console.log(`[ArticleEngine] Expansion attempt ${expansionAttempt}/${MAX_EXPANSION_ATTEMPTS} for node ${nodeId}: ${currentWc} words, need ${wordsNeeded} more (min: ${ctx.wordCountMin})`);
-    try {
-      // Collect existing H2 headings from the current article for outline context
-    const existingH2Headings = Array.from(bodyHtml.matchAll(/<h2[^>]*>([^<]+)<\/h2>/gi)).map((m) => m[1].trim());
-    // Collect internal links already in the article
-    const existingInternalLinks = Array.from(bodyHtml.matchAll(/href="([^"]+)"[^>]*>([^<]+)<\/a>/gi))
-      .filter((m) => !m[1].startsWith("http") || (ctx.ctaUrl && m[1].includes(new URL(ctx.ctaUrl.startsWith("http") ? ctx.ctaUrl : `https://${ctx.ctaUrl}`).hostname)))
-      .map((m) => ({ url: m[1], label: m[2] }))
-      .slice(0, 10);
-    const expansionSystemPrompt = `You are an expert SEO content writer. You will receive an article that is too short and must be expanded.
-
-Current word count: ${currentWc} words
-Required minimum: ${ctx.wordCountMin} words (you are ${wordsNeeded} words SHORT)
-Required maximum: ${ctx.wordCountMax} words
-Primary keyword: ${ctx.primaryKeyword}
-
-You MUST add at least ${wordsNeeded} words. This is not optional.
-
-Existing article outline (H2 sections already written):
-${existingH2Headings.map((h, i) => `${i + 1}. ${h}`).join("\n")}
-
-Internal links available in this article (use ONLY these, do not invent new URLs):
-${existingInternalLinks.map((l) => `- ${l.label}: ${l.url}`).join("\n") || "None"}
-
-How to expand:
-- Add ${Math.ceil(wordsNeeded / 200)} new H2 section(s) that fit naturally into the existing outline above
-- Each new section should be 150–250 words with practical, specific advice
-- The new section(s) must NOT reference pages or URLs that are not in the internal links list above
-- Focus keyword: "${ctx.primaryKeyword}" — use it naturally once in each new section
-- Expand existing thin paragraphs with real-world examples and step-by-step guidance
-- Add a FAQ section if one does not already exist (3–5 questions and detailed answers)
-- Maintain the same tone, voice, and HTML structure
-- Keep all existing links, keywords, schema, and the closing CTA section intact
-- Do NOT add the CTA section again — it already exists at the end
-- Use Australian English spelling
-
-Return ONLY the expanded article body as clean HTML, wrapped in these exact delimiters:
-<EXPANDED_HTML>
-...full expanded HTML here...
-</EXPANDED_HTML>`;
-
-      const expansionResult = await invokeLLMWithCost(
-        {
-          messages: [
-            { role: "system", content: expansionSystemPrompt },
-            { role: "user", content: bodyHtml },
-          ],
-          max_tokens: TOKEN_LIMITS.expansion,
-        },
-        { userId, feature: "article_generation" }
-      );
-      const expansionContent = expansionResult.choices[0]?.message?.content ?? "";
-      const rawExpansion = typeof expansionContent === "string" ? expansionContent : JSON.stringify(expansionContent);
-      // Extract HTML from delimiters — robust against any JSON/markdown wrapping
-      const delimMatch = rawExpansion.match(/<EXPANDED_HTML>([\s\S]*?)<\/EXPANDED_HTML>/i);
-      const expandedHtml = delimMatch ? delimMatch[1].trim() : rawExpansion.trim();
-      if (expandedHtml && expandedHtml.length > 100) {
-        const expandedWordCount = expandedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-        if (expandedWordCount > currentWc) {
-          bodyHtml = expandedHtml;
-          wordCount = expandedWordCount;
-          console.log(`[ArticleEngine] Expansion attempt ${expansionAttempt} for node ${nodeId}: ${currentWc} → ${expandedWordCount} words`);
-        } else {
-          console.warn(`[ArticleEngine] Expansion attempt ${expansionAttempt} for node ${nodeId} did not increase word count (${expandedWordCount} vs ${currentWc}) — retrying`);
-        }
-      }
-    } catch (err) {
-      console.warn(`[ArticleEngine] Expansion attempt ${expansionAttempt} failed for node ${nodeId}:`, err);
-    }
-    if (expansionAttempt === MAX_EXPANSION_ATTEMPTS) {
-      console.warn(`[ArticleEngine] Max expansion attempts reached for node ${nodeId}: final word count ${wordCount} (min: ${ctx.wordCountMin})`);
-    }
-  }
-
-  // --- Pass B: AI fingerprint scrub ---
-  try {
-    const scrubPrompt = buildScrubPrompt(bodyHtml, bodyMarkdown, ctx.primaryKeyword, ctx.level);
-    const scrubResult = await invokeLLMWithCost(
-      {
-        messages: [{ role: "user", content: scrubPrompt }],
-        // No json_object mode — we use plain HTML delimiters to avoid JSON encoding issues
-        max_tokens: TOKEN_LIMITS.scrub,
-      },
-      { userId, feature: "article_generation" }
-    );
-    const scrubContent = scrubResult.choices[0]?.message?.content ?? "";
-    const rawScrub = typeof scrubContent === "string" ? scrubContent : JSON.stringify(scrubContent);
-    // Extract HTML from delimiters
-    const scrubMatch = rawScrub.match(/<SCRUBBED_HTML>([\s\S]*?)<\/SCRUBBED_HTML>/i);
-    const scrubbedHtml = scrubMatch ? scrubMatch[1].trim() : "";
-    if (scrubbedHtml && scrubbedHtml.length > 100) {
-      const scrubWordCount = scrubbedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-      const originalWordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-      // Safety guard: reject scrubbed body if it lost more than 20% of the original content
-      if (scrubWordCount >= originalWordCount * 0.8) {
-        bodyHtml = scrubbedHtml;
-        console.log(`[ArticleEngine] Scrub pass accepted: ${scrubWordCount} words (original: ${originalWordCount}) for node ${nodeId}`);
-      } else {
-        console.warn(`[ArticleEngine] Scrub pass REJECTED for node ${nodeId}: scrubbed body too short (${scrubWordCount} vs ${originalWordCount} original words) — using original`);
-      }
-    } else {
-      console.warn(`[ArticleEngine] Scrub pass returned no delimited content for node ${nodeId} — using original content`);
-    }
-    // Recount words after scrub
-    wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-  } catch (err) {
-    // Scrub failure is non-fatal — continue with original content
-    console.warn(`[ArticleEngine] Scrub pass failed for node ${nodeId}:`, err);
-  }
-
-  // --- Pass B2: Post-scrub word count safety check ---
-  // If the scrub pass somehow reduced the article below the minimum, run one more expansion.
-  {
-    const postScrubWc = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-    if (postScrubWc < ctx.wordCountMin - WORD_COUNT_TOLERANCE) {
-      const wordsNeeded = ctx.wordCountMin - postScrubWc;
-      console.warn(`[ArticleEngine] Post-scrub word count below minimum for node ${nodeId}: ${postScrubWc} words (min: ${ctx.wordCountMin}) — running recovery expansion`);
-      try {
-        const recoverySystemPrompt = `You are an expert SEO content writer. You will receive an article that needs to be expanded.
-Current word count: ${postScrubWc} words
-Required minimum: ${ctx.wordCountMin} words (you are ${wordsNeeded} words SHORT)
-Required maximum: ${ctx.wordCountMax} words
-Primary keyword: ${ctx.primaryKeyword}
-Add ${Math.ceil(wordsNeeded / 200)} new H2 sections covering related subtopics. Each section 150-250 words. Maintain tone, HTML structure, and all existing links.
-Return ONLY the expanded HTML wrapped in:
-<EXPANDED_HTML>
-...full expanded HTML here...
-</EXPANDED_HTML>`;
-        const recoveryResult = await invokeLLMWithCost(
-          {
-            messages: [
-              { role: "system", content: recoverySystemPrompt },
-              { role: "user", content: bodyHtml },
-            ],
-            max_tokens: TOKEN_LIMITS.recovery,
-          },
-          { userId, feature: "article_generation" }
-        );
-        const recoveryContent = recoveryResult.choices[0]?.message?.content ?? "";
-        const rawRecovery = typeof recoveryContent === "string" ? recoveryContent : JSON.stringify(recoveryContent);
-        const recoveryMatch = rawRecovery.match(/<EXPANDED_HTML>([\s\S]*?)<\/EXPANDED_HTML>/i);
-        const recoveredHtml = recoveryMatch ? recoveryMatch[1].trim() : "";
-        if (recoveredHtml && recoveredHtml.length > 100) {
-          const recoveredWc = recoveredHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-          if (recoveredWc > postScrubWc) {
-            bodyHtml = recoveredHtml;
-            wordCount = recoveredWc;
-            console.log(`[ArticleEngine] Post-scrub recovery expansion: ${postScrubWc} → ${recoveredWc} words for node ${nodeId}`);
-          }
-        }
       } catch (err) {
-        console.warn(`[ArticleEngine] Post-scrub recovery expansion failed for node ${nodeId}:`, err);
-      }
-    }
-  }
-
-  // --- Pass B3: Second banned-phrase verification pass ---
-  // If any banned phrases survived the scrub, run a targeted second scrub.
-  {
-    const remainingBanned = BANNED_PHRASES.filter((phrase) =>
-      bodyHtml.toLowerCase().includes(phrase.toLowerCase())
-    );
-    if (remainingBanned.length > 0) {
-      console.log(`[ArticleEngine] Pass B3: ${remainingBanned.length} banned phrase(s) survived scrub for node ${nodeId}: ${remainingBanned.join(", ")} — running targeted scrub`);
-      try {
-        const targetedScrubPrompt = `Remove these specific phrases from the article and rewrite those sentences naturally. Do not change any other content, HTML tags, or structure.
-
-Phrases to remove: ${remainingBanned.join(", ")}
-
-For each phrase found:
-- Identify the sentence containing it
-- Rewrite that sentence to convey the same meaning without the banned phrase
-- Keep all surrounding HTML intact
-
-Return ONLY the full article HTML wrapped in:
-<SCRUBBED_HTML>
-...full article HTML here...
-</SCRUBBED_HTML>`;
-        const targetedResult = await invokeLLMWithCost(
-          {
-            messages: [
-              { role: "user", content: targetedScrubPrompt },
-              { role: "user", content: bodyHtml },
-            ],
-            max_tokens: TOKEN_LIMITS.recovery,
-          },
-          { userId, feature: "article_generation" }
-        );
-        const targetedContent = targetedResult.choices[0]?.message?.content ?? "";
-        const rawTargeted = typeof targetedContent === "string" ? targetedContent : JSON.stringify(targetedContent);
-        const targetedMatch = rawTargeted.match(/<SCRUBBED_HTML>([\s\S]*?)<\/SCRUBBED_HTML>/i);
-        const targetedHtml = targetedMatch ? targetedMatch[1].trim() : "";
-        if (targetedHtml && targetedHtml.length > 100) {
-          const targetedWc = targetedHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-          const originalWc = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-          if (targetedWc >= originalWc * 0.8) {
-            bodyHtml = targetedHtml;
-            wordCount = targetedWc;
-            console.log(`[ArticleEngine] Pass B3 targeted scrub accepted for node ${nodeId}: ${targetedWc} words`);
-          } else {
-            console.warn(`[ArticleEngine] Pass B3 targeted scrub rejected for node ${nodeId}: too short (${targetedWc} vs ${originalWc})`);
-          }
-        }
-      } catch (err) {
-        console.warn(`[ArticleEngine] Pass B3 targeted scrub failed for node ${nodeId}:`, err);
-      }
-    }
-  }
-
-  // --- Pass C: Post-scrub keyword density + first-100-words enforcement ---
-  // Ensures keyword appears in the first paragraph AND meets density threshold.
-  {
-    const kw = ctx.primaryKeyword.toLowerCase();
-    const bodyTextRaw = bodyHtml.replace(/<[^>]+>/g, " ").toLowerCase();
-    const kwMatches = (bodyTextRaw.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
-    const kwDensity = wordCount > 0 ? kwMatches / wordCount : 0;
-    const first150 = bodyTextRaw.split(/\s+/).slice(0, 150).join(" ");
-    // Use token-presence check (not exact match) — handles word order variations
-    const kwInFirst150 = kwPresentInText(kw, first150);
-
-    // Inject keyword into the VERY FIRST <p> tag if it doesn't already contain it
-    if (!kwInFirst150) {
-      const firstParaMatch = bodyHtml.match(/<p[^>]*>([^<]{10,})<\/p>/);
-      if (firstParaMatch) {
-        const injection = ` When considering ${ctx.primaryKeyword} in ${ctx.location || "Australia"}, understanding the facts is essential.`;
-        bodyHtml = bodyHtml.replace(firstParaMatch[0], firstParaMatch[0].replace("</p>", `${injection}</p>`));
-        wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-        console.log(`[ArticleEngine] P5 enforcement: injected keyword into first paragraph for node ${nodeId}`);
+        if (attempt === 2) throw new Error(`Single-pass article generation failed after 2 attempts: ${err}`);
+        console.warn(`[ArticleEngine] Write attempt ${attempt} failed for node ${nodeId} — retrying...`);
       }
     }
 
-    // If density is still below threshold, inject keyword mentions until we reach 5+
-    const injectionPhrases = [
-      ` This is particularly relevant when evaluating ${ctx.primaryKeyword} options.`,
-      ` Understanding ${ctx.primaryKeyword} helps you make an informed decision.`,
-      ` Many clients researching ${ctx.primaryKeyword} find this information valuable.`,
-    ];
-    let injectionIdx = 0;
-    for (let pass = 0; pass < 3; pass++) {
-      const currentBodyText = bodyHtml.replace(/<[^>]+>/g, " ").toLowerCase();
-      const currentMatches = (currentBodyText.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
-      const currentDensity = wordCount > 0 ? currentMatches / wordCount : 0;
-      if (currentMatches >= 5 && currentDensity >= 0.005) break; // threshold met
-      if (injectionIdx >= injectionPhrases.length) break;
-      // Find a paragraph that doesn't already contain the exact keyword
-      const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>([^<]{40,})<\/p>/g));
-      const targetIdx = pass === 0 ? Math.floor(allParas.length / 2) : pass === 1 ? Math.floor(allParas.length * 0.75) : 1;
-      const targetPara = allParas[Math.min(targetIdx, allParas.length - 1)];
-      if (targetPara && !targetPara[1].toLowerCase().includes(kw)) {
-        const injection = injectionPhrases[injectionIdx++];
-        bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace("</p>", `${injection}</p>`));
-        wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-        console.log(`[ArticleEngine] P1 density enforcement pass ${pass + 1}: injected keyword for node ${nodeId} (now ${currentMatches + 1} mentions)`);
-      } else {
-        injectionIdx++; // skip to next phrase
-      }
+    const parsed = rawArticle!;
+    let title = String(parsed.title ?? "");
+    let metaTitle = String(parsed.metaTitle ?? "");
+    let metaDescription = String(parsed.metaDescription ?? "");
+    let bodyHtml = String(parsed.bodyHtml ?? "");
+    let bodyMarkdown = String(parsed.bodyMarkdown ?? "");
+    const schemaMarkup = String(parsed.schemaMarkup ?? "");
+    const faqItemsRaw = Array.isArray(parsed.faqItems) ? (parsed.faqItems as Array<{ question: string; answer: string }>) : null;
+    const faqItems = ctx.level === "cluster" ? null : faqItemsRaw;
+
+    const writeDone = Date.now();
+    let wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    console.log(`[ArticleEngine] Write done for node ${nodeId}: "${title}" — ${wordCount} words in ${((writeDone - writeStart) / 1000).toFixed(1)}s`);
+
+    // =========================================================================
+    // STEP 2 — MECHANICAL POST-PROCESS (no LLM)
+    // =========================================================================
+    const postProcessed = mechanicalPostProcess(bodyHtml);
+    bodyHtml = postProcessed.bodyHtml;
+    wordCount = postProcessed.wordCount;
+
+    // Enforce slug, meta title, meta description
+    ctx.urlSlug = enforceSlug(ctx.urlSlug, ctx.primaryKeyword, nodeId);
+    metaTitle = enforceMetaTitle(metaTitle, ctx.primaryKeyword);
+    metaDescription = enforceMetaDescription(metaDescription, ctx.primaryKeyword, ctx.businessName);
+
+    // Enforce keyword in title (H1)
+    if (!kwPresentInText(ctx.primaryKeyword.toLowerCase(), title.toLowerCase())) {
+      const capitalised = ctx.primaryKeyword.charAt(0).toUpperCase() + ctx.primaryKeyword.slice(1);
+      title = `${capitalised}: ${title}`;
+      console.log(`[ArticleEngine] P2 enforcement: prepended keyword into title for node ${nodeId}`);
     }
-  }
 
-  // --- Pass D: P3 mechanical H2 keyword injection ---
-  // Ensures the exact keyword phrase appears in at least one H2 heading.
-  {
-    const kw = ctx.primaryKeyword.toLowerCase();
-    const h2Matches = Array.from(bodyHtml.matchAll(/<h2[^>]*>([^<]+)<\/h2>/gi));
-    // Use token-presence check (same as P3 scorer) — handles word order variations
-    const kwInH2 = h2Matches.some((m) => kwPresentInText(kw, m[1]));
-    if (!kwInH2 && h2Matches.length > 0) {
-      // Append keyword to the first H2 that doesn't already contain it
-      const firstH2 = h2Matches[0];
-      const originalH2Text = firstH2[1];
-      const newH2Text = `${originalH2Text}: ${ctx.primaryKeyword}`;
-      bodyHtml = bodyHtml.replace(firstH2[0], firstH2[0].replace(originalH2Text, newH2Text));
-      console.log(`[ArticleEngine] P3 enforcement: appended keyword to H2 for node ${nodeId}`);
-    }
-  }
+    // =========================================================================
+    // STEP 3 — PASS 1 SCORER (rules-based, synchronous)
+    // =========================================================================
+    const pass1 = runPass1Scorer({
+      bodyHtml,
+      bodyMarkdown,
+      title,
+      metaTitle,
+      metaDescription,
+      urlSlug: ctx.urlSlug,
+      wordCount,
+      level: ctx.level,
+      primaryKeyword: ctx.primaryKeyword,
+      externalLinkPresent: bodyHtml.includes("http"),
+      internalCtaLinkPresent: bodyHtml.includes(ctx.ctaUrl),
+      internalBlogLinksPresent: ctx.allBatchSlugs.some(slug => bodyHtml.includes(slug)),
+      schemaPresent: schemaMarkup.length > 0,
+    });
+    console.log(`[ArticleEngine] Pass 1 done for node ${nodeId}: ${pass1.score}/100 (${Object.values(pass1.points).filter(Boolean).length}/16 checks passed)`);
 
-  // AI disclosure removed — not added to article body.
+    // =========================================================================
+    // STEP 4 — PASS 2 SCORER (AI quality)
+    // =========================================================================
+    let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
+    const pass2Done = Date.now();
+    console.log(`[ArticleEngine] Pass 2 done for node ${nodeId}: ${pass2.score}/100 — "${pass2.reason}" (${((pass2Done - writeDone) / 1000).toFixed(1)}s)`);
 
-  // --- Line spacing: insert a blank line between block-level elements for clean CMS rendering ---
-  // This ensures headings and paragraphs are visually separated when published to Wix/WordPress.
-  bodyHtml = bodyHtml
-    // Add newline before each opening block tag (if not already preceded by a newline)
-    .replace(/([^\n])<(h[1-6]|p|ul|ol|blockquote|div|figure|table|pre)([\s>])/g, "$1\n<$2$3")
-    // Add newline after each closing block tag (if not already followed by a newline)
-    .replace(/<\/(h[1-6]|p|ul|ol|blockquote|div|figure|table|pre)>([^\n])/g, "</$1>\n$2")
-    // Collapse 3+ consecutive newlines down to 2 (avoid excessive whitespace)
-    .replace(/\n{3,}/g, "\n\n");
+    // =========================================================================
+    // STEP 5 — ONE IMPROVEMENT ATTEMPT (if needed)
+    // =========================================================================
+    const pass1PointsCount = Object.values(pass1.points).filter(Boolean).length;
+    const needsImprovement = pass1PointsCount < 14 || pass2.score < 80;
+    let improvementAttempts = 0;
 
-  // Recount words after prepending disclosure (disclosure words are minimal, ~15 words)
-  wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    if (needsImprovement) {
+      improvementAttempts = 1;
+      // Collect Pass 1 failures for the prompt
+      const pass1Failures = Object.entries(pass1.points)
+        .filter(([, passed]) => !passed)
+        .map(([checkId]) => {
+          const detail = pass1.details[checkId] ?? checkId;
+          return `- ${checkId}: ${detail}`;
+        })
+        .join("\n");
 
-  // --- Pass E: P9 opening answer block enforcement ---
-  // Ensures the first paragraph contains a bold question + direct answer.
-  {
-    const first800 = bodyHtml.slice(0, 800);
-    const hasOpeningAnswer =
-      /<(strong|b)[^>]*>[^<]*\?[^<]*<\/(strong|b)>/i.test(first800) ||
-      /<p[^>]*>[^<]{5,200}\?/i.test(first800) ||
-      /<h[23][^>]*>[^<]*\?[^<]*<\/h[23]>/i.test(first800);
-    if (!hasOpeningAnswer) {
-      // Prepend a bold question + direct answer block immediately after the first H2
-      const firstH2Match = bodyHtml.match(/<h2[^>]*>[^<]+<\/h2>/i);
-      if (firstH2Match) {
-        const question = ctx.paaQuestion || `What are the key facts about ${ctx.primaryKeyword}?`;
-        const answerBlock = `<p><strong>${question}</strong> Understanding ${ctx.primaryKeyword} is essential for ${ctx.audiences[0] || 'anyone in ' + ctx.industry}. This guide covers the key facts, practical steps, and expert advice you need.</p>`;
-        bodyHtml = bodyHtml.replace(firstH2Match[0], firstH2Match[0] + '\n' + answerBlock);
-        console.log(`[ArticleEngine] P9 enforcement: injected opening answer block for node ${nodeId}`);
-      }
-    }
-  }
+      console.log(`[ArticleEngine] Improvement pass triggered for node ${nodeId} (Pass 1: ${pass1PointsCount}/16, Pass 2: ${pass2.score}/100)...`);
 
-  // --- Pass F: P10 external authority link enforcement ---
-  // Ensures at least one real external link to a .gov.au or industry body.
-  {
-    const hasExternal = /href=["'](https?:\/\/[^"']+)["']/i.test(bodyHtml) &&
-      (() => {
-        const externalHrefPattern = /href=["'](https?:\/\/[^"']+)["']/gi;
-        let m;
-        while ((m = externalHrefPattern.exec(bodyHtml)) !== null) {
-          const href = m[1].toLowerCase();
-          if (!href.includes('localhost') && !href.startsWith('/')) return true;
-        }
-        return false;
-      })();
-    if (!hasExternal) {
-      // Inject a generic authority link into the second paragraph
-      const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>[^<]{40,}<\/p>/g));
-      const targetPara = allParas[1] ?? allParas[0];
-      if (targetPara) {
-        const authorityLink = ctx.industry.toLowerCase().includes('health') || ctx.industry.toLowerCase().includes('psych')
-          ? `<a href="https://www.safeworkaustralia.gov.au" target="_blank" rel="noopener">Safe Work Australia</a>`
-          : `<a href="https://www.fairwork.gov.au" target="_blank" rel="noopener">Fair Work Commission</a>`;
-        bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace('</p>', ` For regulatory guidance, refer to ${authorityLink}.</p>`));
-        console.log(`[ArticleEngine] P10 enforcement: injected external authority link for node ${nodeId}`);
-      }
-    }
-  }
+      const improvementPrompt = `This article needs improvement. Here are the exact issues identified:
 
-  // --- Pass G: P11 internal CTA link enforcement ---
-  // Ensures at least one link to the business CTA URL.
-  {
-    const hasInternalCta = bodyHtml.includes(ctx.ctaUrl) || bodyHtml.includes('/');
-    if (!hasInternalCta && ctx.ctaUrl) {
-      // Append CTA link to the last paragraph before the closing CTA section
-      const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>[^<]{40,}<\/p>/g));
-      const targetPara = allParas[allParas.length - 2] ?? allParas[allParas.length - 1];
-      if (targetPara) {
-        bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace('</p>', ` <a href="${ctx.ctaUrl}">${ctx.ctaText}</a>.</p>`));
-        console.log(`[ArticleEngine] P11 enforcement: injected internal CTA link for node ${nodeId}`);
-      }
-    }
-  }
+PASS 1 FAILURES (SEO rules not met):
+${pass1Failures || "None — all Pass 1 checks passed"}
 
-  // --- Pass H: P12 internal blog links enforcement ---
-  // Ensures at least 2 internal blog links from the batch slugs.
-  {
-    const internalLinkCount = (bodyHtml.match(/href=["']\/[^"']+["']/gi) || []).length;
-    if (internalLinkCount < 2 && ctx.allBatchSlugs.length >= 2) {
-      const slugsToAdd = ctx.allBatchSlugs
-        .filter(s => !bodyHtml.includes(s))
-        .slice(0, 2 - Math.max(0, internalLinkCount));
-      for (const slug of slugsToAdd) {
-        const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>[^<]{60,}<\/p>/g));
-        const targetPara = allParas[Math.floor(allParas.length / 2)];
-        if (targetPara) {
-          const label = slug.replace(/^\//,'').replace(/-/g,' ').replace(/\b\w/g, c => c.toUpperCase());
-          bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace('</p>', ` See also: <a href="${slug}">${label}</a>.</p>`));
-          console.log(`[ArticleEngine] P12 enforcement: injected internal blog link ${slug} for node ${nodeId}`);
-        }
-      }
-    }
-  }
-
-  // --- Pass I: P14 E-E-A-T signal enforcement ---
-  // Ensures at least one E-E-A-T signal word appears in the body.
-  // The scorer checks for: "year", "experience", "client", "award"
-  {
-    const bodyLower = bodyHtml.toLowerCase();
-    const hasEeat = bodyLower.includes("year") || bodyLower.includes("experience") ||
-      bodyLower.includes("client") || bodyLower.includes("award");
-    if (!hasEeat) {
-      // Inject a credibility sentence into the second paragraph
-      const allParas = Array.from(bodyHtml.matchAll(/<p[^>]*>[^<]{40,}<\/p>/g));
-      const targetPara = allParas[1] ?? allParas[0];
-      if (targetPara) {
-        const eeatSentence = ` With years of experience helping ${ctx.audiences[0] || 'clients'} across ${ctx.location || 'Australia'}, ${ctx.businessName} understands what works.`;
-        bodyHtml = bodyHtml.replace(targetPara[0], targetPara[0].replace('</p>', `${eeatSentence}</p>`));
-        console.log(`[ArticleEngine] P14 enforcement: injected E-E-A-T signal for node ${nodeId}`);
-      }
-    }
-  }
-
-  // --- Pass 1: Rules-based scorer ---
-  const pass1 = runPass1Scorer({
-    bodyHtml,
-    bodyMarkdown,
-    title,
-    metaTitle,
-    metaDescription,
-    urlSlug: ctx.urlSlug,
-    wordCount,
-    level: ctx.level,
-    primaryKeyword: ctx.primaryKeyword,
-    externalLinkPresent: bodyHtml.includes("http"),
-    internalCtaLinkPresent: bodyHtml.includes(ctx.ctaUrl),
-    internalBlogLinksPresent: ctx.allBatchSlugs.some(slug => bodyHtml.includes(slug)),
-    schemaPresent: schemaMarkup.length > 0,
-  });
-
-  // --- Pass 2: AI quality scorer ---
-  console.log(`[ArticleEngine] Pass 2 scoring for node ${nodeId} (${wordCount} words)...`);
-  let pass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
-  console.log(`[ArticleEngine] Pass 2 score: ${pass2.score} for node ${nodeId} — ${pass2.reason}`);
-
-  // --- Pass 2 quality floor: up to 3 improvement attempts if score < 80 ---
-  // Each attempt injects the EXACT scorer feedback so the model fixes the specific issues raised.
-  // If score reaches ≥80 at any point, the loop exits early.
-  // If still <80 after 3 attempts, statusBadge is forced to "needs_review" so the user knows manual editing is required.
-  const MAX_IMPROVEMENT_ATTEMPTS = 3;
-  let improvementAttempts = 0;
-  if (pass2.score < 80) {
-    console.log(`[ArticleEngine] Pass 2 quality floor triggered (score ${pass2.score} < 80) for node ${nodeId}. Running up to ${MAX_IMPROVEMENT_ATTEMPTS} improvement attempts...`);
-    for (let attempt = 1; attempt <= MAX_IMPROVEMENT_ATTEMPTS; attempt++) {
-      if (pass2.score >= 80) break;
-      improvementAttempts = attempt;
-      console.log(`[ArticleEngine] Improvement attempt ${attempt}/${MAX_IMPROVEMENT_ATTEMPTS} for node ${nodeId} (current score: ${pass2.score})...`);
-      try {
-        const improvementPrompt = `This article scored ${pass2.score}/100 on writing quality. The target is 80+.
-
+PASS 2 QUALITY SCORE: ${pass2.score}/100
 The scorer gave this specific feedback:
 "${pass2.reason}"
 
-You MUST fix exactly the issues described in that feedback above. Do NOT rewrite the article from scratch.
-Instead, identify the specific sections, sentences, or patterns that caused the low score and fix only those.
-
-Scoring dimensions (for context):
-1. CLARITY & FLOW: Ideas connect logically. Transitions feel natural. The reader never has to re-read a sentence.
-2. HUMAN AUTHENTICITY: Reads as written by a real human expert. No AI fingerprint patterns. No performative declarations. Specific, opinionated, direct.
-3. DEPTH & SPECIFICITY: Uses concrete numbers, named examples, real scenarios. Avoids vague generalisations.
-4. ENGAGEMENT: Holds attention throughout. Varied rhythm. Strong opening. Sections build on each other.
+You MUST fix exactly the issues described above. Do NOT rewrite the article from scratch.
+Identify the specific sections, sentences, or patterns that caused the failures and fix only those.
 
 Rules for this improvement pass:
-- Fix the specific issues raised in the scorer feedback — do not make unrelated changes
-- Do NOT change the structure, headings, keyword usage, or overall length
+- Fix the specific Pass 1 failures listed above (keyword placement, meta fields, link requirements)
+- Fix the specific Pass 2 issues raised in the scorer feedback
+- Do NOT change the structure, headings, or overall length
 - Do NOT rewrite sections that are already working well
-- Do NOT add or remove internal links, schema markup, or the closing CTA section
+- Do NOT add or remove schema markup or the closing CTA section
 - Do NOT make it sound more AI-generated — make it sound more like a trusted human expert
 - Use Australian English spelling
 
@@ -2018,6 +1523,7 @@ Return the improved article HTML body only, wrapped in:
 
 ${bodyHtml}`;
 
+      try {
         const improvementResult = await invokeLLMWithCost(
           {
             messages: [{ role: "user", content: improvementPrompt }],
@@ -2034,54 +1540,53 @@ ${bodyHtml}`;
               .map(b => b.text ?? "")
               .join("");
 
-        // Extract from delimiters — fall back to raw if no delimiters found
         const delimMatch = rawImprovement.match(/<IMPROVED_HTML>([\s\S]*?)<\/IMPROVED_HTML>/i);
         const improvedHtml = delimMatch ? delimMatch[1].trim() : rawImprovement.trim();
 
         if (improvedHtml && improvedHtml.length > 100) {
           bodyHtml = improvedHtml;
+          wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+          // Re-score Pass 2 after improvement
           const improvedPass2 = await runPass2Scorer(bodyHtml, ctx.primaryKeyword, userId);
-          console.log(`[ArticleEngine] Improvement attempt ${attempt}: score ${pass2.score} → ${improvedPass2.score} for node ${nodeId}`);
+          console.log(`[ArticleEngine] Improvement pass: Pass 2 score ${pass2.score} → ${improvedPass2.score} for node ${nodeId}`);
           pass2 = improvedPass2;
         } else {
-          console.warn(`[ArticleEngine] Improvement attempt ${attempt} returned no usable HTML for node ${nodeId} — keeping current`);
+          console.warn(`[ArticleEngine] Improvement pass returned no usable HTML for node ${nodeId} — keeping original`);
         }
       } catch (err) {
-        console.warn(`[ArticleEngine] Improvement attempt ${attempt} failed for node ${nodeId}:`, err);
+        console.warn(`[ArticleEngine] Improvement pass failed for node ${nodeId}:`, err);
       }
     }
-    if (pass2.score < 80) {
-      console.warn(`[ArticleEngine] Pass 2 quality floor: still ${pass2.score} after ${improvementAttempts} attempt(s) for node ${nodeId} — will store as needs_review`);
+
+    // =========================================================================
+    // STEP 6 — DERIVE BADGE AND RETURN
+    // =========================================================================
+    let { internalScore, statusBadge } = deriveStatusBadge(pass1.score, pass2.score);
+    if (pass2.score < 80 && improvementAttempts > 0) {
+      statusBadge = "needs_review";
+      console.log(`[ArticleEngine] Badge overridden to needs_review for node ${nodeId} (Pass 2 score ${pass2.score} after improvement attempt)`);
     }
-  }
 
-  // --- Derive badge ---
-  // If Pass 2 score is still below 80 after all improvement attempts, force needs_review
-  // so the user knows manual editing is required regardless of Pass 1 score.
-  let { internalScore, statusBadge } = deriveStatusBadge(pass1.score, pass2.score);
-  if (pass2.score < 80 && improvementAttempts > 0) {
-    statusBadge = "needs_review";
-    console.log(`[ArticleEngine] Badge overridden to needs_review for node ${nodeId} (Pass 2 score ${pass2.score} after ${improvementAttempts} improvement attempt(s))`);
-  }
-  console.log(`[ArticleEngine] Final score: ${internalScore} (${statusBadge}) for node ${nodeId}`);
+    const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1);
+    console.log(`[ArticleEngine] Complete for node ${nodeId}: Pass 1 ${pass1.score}/100, Pass 2 ${pass2.score}/100, badge=${statusBadge}, total=${totalElapsed}s`);
 
-  return {
-    title,
-    metaTitle,
-    metaDescription,
-    bodyHtml,
-    bodyMarkdown,
-    schemaMarkup,
-    faqItems: ctx.level === "cluster" ? null : faqItems,
-    wordCount,
-    urlSlug: ctx.urlSlug,
-    internalScore,
-    statusBadge,
-    pass1Points: pass1.points,
-    pass1Metrics: pass1.details,
-    pass2Score: pass2.score,
-    pass2Reason: pass2.reason,
-  };
+    return {
+      title,
+      metaTitle,
+      metaDescription,
+      bodyHtml,
+      bodyMarkdown,
+      schemaMarkup,
+      faqItems,
+      wordCount,
+      urlSlug: ctx.urlSlug,
+      internalScore,
+      statusBadge,
+      pass1Points: pass1.points,
+      pass1Metrics: pass1.details,
+      pass2Score: pass2.score,
+      pass2Reason: pass2.reason,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[ArticleEngine] generateSingleArticle failed for businessId=${businessId} nodeId=${nodeId}:`, message);
