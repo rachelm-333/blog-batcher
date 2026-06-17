@@ -197,19 +197,21 @@ describe("16-point Authority Standard in generation prompt", () => {
     expect(prompt).toContain("1%");
   });
 
-  it("Prompt instructs to count keyword appearances and enforce density before finalising", () => {
-    expect(prompt).toContain("count keyword appearances");
-    expect(prompt).toContain("count is below 4");
+  it("Prompt instructs keyword density rule with minimum 4 appearances", () => {
+    // New single-pass prompt enforces density via the 16-point Authority Standard rule 1
+    expect(prompt).toContain("MINIMUM of 4 times");
+    expect(prompt).toContain("1%");
   });
 
   it("Prompt includes keyword in H1 rule (point 2)", () => {
     expect(prompt).toContain("KEYWORD IN H1");
   });
 
-  it("Prompt requires keyword in H2 (not just H3) — point 3 is mandatory", () => {
+  it("Prompt requires keyword in H2 (not just H3)", () => {
     expect(prompt).toContain("KEYWORD IN H2");
     expect(prompt).toContain("AT LEAST ONE <h2> heading");
-    expect(prompt).toContain("mandatory");
+    // The 16-point header declares all points are mandatory
+    expect(prompt).toContain("ALL POINTS ARE MANDATORY");
   });
 
   it("Prompt instructs keyword within first 100 words of body text — point 5", () => {
@@ -777,13 +779,20 @@ describe("buildGenerationPrompt — single-pass engine", () => {
     expect(prompt).toContain(ctx.ctaUrl);
   });
 
-  it("Requires JSON output format with all required fields", () => {
+  it("Requires delimiter-based output format with METADATA and ARTICLE_HTML sections", () => {
     const ctx = makeContext();
     const prompt = buildGenerationPrompt(ctx);
-    expect(prompt).toContain('"bodyHtml"');
+    // New delimiter format — body is outside JSON
+    expect(prompt).toContain("<METADATA>");
+    expect(prompt).toContain("</METADATA>");
+    expect(prompt).toContain("<ARTICLE_HTML>");
+    expect(prompt).toContain("</ARTICLE_HTML>");
+    // Metadata fields still present (inside the METADATA JSON example)
     expect(prompt).toContain('"metaTitle"');
     expect(prompt).toContain('"metaDescription"');
     expect(prompt).toContain('"schemaMarkup"');
+    // Body HTML is NOT embedded in JSON
+    expect(prompt).not.toContain('"bodyHtml"');
   });
 
   it("Includes customer intelligence when problemsSolved is set", () => {
@@ -1016,6 +1025,10 @@ describe("Improvement pass — TOKEN_LIMITS and constants", () => {
 
   it("TOKEN_LIMITS.pass2 is 4096", () => {
     expect(TOKEN_LIMITS.pass2).toBe(4096);
+  });
+
+  it("TOKEN_LIMITS.section is 16000 (raised to fit full article + metadata)", () => {
+    expect(TOKEN_LIMITS.section).toBe(16000);
   });
 
   it("TOKEN_LIMITS defines all required pass types", () => {

@@ -41,7 +41,7 @@ import { getDb } from "./db";
 // ---------------------------------------------------------------------------
 export const TOKEN_LIMITS = {
   outline: 4096,       // Outline JSON: small structured call
-  section: 12000,      // Section HTML: longest single call
+  section: 16000,      // Section HTML: longest single call (raised to fit full 2000+ word article + metadata)
   scrub: 12000,        // AI fingerprint scrub
   improvement: 12000,  // Pass 2 quality improvement
   condensation: 12000, // Word-count condensation
@@ -476,185 +476,14 @@ export async function buildArticleContext(
 // Prompt builder — 16-point Authority Standard
 // ---------------------------------------------------------------------------
 
+/**
+ * Exported alias for buildSinglePassPrompt — used by tests and external callers.
+ * Delegates to the internal single-pass prompt builder (delimiter-based format).
+ */
 export function buildGenerationPrompt(ctx: ArticleContext): string {
-  const articleTypeLabel: Record<string, string> = {
-    cornerstone_guide: "Cornerstone Guide",
-    top_10_list: "Top 10 List",
-    how_to: "How-To Article",
-    the_why: "The Why Article",
-    comparison: "Comparison Article",
-    myth_busting: "Myth-Busting Article",
-    specialist_post: "Specialist Post",
-  };
-
-  const typeLabel = articleTypeLabel[ctx.articleType] ?? ctx.articleType;
-  const isCornerstoneOrPillar = ctx.level === "cornerstone" || ctx.level === "pillar";
-
-  const servicesText = ctx.services
-    .map(s => `- ${s.name}${s.pageUrl ? ` (${s.pageUrl})` : ""}`)
-    .join("\n");
-
-  const competitorText = ctx.competitors.length
-    ? ctx.competitors.map(c => `- ${c.name}${c.url ? ` (${c.url})` : ""}`).join("\n")
-    : "None provided";
-
-  const internalLinkContext = [
-    ctx.parentCornerstoneUrl ? `Parent Cornerstone URL: ${ctx.parentCornerstoneUrl}` : null,
-    ctx.parentPillarUrl ? `Parent Pillar URL: ${ctx.parentPillarUrl}` : null,
-    ctx.siblingUrls?.length ? `Sibling Cluster URLs for cross-linking: ${ctx.siblingUrls.join(", ")}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  // Build optional internal page links section — only include pages that have URLs
-  const optionalPageLinks: string[] = [];
-  if (ctx.contactPageUrl) optionalPageLinks.push(`Contact Page: ${ctx.contactPageUrl}`);
-  if (ctx.bookingsPageUrl) optionalPageLinks.push(`Bookings/Appointments Page: ${ctx.bookingsPageUrl}`);
-  if (ctx.testimonialsPageUrl) optionalPageLinks.push(`Testimonials/Reviews Page: ${ctx.testimonialsPageUrl}`);
-  if (ctx.shopUrl) optionalPageLinks.push(`Shop/E-commerce Page: ${ctx.shopUrl}`);
-  if (ctx.otherInternalLinks?.length) {
-    ctx.otherInternalLinks.forEach(l => optionalPageLinks.push(`${l.label}: ${l.url}`));
-  }
-  const optionalLinksText = optionalPageLinks.length
-    ? optionalPageLinks.join("\n")
-    : null;
-
-  return `You are an expert SEO content writer producing a high-authority blog article for an Australian business.
-
-=== BUSINESS CONTEXT ===
-Business Name: ${ctx.businessName}
-Industry: ${ctx.industry}
-Location: ${ctx.location}
-Unique Value Proposition: ${ctx.uvp}
-Social Proof: ${ctx.socialProof || "Not provided"}
-${(ctx.linkedinUrl || ctx.facebookUrl || ctx.instagramHandle) ? `Social Presence: This business has verified social profiles:\n${ctx.linkedinUrl ? `- LinkedIn: ${ctx.linkedinUrl}\n` : ""}${ctx.facebookUrl ? `- Facebook: ${ctx.facebookUrl}\n` : ""}${ctx.instagramHandle ? `- Instagram: ${ctx.instagramHandle}\n` : ""}These can be referenced as evidence of established business presence.` : ""}
-Target Audiences: ${ctx.audiences.join(", ") || "General audience"}
-
-Services/Products (use these for internal CTA links):
-${servicesText || "No services listed"}
-
-Primary CTA: ${ctx.ctaText} → ${ctx.ctaUrl}
-${optionalLinksText ? `\nAdditional internal pages you may link to naturally:\n${optionalLinksText}` : ""}
-${!ctx.bookingsPageUrl ? "IMPORTANT: Do NOT mention bookings, appointments, or scheduling — this business has not provided a bookings URL." : ""}
-
-Competitors (for Comparison articles only):
-${competitorText}
-
-=== VOICE BRIEF ===
-${ctx.voiceBrief || "Write in a professional, authoritative, and helpful tone. Sound like a real human expert."}
-
-=== ARTICLE SPECIFICATION ===
-Article Type: ${typeLabel}
-URL Slug: /${ctx.urlSlug}
-Primary Keyword: ${ctx.primaryKeyword}
-Secondary Keywords: ${ctx.secondaryKeywords.join(", ") || "None"}
-PAA Question to Answer: ${ctx.paaQuestion || "Not specified — answer the most likely search intent question"}
-Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (MINIMUM: ${ctx.wordCountMin} words — you MUST write at least ${ctx.wordCountMin} words; HARD MAXIMUM: ${ctx.wordCountMax} words — do not exceed). A ${ctx.level} article that is shorter than ${ctx.wordCountMin} words is UNACCEPTABLE and will be rejected.
-
-=== INTERNAL LINK CONTEXT ===
-${internalLinkContext || "No parent/sibling articles yet — this is a Cornerstone."}
-
-All article slugs in this batch (use for internal blog links):
-${ctx.allBatchSlugs.slice(0, 20).join(", ")}
-
-=== 16-POINT AUTHORITY STANDARD — ALL POINTS ARE MANDATORY ===
-
-1. PRIMARY KEYWORD DENSITY: The primary keyword "${ctx.primaryKeyword}" must appear a MINIMUM of 4 times across the full article (H1 title, H2 headings, and body text combined). HARD MAXIMUM: keyword density must not exceed 1% of total word count (e.g. for a 1,000-word article, no more than 10 mentions). After drafting, count keyword appearances and total words. If count is below 4, add the keyword naturally in headings or body paragraphs before finalising. Never stuff — every use must read naturally.
-2. KEYWORD IN H1: Primary keyword must appear verbatim in the H1 heading (the article title).
-3. KEYWORD IN H2: Primary keyword must appear verbatim in AT LEAST ONE <h2> heading. This is mandatory — not optional, not an H3. An H2.
-4. KEYWORD IN H3: If the article uses H3 subheadings, the primary keyword MUST appear in at least one H3. If the article has no H3 headings at all, this rule is automatically satisfied — do not force H3s just to satisfy it.
-5. KEYWORD IN FIRST 100 WORDS: Primary keyword must appear naturally within the first 100 words of body text (not counting the H1 title). Do not bury it — place it in the opening paragraph.
-6. KEYWORD IN URL SLUG: The URL slug is already set to /${ctx.urlSlug}. Ensure the H1 title reflects the same topic territory.
-7. META TITLE: Must include primary keyword verbatim. Maximum 60 characters. Written for click-through rate.
-8. META DESCRIPTION: Must include the EXACT primary keyword phrase "${ctx.primaryKeyword}" verbatim (do not insert extra words into the phrase). Exactly 140–160 characters. Written for CTR.
-9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
-10. EXTERNAL AUTHORITY LINK: You MUST include at least one hyperlink to a real, high-authority external source — a government website (.gov.au), an industry body, or a nationally recognised publication. Use descriptive anchor text (never a raw URL). This link must be genuine and relevant to the article topic. Examples: Australian Building Codes Board, Fair Work Commission, Australian Bureau of Statistics, relevant industry association.
-11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
-12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs listed below — do NOT invent or guess URLs. Use descriptive anchor text. No keyword cannibalization.
-   Available batch article slugs (use these exact paths):
-   ${ctx.allBatchSlugs.slice(0, 20).join(", ")}
-13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
-14. E-E-A-T SIGNALS: Weave in Experience, Expertise, Authoritativeness, and Trustworthiness. Include social proof signals: ${ctx.socialProof || "mention industry experience"}.
-${ctx.problemsSolved ? `
-CUSTOMER INTELLIGENCE — USE THIS TO WRITE LIKE A HUMAN WHO KNOWS THESE CUSTOMERS:
-What the customer's situation was BEFORE finding this business:
-"${ctx.customerSituationBefore ?? 'not provided'}"
-What they were frustrated with or had already tried:
-"${ctx.customerFrustrations ?? 'not provided'}"
-What changed or became possible after working with this business:
-"${ctx.customerTransformation ?? 'not provided'}"
-Summary (use for CTA and closing sections):
-"${ctx.problemsSolved}"
-WRITING RULES BASED ON THIS INTELLIGENCE:
-- Use the customer's actual situation (field 1) to open the first body section — describe the scenario in second person ("If you've ever found yourself...") or third person ("Most [industry] clients come to us after...")
-- Use the frustrations (field 2) when writing any section about common mistakes, what to avoid, or why other approaches fail
-- Use the transformation (field 3) in the conclusion and CTA — what the reader can achieve, not just what the business offers
-- Pull specific words and phrases from these answers where they fit naturally — this is how the article sounds like it was written by someone who actually knows the customer, not an AI that read a brief
-` : ""}${ctx.contentPlanDirection ? `
-WRITER DIRECTION FROM PUBLISHER:
-The person publishing this article has added this specific direction:
-"${ctx.contentPlanDirection}"
-Follow this direction. If it specifies topics, examples, or angles to cover — include them. This takes priority over general guidelines.
-` : ""}15. HUMAN AUTHENTICITY: No AI fingerprint patterns. Content must solve the reader's problem completely. Must be cohesive with the rest of the batch.
-   HARD RULES — HUMAN AUTHENTICITY:
-   - DO NOT make up statistics (e.g. "over 500 clients since 2018", "9 out of 10 businesses") without a real, citable source. If you cannot cite a real source, do not include the statistic.
-   - DO NOT use generic credibility claims such as "industry-leading", "trusted by thousands", "proven track record", or "years of expertise" without specific, verifiable backing.
-   - If citing business experience or client numbers, be specific and real — or omit entirely. Fabricated social proof is worse than no social proof.
-16. SEARCH INTENT RESOLUTION: The article title makes a promise to the reader. You MUST deliver on that promise.
-   HARD RULES — SEARCH INTENT RESOLUTION:
-   - If the title promises "how to start X", "how to do X", or "step-by-step guide to X" — deliver actual numbered step-by-step actionable instructions. Do NOT substitute framework overviews, general principles, or conceptual summaries.
-   - Every H2 section MUST contain at least one specific, actionable instruction the reader can execute today. Sections that only explain concepts without telling the reader what to DO are not acceptable.
-   - Actionable instructions must be concrete: name the tool, form, website, phone number, or exact action — not vague directions like "research your options" or "consider your goals".
-17. ARTICLE TYPE STRUCTURE: Format and structure this as a ${typeLabel}. The title must signal specific territory ownership.
-
-=== CLOSING CTA SECTION (MANDATORY) ===
-Every article MUST end with a dedicated CTA section using this exact structure:
-<h2>Ready to Take the Next Step?</h2>
-<p>[1–2 sentences summarising the value the reader has just gained and why acting now makes sense.]</p>
-<p>${ctx.ctaText}: <a href="${ctx.ctaUrl}">${ctx.ctaText}</a></p>
-
-Customise the H2 heading and body copy to match the article topic and brand voice — do not use the generic placeholder text above verbatim. The CTA link MUST point to ${ctx.ctaUrl}.
-
-=== ABSOLUTE RULES ===
-- DO NOT fabricate statistics, quotes, or data. If you reference a statistic, it must come from a real, citable source. Use the external authority link as the citation anchor.
-- DO NOT invent URLs. Every link in the article must use a real, verifiable URL. For internal links, use only the batch slugs listed in point 12. For external links, use only well-known, verifiable domains (.gov.au, industry bodies, major publications). If no real external link is available for a claim, do not include one.
-- DO NOT use em dashes (—) excessively.
-- DO NOT open with a rhetorical question.
-- DO NOT introduce sections with a bolded question followed by an answer paragraph — this is a formulaic AI pattern.
-- DO NOT use formulaic section structures where every H3 follows the exact same pattern.
-- DO NOT open paragraphs with "This means that...".
-- DO NOT use these phrases (banned): "in today's world", "it's important to note", "it's worth noting", "delve into", "game-changer", "game-changing", "leverage", "synergy", "transformative", "non-negotiable", "minefield blindfolded", "the truth is", "let's be honest", "the reality is", "make no mistake", "here's the thing", "the fact is", "simply put", "it's no secret", "spoiler alert", "the good news is", "the bad news is", "in other words", "to put it simply".
-- DO NOT use strong declarations that sound performative or designed to impress rather than inform.
-- DO NOT repeat sentence structures — vary sentence length, mixing short punchy sentences with longer explanatory ones.
-- Write as a knowledgeable human practitioner who has actually done this work, not as an AI summarising a topic.
-- Use specific numbers, real examples, and concrete details rather than general statements.
-- Sections should feel like they were written by someone with direct experience — conversational but authoritative, like a trusted advisor explaining something, not a content farm.
-- Use Australian English spelling (e.g., "optimise" not "optimize", "colour" not "color").
-
-=== WRITING QUALITY SCORING CRITERIA ===
-This article will be scored on four dimensions after generation. Write to score 80+ on all four:
-1. CLARITY & FLOW: Ideas connect logically. Transitions feel natural, not mechanical. The reader never has to re-read a sentence.
-2. HUMAN AUTHENTICITY: Reads as written by a real human expert. No AI fingerprint patterns. No performative declarations. Specific, opinionated, direct.
-3. DEPTH & SPECIFICITY: Uses concrete numbers, named examples, real scenarios. Avoids vague generalisations. Demonstrates genuine subject-matter knowledge.
-4. ENGAGEMENT: Holds the reader's attention throughout. Varied rhythm. Strong opening. Sections that build on each other rather than repeating the same point.
-
-=== REQUIRED OUTPUT FORMAT (JSON) ===
-Return a single JSON object with these exact fields:
-{
-  "title": "H1 title of the article",
-  "metaTitle": "SEO meta title (max 60 chars, includes primary keyword)",
-  "metaDescription": "SEO meta description (140–160 chars exactly, includes primary keyword)",
-  "bodyHtml": "Full article body as clean HTML. FORMATTING RULES: (1) Use h2, h3, p, ul, ol, li, a, strong, em, blockquote tags — no inline styles. (2) BULLET LISTS: Every <li> must be a direct child of <ul> or <ol>. Add a blank line (newline) between each <li> item so Wix/WordPress renders spacing between bullets. Do NOT indent <ul> tags — keep them flush with the left margin. (3) FAQ SECTION: If the article includes a FAQ, format each Q&A pair as: <div class=\"faq-item\"><hr><p><strong>Q: [question]</strong></p><p>A: [answer]</p></div> — the <hr> creates a visible divider line between each Q&A pair. The FAQ section must start with <h2>Frequently Asked Questions</h2>. Do NOT use Q: and A: as plain text paragraphs — always wrap them in this structure.",
-  "bodyMarkdown": "Full article body as Markdown",
-  "schemaMarkup": "JSON-LD schema as a string (Article + Breadcrumb${isCornerstoneOrPillar ? " + FAQ" : ""})",
-  "faqItems": ${isCornerstoneOrPillar ? '[{"question": "...", "answer": "..."}] — include 3–5 FAQ items' : "null — Cluster articles do not get FAQ"},
-  "wordCount": <integer — actual word count of bodyHtml>,
-  "externalLinkPresent": <boolean>,
-  "internalCtaLinkPresent": <boolean>,
-  "internalBlogLinksPresent": <boolean>,
-  "schemaPresent": <boolean>
-}`;
+  return buildSinglePassPrompt(ctx, new Date().getFullYear());
 }
+
 
 // ---------------------------------------------------------------------------
 // AI fingerprint scrub pass (from scope Section 6.4)
@@ -1182,22 +1011,26 @@ Customise the H2 heading and body copy to match the article topic and brand voic
 - Use specific numbers, real examples, and concrete details rather than general statements.
 - Vary sentence length — mix short punchy sentences with longer explanatory ones.
 
-=== REQUIRED OUTPUT FORMAT (JSON) ===
-Return a single JSON object with these exact fields:
-{
-  "title": "H1 title of the article (contains primary keyword verbatim)",
-  "metaTitle": "SEO meta title (max 60 chars, includes primary keyword)",
-  "metaDescription": "SEO meta description (140–160 chars exactly, includes exact primary keyword phrase)",
-  "bodyHtml": "Full article body as clean HTML. Use h2, h3, p, ul, ol, li, a, strong, em, blockquote tags — no inline styles. BULLET LISTS: Every <li> must be a direct child of <ul> or <ol>. Add a blank line between each <li> item. FAQ SECTION: If the article includes a FAQ, format each Q&A pair as: <div class=\\"faq-item\\"><hr><p><strong>Q: [question]</strong></p><p>A: [answer]</p></div>. The FAQ section must start with <h2>Frequently Asked Questions</h2>.",
-  "bodyMarkdown": "Full article body as Markdown (convert the HTML to clean Markdown)",
-  "schemaMarkup": "JSON-LD schema as a string (Article + Breadcrumb${isCornerstoneOrPillar ? " + FAQ" : ""})",
-  "faqItems": ${isCornerstoneOrPillar ? '[{"question": "...", "answer": "..."}] — include 3–5 FAQ items' : "null — Cluster articles do not get FAQ"},
-  "wordCount": <integer — actual word count of bodyHtml>,
-  "externalLinkPresent": <boolean>,
-  "internalCtaLinkPresent": <boolean>,
-  "internalBlogLinksPresent": <boolean>,
-  "schemaPresent": <boolean>
-}`;
+=== REQUIRED OUTPUT FORMAT ===
+Respond using EXACTLY this structure — two clearly delimited sections:
+
+<METADATA>
+{"title": "...", "metaTitle": "...", "metaDescription": "...", "schemaMarkup": "JSON-LD schema string (Article + Breadcrumb${isCornerstoneOrPillar ? " + FAQ" : ""})", "faqItems": ${isCornerstoneOrPillar ? '[{"question": "...", "answer": "..."}]' : "null"}, "externalLinkPresent": true, "internalCtaLinkPresent": true, "internalBlogLinksPresent": true, "schemaPresent": true}
+</METADATA>
+<ARTICLE_HTML>
+...the full article body as clean HTML here...
+</ARTICLE_HTML>
+
+CRITICAL RULES FOR OUTPUT FORMAT:
+- Output ONLY the two delimited sections above. No preamble, no explanation, no markdown fences.
+- The METADATA block must be a single-line valid JSON object. Use double-quotes for all JSON keys and string values.
+- The ARTICLE_HTML block must contain the COMPLETE article HTML — do NOT truncate it.
+- Do NOT embed the article HTML inside the JSON. The HTML goes between ARTICLE_HTML tags only.
+- metaTitle: max 60 characters, must include the primary keyword.
+- metaDescription: exactly 140-160 characters, must include the exact primary keyword phrase.
+- faqItems: ${isCornerstoneOrPillar ? "include 3-5 FAQ items as a JSON array of {question, answer} objects" : "set to null — Cluster articles do not get FAQ"}.
+- BULLET LISTS in HTML: every li must be a direct child of ul or ol. Add a blank line between each li item.
+- FAQ SECTION in HTML: format each Q&A as: <div class="faq-item"><hr><p><strong>Q: [question]</strong></p><p>A: [answer]</p></div>. Start the FAQ section with <h2>Frequently Asked Questions</h2>.`;
 }
 
 /**
@@ -1385,7 +1218,54 @@ export async function generateSingleArticle(
 
     const prompt = buildSinglePassPrompt(ctx, currentYear);
 
-    let rawArticle: Record<string, unknown> | null = null;
+    // -------------------------------------------------------------------------
+    // Helper: parse the delimiter-based response format
+    // Returns null if the response is truncated (missing </ARTICLE_HTML>)
+    // -------------------------------------------------------------------------
+    const parseDelimitedResponse = (raw: string): {
+      title: string; metaTitle: string; metaDescription: string;
+      bodyHtml: string; schemaMarkup: string;
+      faqItems: Array<{ question: string; answer: string }> | null;
+    } | null => {
+      const metaMatch = raw.match(/<METADATA>([\s\S]*?)<\/METADATA>/i);
+      const htmlMatch = raw.match(/<ARTICLE_HTML>([\s\S]*?)<\/ARTICLE_HTML>/i);
+
+      // If the closing </ARTICLE_HTML> tag is missing, the response was truncated
+      if (!htmlMatch) {
+        console.warn(`[ArticleEngine] Response truncated for node ${nodeId} — no closing </ARTICLE_HTML> tag found`);
+        return null;
+      }
+
+      const bodyHtml = htmlMatch[1].trim();
+
+      // Parse the short metadata JSON
+      let metaObj: Record<string, unknown> = {};
+      if (metaMatch) {
+        try {
+          const metaRaw = metaMatch[1].trim();
+          metaObj = JSON.parse(metaRaw);
+        } catch (jsonErr) {
+          console.error(`[ArticleEngine] <METADATA> JSON parse failed for node ${nodeId}:`, jsonErr);
+          console.error(`[ArticleEngine] Raw metadata block:`, metaMatch[1].slice(0, 500));
+          // Don't throw — we still have the HTML body; derive defaults below
+        }
+      }
+
+      const faqItemsRaw = Array.isArray(metaObj.faqItems)
+        ? (metaObj.faqItems as Array<{ question: string; answer: string }>)
+        : null;
+
+      return {
+        title: String(metaObj.title ?? ""),
+        metaTitle: String(metaObj.metaTitle ?? ""),
+        metaDescription: String(metaObj.metaDescription ?? ""),
+        bodyHtml,
+        schemaMarkup: String(metaObj.schemaMarkup ?? ""),
+        faqItems: ctx.level === "cluster" ? null : faqItemsRaw,
+      };
+    }
+
+    let parsedResult: ReturnType<typeof parseDelimitedResponse> = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const result = await invokeLLMWithCost(
@@ -1393,37 +1273,41 @@ export async function generateSingleArticle(
             messages: [
               {
                 role: "system" as const,
-                content: "You are an expert SEO content writer. Return ONLY a valid JSON object matching the specified schema. No markdown, no code fences, no explanation.",
+                content: "You are an expert SEO content writer. Follow the output format instructions exactly. Output ONLY the two delimited sections: <METADATA>...</METADATA> and <ARTICLE_HTML>...</ARTICLE_HTML>. No preamble, no explanation, no markdown fences.",
               },
               { role: "user" as const, content: prompt },
             ],
-            response_format: { type: "json_object" },
-            max_tokens: TOKEN_LIMITS.section, // 12000 tokens
+            max_tokens: TOKEN_LIMITS.section, // 16000 tokens
           },
           { userId, feature: "article_generation" }
         );
         const raw = result.choices[0]?.message?.content ?? "";
-        const stripped = (typeof raw === "string" ? raw : JSON.stringify(raw))
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/\s*```$/i, "")
-          .trim();
-        rawArticle = JSON.parse(stripped);
-        break;
+        const rawStr = typeof raw === "string" ? raw : JSON.stringify(raw);
+
+        parsedResult = parseDelimitedResponse(rawStr);
+        if (parsedResult !== null) {
+          break; // success
+        }
+        // parsedResult is null = truncated response — retry
+        if (attempt === 2) {
+          throw new Error(`Single-pass article generation truncated after ${attempt} attempts — response missing </ARTICLE_HTML> closing tag`);
+        }
+        console.warn(`[ArticleEngine] Write attempt ${attempt} truncated for node ${nodeId} — retrying with same token limit...`);
       } catch (err) {
         if (attempt === 2) throw new Error(`Single-pass article generation failed after 2 attempts: ${err}`);
         console.warn(`[ArticleEngine] Write attempt ${attempt} failed for node ${nodeId} — retrying...`);
       }
     }
 
-    const parsed = rawArticle!;
-    let title = String(parsed.title ?? "");
-    let metaTitle = String(parsed.metaTitle ?? "");
-    let metaDescription = String(parsed.metaDescription ?? "");
-    let bodyHtml = String(parsed.bodyHtml ?? "");
-    let bodyMarkdown = String(parsed.bodyMarkdown ?? "");
-    const schemaMarkup = String(parsed.schemaMarkup ?? "");
-    const faqItemsRaw = Array.isArray(parsed.faqItems) ? (parsed.faqItems as Array<{ question: string; answer: string }>) : null;
-    const faqItems = ctx.level === "cluster" ? null : faqItemsRaw;
+    const parsed = parsedResult!;
+    let title = parsed.title;
+    let metaTitle = parsed.metaTitle;
+    let metaDescription = parsed.metaDescription;
+    let bodyHtml = parsed.bodyHtml;
+    // bodyMarkdown: derive from bodyHtml (strip tags) as a lightweight fallback
+    let bodyMarkdown = bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const schemaMarkup = parsed.schemaMarkup;
+    const faqItems = parsed.faqItems;
 
     const writeDone = Date.now();
     let wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
