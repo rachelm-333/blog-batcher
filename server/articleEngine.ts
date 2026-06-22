@@ -366,6 +366,8 @@ export interface ArticleContext {
   linkedinUrl?: string;
   facebookUrl?: string;
   instagramHandle?: string;
+  /** Exhaustive allowlist of every URL the article is permitted to link to. */
+  linkAllowlist: string[];
 }
 
 /**
@@ -469,6 +471,43 @@ export async function buildArticleContext(
     linkedinUrl: biz.linkedinUrl ?? undefined,
     facebookUrl: biz.facebookUrl ?? undefined,
     instagramHandle: biz.instagramHandle ?? undefined,
+    // -----------------------------------------------------------------------
+    // LINK ALLOWLIST — every URL the article is permitted to link to.
+    // Nothing outside this list may appear as an href in the generated HTML.
+    // -----------------------------------------------------------------------
+    linkAllowlist: (() => {
+      const urls = new Set<string>();
+      // Business real pages
+      if (biz.websiteUrl) urls.add(biz.websiteUrl);
+      if (biz.primaryCtaUrl) urls.add(biz.primaryCtaUrl);
+      if (biz.bookingsPageUrl) urls.add(biz.bookingsPageUrl);
+      if (biz.contactPageUrl) urls.add(biz.contactPageUrl);
+      if (biz.testimonialsPageUrl) urls.add(biz.testimonialsPageUrl);
+      if (biz.shopUrl) urls.add(biz.shopUrl);
+      if (biz.linkedinUrl) urls.add(biz.linkedinUrl);
+      if (biz.facebookUrl) urls.add(biz.facebookUrl);
+      if (biz.instagramHandle) urls.add(`https://instagram.com/${biz.instagramHandle.replace(/^@/, "")}`);
+      // Service page URLs
+      services.forEach(s => { if (s.pageUrl) urls.add(s.pageUrl); });
+      // Other internal links
+      if (biz.otherInternalLinks) {
+        (biz.otherInternalLinks as Array<{ label: string; url: string }>).forEach(l => { if (l.url) urls.add(l.url); });
+      }
+      // Real batch article slugs (relative paths)
+      allOrderedNodes.forEach(n => { if (n.urlSlug) urls.add(`/${n.urlSlug}`); });
+      // Parent article URLs
+      if (node.parentCornerstoneId) {
+        const pcs = allOrderedNodes.find(n => n.nodeId === node.parentCornerstoneId);
+        if (pcs?.urlSlug) urls.add(`/${pcs.urlSlug}`);
+      }
+      if (node.parentPillarId) {
+        const pp = allOrderedNodes.find(n => n.nodeId === node.parentPillarId);
+        if (pp?.urlSlug) urls.add(`/${pp.urlSlug}`);
+      }
+      // Competitor external URLs
+      competitors.forEach(c => { if (c.websiteUrl) urls.add(c.websiteUrl); });
+      return Array.from(urls).filter(Boolean);
+    })(),
   };
 }
 
@@ -488,6 +527,67 @@ export function buildGenerationPrompt(ctx: ArticleContext): string {
 // ---------------------------------------------------------------------------
 // AI fingerprint scrub pass (from scope Section 6.4)
 // ---------------------------------------------------------------------------
+
+/**
+ * Parse every <a href="..."> in the article HTML.
+ * Any href that is NOT in the allowlist (and is NOT an external authority link)
+ * is stripped — the <a> tag is removed but the anchor text is kept as plain text.
+ *
+ * External authority links (http/https links to domains NOT in the allowlist) are
+ * allowed through because point 10 of the Authority Standard requires a real
+ * government / industry body link that the engine chooses at generation time.
+ *
+ * Returns the cleaned HTML, the count of stripped links, and the stripped URLs.
+ */
+export function validateAndStripLinks(
+  html: string,
+  allowlist: string[]
+): { html: string; strippedCount: number; strippedUrls: string[] } {
+  const strippedUrls: string[] = [];
+
+  // Build a normalised set for fast lookup
+  const allowed = new Set(allowlist.map(u => u.toLowerCase().replace(/\/$/, "")));
+
+  // Replace every <a ...> ... </a> block
+  const cleaned = html.replace(
+    /<a\b([^>]*?)>([\s\S]*?)<\/a>/gi,
+    (fullMatch, attrs: string, innerText: string) => {
+      // Extract the href value
+      const hrefMatch = attrs.match(/href=["']([^"']*)["']/i);
+      if (!hrefMatch) {
+        // No href — keep the tag as-is (e.g. anchor targets)
+        return fullMatch;
+      }
+      const href = hrefMatch[1].trim();
+      const hrefNorm = href.toLowerCase().replace(/\/$/, "");
+
+      // External links (http/https) — check if the domain is in the allowlist
+      if (href.startsWith("http://") || href.startsWith("https://")) {
+        // Check exact match first
+        if (allowed.has(hrefNorm)) return fullMatch;
+        // Check if any allowlist entry is a prefix of this URL (e.g. service page sub-path)
+        const inAllowlist = allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")));
+        if (inAllowlist) return fullMatch;
+        // External authority links are permitted — they are real external URLs the model
+        // chose for point 10. We identify them as http(s) links to domains NOT in the
+        // allowlist. Allow them through.
+        return fullMatch;
+      }
+
+      // Relative links — must be in the allowlist
+      if (allowed.has(hrefNorm)) return fullMatch;
+      // Check prefix match for relative paths
+      const inAllowlist = allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")));
+      if (inAllowlist) return fullMatch;
+
+      // Not allowed — strip the <a> tag, keep the inner text
+      strippedUrls.push(href);
+      return innerText;
+    }
+  );
+
+  return { html: cleaned, strippedCount: strippedUrls.length, strippedUrls };
+}
 
 export function buildScrubPrompt(
   bodyHtml: string,
@@ -934,8 +1034,13 @@ Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (MINIMUM: ${ctx.word
 === INTERNAL LINK CONTEXT ===
 ${internalLinkContext || "No parent/sibling articles yet — this is a Cornerstone."}
 
-All article slugs in this batch (use for internal blog links):
-${ctx.allBatchSlugs.slice(0, 20).join(", ")}
+=== ⚠️ LINK ALLOWLIST — CRITICAL RULE ===
+You may ONLY insert links (href attributes) to URLs from this EXACT list. NEVER invent, guess, construct, or modify any URL. If you have no relevant real URL for a point, do not add a link at all. Inserting a URL that is not on this list is a critical failure that will be automatically detected and removed.
+
+ALLOWED URLS:
+${(ctx.linkAllowlist ?? []).map(u => `- ${u}`).join("\n") || "(none — do not insert any links except the external authority link in point 10)"}
+
+Note: External authority links (government, industry body, nationally recognised publication) are exempt from this list — they are real external URLs you choose. All other links MUST be from the list above.
 
 === 16-POINT AUTHORITY STANDARD — ALL POINTS ARE MANDATORY ===
 
@@ -950,7 +1055,7 @@ ${ctx.allBatchSlugs.slice(0, 20).join(", ")}
 9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
 10. EXTERNAL AUTHORITY LINK: You MUST include at least one hyperlink to a real, high-authority external source — a government website (.gov.au), an industry body, or a nationally recognised publication. Use descriptive anchor text. This link must be genuine and relevant to the article topic.
 11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
-12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs listed above — do NOT invent or guess URLs.
+12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs from the LINK ALLOWLIST above — do NOT invent, guess, or construct any URL. If fewer than 2 batch slugs are available, link to as many as exist.
 13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
 14. E-E-A-T SIGNALS: Weave in Experience, Expertise, Authoritativeness, and Trustworthiness. Include social proof signals: ${ctx.socialProof || "mention industry experience"}.
 ${ctx.problemsSolved ? `
@@ -1338,6 +1443,16 @@ export async function generateSingleArticle(
       const capitalised = ctx.primaryKeyword.charAt(0).toUpperCase() + ctx.primaryKeyword.slice(1);
       title = `${capitalised}: ${title}`;
       console.log(`[ArticleEngine] P2 enforcement: prepended keyword into title for node ${nodeId}`);
+    }
+
+    // =========================================================================
+    // STEP 2.6 — LINK VALIDATOR (strip any href not in the allowlist)
+    // =========================================================================
+    const linkValidationResult = validateAndStripLinks(bodyHtml, ctx.linkAllowlist);
+    if (linkValidationResult.strippedCount > 0) {
+      console.warn(`[ArticleEngine] Link validator stripped ${linkValidationResult.strippedCount} hallucinated href(s) for node ${nodeId}: ${linkValidationResult.strippedUrls.join(", ")}`);
+      bodyHtml = linkValidationResult.html;
+      wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
     }
 
     // =========================================================================

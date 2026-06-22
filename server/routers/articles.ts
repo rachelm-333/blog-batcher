@@ -46,6 +46,8 @@ import {
   MIN_DELIVERY_SCORE,
   runPass1Scorer,
   deriveStatusBadge,
+  validateAndStripLinks,
+  buildArticleContext,
 } from "../articleEngine";
 import {
   publishToWordPress,
@@ -2066,11 +2068,10 @@ ${row.bodyHtml ?? ""}
           throw new TRPCError({ code: "BAD_REQUEST", message: "Only failed articles can be kept for review" });
         }
 
-        await db
+                await db
           .update(articles)
           .set({ status: "generated", errorMessage: null })
           .where(eq(articles.id, input.articleId));
-
         return { kept: true };
       } catch (err) {
         if (err instanceof TRPCError) throw err;
@@ -2078,6 +2079,82 @@ ${row.bodyHtml ?? ""}
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: err instanceof Error ? err.message : "Failed to update article status",
+        });
+      }
+    }),
+
+  /**
+   * Strip hallucinated links from all already-generated articles in a business's batch.
+   * Parses every <a href> in each article body and removes any href that is not in the
+   * real URL allowlist (business pages + batch slugs + competitor URLs).
+   * External authority links (gov, industry body) are preserved.
+   * Returns a summary of how many articles were patched and how many links were stripped.
+   */
+  stripHallucinatedLinks: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        // Get all generated articles for this business
+        const allArticles = await db
+          .select({
+            id: articles.id,
+            bodyHtml: articles.bodyHtml,
+            articleNodeId: articles.articleNodeId,
+          })
+          .from(articles)
+          .where(
+            and(
+              eq(articles.businessId, input.businessId),
+              inArray(articles.status, ["generated", "approved", "pending_approval"])
+            )
+          );
+
+        if (allArticles.length === 0) return { patchedCount: 0, totalStripped: 0, details: [] };
+
+        // Build the allowlist from the first article's node (all articles in a batch share the same business)
+        const firstNodeId = allArticles[0].articleNodeId;
+        if (!firstNodeId) return { patchedCount: 0, totalStripped: 0, details: [] };
+
+        const allOrderedNodes = await getOrderedNodes(input.businessId);
+        const firstNode = allOrderedNodes.find(n => n.nodeId === firstNodeId);
+        if (!firstNode) return { patchedCount: 0, totalStripped: 0, details: [] };
+
+        // Build context for the first node to get the allowlist (business pages + batch slugs are shared)
+        const ctx0 = await buildArticleContext(input.businessId, firstNodeId, allOrderedNodes);
+        const allowlist = ctx0.linkAllowlist;
+
+        const details: Array<{ articleId: number; stripped: number; urls: string[] }> = [];
+        let patchedCount = 0;
+        let totalStripped = 0;
+
+        for (const article of allArticles) {
+          if (!article.bodyHtml) continue;
+          const result = validateAndStripLinks(article.bodyHtml, allowlist);
+          if (result.strippedCount > 0) {
+            await db
+              .update(articles)
+              .set({ bodyHtml: result.html })
+              .where(eq(articles.id, article.id));
+            patchedCount++;
+            totalStripped += result.strippedCount;
+            details.push({ articleId: article.id, stripped: result.strippedCount, urls: result.strippedUrls });
+            console.log(`[stripHallucinatedLinks] Article ${article.id}: stripped ${result.strippedCount} link(s): ${result.strippedUrls.join(", ")}`);
+          }
+        }
+
+        console.log(`[stripHallucinatedLinks] Business ${input.businessId}: patched ${patchedCount}/${allArticles.length} articles, ${totalStripped} total links stripped`);
+        return { patchedCount, totalStripped, details };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[stripHallucinatedLinks] Error:", err);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: err instanceof Error ? err.message : "Failed to strip hallucinated links",
         });
       }
     }),
