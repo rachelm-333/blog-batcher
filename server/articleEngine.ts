@@ -160,6 +160,18 @@ export const BANNED_PHRASES = [
   "spoiler alert",
   "the good news is",
   "the bad news is",
+  // Banned opening patterns — invented personal anecdotes
+  "i remember sitting",
+  "i remember staring",
+  "i was sitting at",
+  "i was staring at",
+  "kitchen table",
+  "sitting at my kitchen",
+  "staring at my kitchen",
+  "i sat at my",
+  "i remember the day",
+  "i'll never forget the day",
+  "i will never forget the day",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -822,6 +834,8 @@ export async function runPass2Scorer(bodyHtml: string, primaryKeyword: string, u
   const batchCohesionLine = hasSiblings
     ? "5. BATCH COHESION (20 pts): Does it feel like part of a coherent content strategy? Does it cross-link to related articles where appropriate?"
     : "5. BATCH COHESION: NOT APPLICABLE — this article has no sibling or cluster articles to link to in this batch. Award full 20 points for this criterion automatically.";
+  console.log(`[ArticleEngine] Pass 2 Batch Cohesion: ${hasSiblings ? "INCLUDED (siblings present)" : "EXCLUDED (no siblings — full 20 pts awarded automatically)"}`);
+
 
   const prompt = `You are an SEO content quality auditor. Score the following article on these 5 criteria (each worth 20 points, total 100):
 
@@ -1083,6 +1097,7 @@ Follow this direction. It takes priority over general guidelines.
    - DO NOT make up statistics (e.g. "over 500 clients since 2018", "9 out of 10 businesses") without a real, citable source.
    - DO NOT use generic credibility claims such as "industry-leading", "trusted by thousands", "proven track record", or "years of expertise" without specific, verifiable backing.
    - If citing business experience or client numbers, be specific and real — or omit entirely. Fabricated social proof is worse than no social proof.
+   - BANNED OPENINGS: Never open the article with a "kitchen table" anecdote, "I remember sitting at...", "I remember staring at...", or any invented personal story not grounded in real customer intelligence provided above. Open with a concrete, useful statement that delivers immediate value to the reader.
 16. SEARCH INTENT RESOLUTION: The article title makes a promise to the reader. You MUST deliver on that promise.
    HARD RULES — SEARCH INTENT RESOLUTION:
    - If the title promises "how to start X", "how to do X", or "step-by-step guide to X" — deliver actual numbered step-by-step actionable instructions. Do NOT substitute framework overviews.
@@ -1220,6 +1235,18 @@ function mechanicalPostProcess(bodyHtml: string): { bodyHtml: string; wordCount:
     [/\bit is crucial to\b/gi, "you need to"],
     [/\bone of the most important\b/gi, "a key"],
     [/\bthis means that\b/gi, ""],
+    // Banned opening anecdote patterns
+    [/\bi remember sitting\b/gi, ""],
+    [/\bi remember staring\b/gi, ""],
+    [/\bi was sitting at\b/gi, ""],
+    [/\bi was staring at\b/gi, ""],
+    [/\bkitchen table\b/gi, "desk"],
+    [/\bsitting at my kitchen\b/gi, ""],
+    [/\bstaring at my kitchen\b/gi, ""],
+    [/\bi sat at my\b/gi, ""],
+    [/\bi remember the day\b/gi, ""],
+    [/\bi'll never forget the day\b/gi, ""],
+    [/\bi will never forget the day\b/gi, ""],
   ];
 
   for (const [pattern, replacement] of BANNED_REPLACEMENTS) {
