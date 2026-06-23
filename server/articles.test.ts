@@ -238,10 +238,10 @@ describe("16-point Authority Standard in generation prompt", () => {
 
   it("Prompt includes external authority link rule (point 10) with real-source requirement", () => {
     expect(prompt).toContain("EXTERNAL AUTHORITY LINK");
-    // Updated: must specify real sources (.gov.au, industry body, etc.)
-    expect(prompt).toContain(".gov.au");
+    // Updated: must require well-known popular sources with root-domain links
+    expect(prompt).toContain("ROOT DOMAIN");
     expect(prompt).toContain("industry body");
-    expect(prompt).toContain("genuine");
+    expect(prompt).toContain("live-checked before publishing");
   });
 
   it("Prompt includes internal CTA link rule (point 11)", () => {
@@ -753,10 +753,11 @@ describe("buildGenerationPrompt — single-pass engine", () => {
     expect(prompt).toContain("16-POINT AUTHORITY STANDARD");
   });
 
-  it("Requires external authority link (.gov.au)", () => {
+  it("Requires external authority link (root domain of well-known source)", () => {
     const ctx = makeContext();
     const prompt = buildGenerationPrompt(ctx);
-    expect(prompt).toContain(".gov.au");
+    expect(prompt).toContain("ROOT DOMAIN");
+    expect(prompt).toContain("live-checked before publishing");
   });
 
   it("Requires minimum 2 internal blog links", () => {

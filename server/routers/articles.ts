@@ -2134,7 +2134,7 @@ ${row.bodyHtml ?? ""}
 
         for (const article of allArticles) {
           if (!article.bodyHtml) continue;
-          const result = validateAndStripLinks(article.bodyHtml, allowlist);
+          const result = await validateAndStripLinks(article.bodyHtml, allowlist);
           if (result.strippedCount > 0) {
             await db
               .update(articles)

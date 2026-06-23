@@ -551,48 +551,106 @@ export function buildGenerationPrompt(ctx: ArticleContext): string {
  *
  * Returns the cleaned HTML, the count of stripped links, and the stripped URLs.
  */
-export function validateAndStripLinks(
+/**
+ * Live-checks an external URL with HEAD (falling back to GET) and a 5-second timeout.
+ * Returns true if the URL responds with a 2xx or 3xx status, false otherwise.
+ */
+async function checkUrlLive(url: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(url, {
+      method: "HEAD",
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BlogBatcher/1.0)" },
+      redirect: "follow",
+    });
+    clearTimeout(timer);
+    if (res.status < 400) return true;
+    // HEAD blocked — try GET
+    const controller2 = new AbortController();
+    const timer2 = setTimeout(() => controller2.abort(), 5000);
+    const res2 = await fetch(url, {
+      method: "GET",
+      signal: controller2.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BlogBatcher/1.0)" },
+      redirect: "follow",
+    });
+    clearTimeout(timer2);
+    return res2.status < 400;
+  } catch {
+    clearTimeout(timer);
+    return false;
+  }
+}
+
+export async function validateAndStripLinks(
   html: string,
   allowlist: string[]
-): { html: string; strippedCount: number; strippedUrls: string[] } {
+): Promise<{ html: string; strippedCount: number; strippedUrls: string[] }> {
   const strippedUrls: string[] = [];
 
   // Build a normalised set for fast lookup
   const allowed = new Set(allowlist.map(u => u.toLowerCase().replace(/\/$/, "")));
 
-  // Replace every <a ...> ... </a> block
+  // ---- Pass 1: collect all <a> tags and identify external URLs to live-check ----
+  const externalHrefs = new Set<string>();
+  const linkPattern = /<a\b([^>]*?)>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = linkPattern.exec(html)) !== null) {
+    const attrs = m[1];
+    const hrefMatch = attrs.match(/href=["']([^"']*)["']/i);
+    if (!hrefMatch) continue;
+    const href = hrefMatch[1].trim();
+    if (href.startsWith("http://") || href.startsWith("https://")) {
+      const hrefNorm = href.toLowerCase().replace(/\/$/, "");
+      // Only live-check external links NOT already in the allowlist
+      const inAllowlist =
+        allowed.has(hrefNorm) ||
+        allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")));
+      if (!inAllowlist) externalHrefs.add(href);
+    }
+  }
+
+  // ---- Pass 2: live-check all external URLs in parallel ----
+  const liveResults = new Map<string, boolean>();
+  if (externalHrefs.size > 0) {
+    const checks = Array.from(externalHrefs).map(async url => {
+      const ok = await checkUrlLive(url);
+      liveResults.set(url, ok);
+    });
+    await Promise.all(checks);
+    Array.from(liveResults.entries()).forEach(([url, ok]) => {
+      console.log(`[ArticleEngine] External link live-check: ${ok ? "PASS" : "FAIL"} \u2192 ${url}`);
+    });
+  }
+
+  // ---- Pass 3: replace <a> tags based on results ----
   const cleaned = html.replace(
     /<a\b([^>]*?)>([\s\S]*?)<\/a>/gi,
     (fullMatch, attrs: string, innerText: string) => {
-      // Extract the href value
       const hrefMatch = attrs.match(/href=["']([^"']*)["']/i);
-      if (!hrefMatch) {
-        // No href — keep the tag as-is (e.g. anchor targets)
-        return fullMatch;
-      }
+      if (!hrefMatch) return fullMatch; // no href — keep as-is
       const href = hrefMatch[1].trim();
       const hrefNorm = href.toLowerCase().replace(/\/$/, "");
 
-      // External links (http/https) — check if the domain is in the allowlist
       if (href.startsWith("http://") || href.startsWith("https://")) {
-        // Check exact match first
+        // Allowlisted external links always pass
         if (allowed.has(hrefNorm)) return fullMatch;
-        // Check if any allowlist entry is a prefix of this URL (e.g. service page sub-path)
-        const inAllowlist = allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")));
-        if (inAllowlist) return fullMatch;
-        // External authority links are permitted — they are real external URLs the model
-        // chose for point 10. We identify them as http(s) links to domains NOT in the
-        // allowlist. Allow them through.
+        if (allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")))) return fullMatch;
+        // External authority link — keep only if live-check passed
+        const ok = liveResults.get(href);
+        if (ok === false) {
+          strippedUrls.push(href);
+          return innerText;
+        }
         return fullMatch;
       }
 
       // Relative links — must be in the allowlist
       if (allowed.has(hrefNorm)) return fullMatch;
-      // Check prefix match for relative paths
-      const inAllowlist = allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")));
-      if (inAllowlist) return fullMatch;
+      if (allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")))) return fullMatch;
 
-      // Not allowed — strip the <a> tag, keep the inner text
       strippedUrls.push(href);
       return innerText;
     }
@@ -1067,7 +1125,7 @@ Note: External authority links (government, industry body, nationally recognised
 7. META TITLE: Must include primary keyword verbatim. Maximum 60 characters. Written for click-through rate.
 8. META DESCRIPTION: Must include the EXACT primary keyword phrase "${ctx.primaryKeyword}" verbatim. Exactly 140–160 characters. Written for CTR.
 9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
-10. EXTERNAL AUTHORITY LINK: You MUST include at least one hyperlink to a real, high-authority external source — a government website (.gov.au), an industry body, or a nationally recognised publication. Use descriptive anchor text. This link must be genuine and relevant to the article topic.
+10. EXTERNAL AUTHORITY LINK: You MUST include at least one hyperlink to a real, well-known, popular, authoritative source that is DIRECTLY relevant to the article topic and the business's target market. This can be a famous person's official website, a recognised brand's homepage, a major publication, a government website, or an industry body. CRITICAL RULES: (a) Link ONLY to the ROOT DOMAIN / homepage of the source (e.g. https://www.gordonramsay.com, https://www.taylormade.com, https://www.vogue.com.au) — never invent a deep sub-page path. (b) The source must be genuinely well-known and popular — not obscure. (c) If you cannot name a genuinely well-known relevant source, do NOT add an external link at all. (d) This link will be live-checked before publishing — a 404 or dead URL will be automatically stripped. Use descriptive anchor text.
 11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
 12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs from the LINK ALLOWLIST above — do NOT invent, guess, or construct any URL. If fewer than 2 batch slugs are available, link to as many as exist.
 13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
@@ -1475,7 +1533,7 @@ export async function generateSingleArticle(
     // =========================================================================
     // STEP 2.6 — LINK VALIDATOR (strip any href not in the allowlist)
     // =========================================================================
-    const linkValidationResult = validateAndStripLinks(bodyHtml, ctx.linkAllowlist);
+    const linkValidationResult = await validateAndStripLinks(bodyHtml, ctx.linkAllowlist);
     if (linkValidationResult.strippedCount > 0) {
       console.warn(`[ArticleEngine] Link validator stripped ${linkValidationResult.strippedCount} hallucinated href(s) for node ${nodeId}: ${linkValidationResult.strippedUrls.join(", ")}`);
       bodyHtml = linkValidationResult.html;
