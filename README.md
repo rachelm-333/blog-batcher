@@ -1,8 +1,119 @@
-# Web App Template (tRPC + Manus Auth + Database)
+# Blog Batcher
 
-This template gives you a React 19 + Tailwind 4 + Express 4 + tRPC 11 stack with Manus OAuth already wired. Procedures are your contracts, types flow end to end, and authentication "just works".
+AI-powered blog content pipeline: keyword research → article generation → SEO scoring → CMS publish.
+Built with React 19, Tailwind 4, Express 4, tRPC 11, Drizzle ORM, and MySQL/TiDB.
 
 ---
+
+## Quick Start (Local Development)
+
+### Prerequisites
+- Node.js 22+
+- pnpm (`npm install -g pnpm`)
+- A MySQL or TiDB database (local or cloud)
+
+### Install & Run
+
+```bash
+pnpm install          # install dependencies
+pnpm db:push          # generate + apply database migrations
+pnpm dev              # start dev server at http://localhost:3000
+```
+
+### Other Commands
+
+| Command | Description |
+|---|---|
+| `pnpm build` | Build for production (`dist/` + `client/dist/`) |
+| `pnpm start` | Run production build |
+| `pnpm test` | Run all 422 Vitest tests |
+| `pnpm check` | TypeScript type check (0 errors) |
+| `pnpm db:push` | Generate + apply Drizzle migrations |
+| `pnpm format` | Format code with Prettier |
+
+---
+
+## Environment Variables
+
+Create a `.env` file in the project root. **Never commit `.env` to git.**
+
+### Required — Core
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | MySQL/TiDB connection string, e.g. `mysql://user:pass@host:3306/dbname` |
+| `JWT_SECRET` | Secret used to sign session cookies — any long random string |
+
+### Required — AI / LLM
+
+| Variable | Description |
+|---|---|
+| `OPENROUTER_API_KEY` | OpenRouter API key for article generation and keyword research. Get one at [openrouter.ai](https://openrouter.ai) |
+
+### Required — Manus OAuth (platform auth)
+
+| Variable | Description |
+|---|---|
+| `VITE_APP_ID` | Manus OAuth application ID |
+| `OAUTH_SERVER_URL` | Manus OAuth backend base URL |
+| `VITE_OAUTH_PORTAL_URL` | Manus login portal URL (frontend) |
+| `OWNER_OPEN_ID` | Owner's Manus OpenID |
+| `BUILT_IN_FORGE_API_URL` | Manus built-in API base URL (LLM, storage, notifications) |
+| `BUILT_IN_FORGE_API_KEY` | Bearer token for server-side Manus built-in API calls |
+| `VITE_FRONTEND_FORGE_API_KEY` | Bearer token for frontend Manus built-in API calls |
+| `VITE_FRONTEND_FORGE_API_URL` | Manus built-in API URL for frontend |
+
+### Optional — Payments (Stripe)
+
+| Variable | Description |
+|---|---|
+| `STRIPE_SECRET_KEY` | Stripe secret key (`sk_test_...` for test, `sk_live_...` for production) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (`pk_test_...` or `pk_live_...`) |
+
+### Optional — SEO Data
+
+| Variable | Description |
+|---|---|
+| `DATAFORSEO_LOGIN` | DataForSEO account login email |
+| `DATAFORSEO_PASSWORD` | DataForSEO account password |
+
+### Optional — Email
+
+| Variable | Description |
+|---|---|
+| `RESEND_API_KEY` | Resend API key for transactional email |
+| `EMAIL_FROM_ADDRESS` | Sender address for outbound emails |
+
+---
+
+## Database
+
+- **Engine:** MySQL / TiDB (compatible)
+- **ORM:** Drizzle ORM
+- **Schema file:** `drizzle/schema.ts`
+- **Migration command:** `pnpm db:push` (runs `drizzle-kit generate` then `drizzle-kit migrate`)
+
+---
+
+## Workflow Stages
+
+1. **Business Profile** — website scan, brand voice, services
+2. **Blog Architecture** — content hierarchy, cornerstone/pillar/cluster structure
+3. **Keyword Research** — primary keywords, PAA questions, approval
+4. **Article Generation** — AI-written, SEO-scored drafts
+5. **Review & Edit** — manual editing, AI polish, SEO scoring
+6. **Publish & Schedule** — push to CMS or schedule
+
+## CMS Integrations
+
+WordPress · Wix · Ghost · Webflow · Squarespace · Shopify · Custom webhook
+
+Configure under **Manage → Integrations** in the app.
+
+---
+
+<!-- Template documentation below — kept for framework reference -->
 
 ## Quick Facts
 
