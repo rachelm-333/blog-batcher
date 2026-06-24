@@ -382,15 +382,44 @@ function htmlToRicos(html: string): Record<string, unknown> {
     };
   }
 
+  // ── Pre-process: flatten wrapper divs/sections so nested block content is never dropped ──
+  // Replace wrapper tags (div, section, article, header) that contain block-level children
+  // with their inner content, unwrapping one level at a time until stable.
+  // This prevents the non-greedy regex below from swallowing nested blocks.
+  function flattenWrappers(input: string): string {
+    // Unwrap div/section/article/header that contain block-level children
+    // We do up to 8 passes to handle deeply nested structures
+    let result = input;
+    for (let pass = 0; pass < 8; pass++) {
+      const prev = result;
+      // Replace <div ...>content</div> (and section/article/header) with just content
+      // when the content contains block-level tags (h1-h6, p, ul, ol, blockquote)
+      result = result.replace(
+        /<(div|section|article|header)[^>]*>((?:[\s\S](?!<(?:div|section|article|header)[^>]*>))*?)<\/\1>/gi,
+        (_match, _tag, inner) => {
+          // If inner contains block-level tags, unwrap
+          if (/<(h[1-6]|p|ul|ol|blockquote|div|section|article|header)[ >]/i.test(inner)) {
+            return inner;
+          }
+          // Otherwise keep as paragraph-worthy content (return as-is, will be caught by blockPattern)
+          return _match;
+        }
+      );
+      if (result === prev) break; // stable — no more wrappers to unwrap
+    }
+    return result;
+  }
+  const flatHtml = flattenWrappers(html);
+
   // Tokenise the HTML into block-level elements
   // We process h1-h6, p, ul, ol, li, blockquote, and fall back to paragraph for anything else
   const blockPattern = /<(h[1-6]|p|ul|ol|blockquote|div|section|article|header|figure|figcaption)([^>]*?)>([\s\S]*?)<\/\1>/gi;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = blockPattern.exec(html)) !== null) {
+  while ((match = blockPattern.exec(flatHtml)) !== null) {
     // Capture any text between blocks as a paragraph
-    const before = html.slice(lastIndex, match.index).trim();
+    const before = flatHtml.slice(lastIndex, match.index).trim();
     if (before) {
       const cleaned = before.replace(/<[^>]+>/g, "").trim();
       if (cleaned) nodes.push(makeParagraph(before));
@@ -455,7 +484,15 @@ function htmlToRicos(html: string): Record<string, unknown> {
       }
     } else if (tag === "p" || tag === "div" || tag === "section" || tag === "article" || tag === "header") {
       if (inner.trim()) {
-        nodes.push(makeParagraph(inner));
+        // If inner still contains block-level tags (deeply nested), recurse via flatHtml pass
+        const hasBlocks = /<(h[1-6]|p|ul|ol|blockquote)[ >]/i.test(inner);
+        if (hasBlocks) {
+          // Extract plain text to avoid losing content
+          const textOnly = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          if (textOnly) nodes.push(makeParagraph(textOnly));
+        } else {
+          nodes.push(makeParagraph(inner));
+        }
       }
     } else if (tag === "figure" || tag === "figcaption") {
       // Skip figure/figcaption wrappers — we don't have Wix media IDs
@@ -465,7 +502,7 @@ function htmlToRicos(html: string): Record<string, unknown> {
   }
 
   // Capture any trailing text after the last block
-  const trailing = html.slice(lastIndex).trim();
+  const trailing = flatHtml.slice(lastIndex).trim();
   if (trailing) {
     const cleaned = trailing.replace(/<[^>]+>/g, "").trim();
     if (cleaned) nodes.push(makeParagraph(trailing));

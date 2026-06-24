@@ -227,3 +227,78 @@ describe("publishToWix — scheduling behaviour", () => {
     expect((publishCall!.body as any).memberId).toBe(CREDS.memberId);
   });
 });
+
+// ---------------------------------------------------------------------------
+// htmlToRicos: nested wrapper div/section flattening tests
+// These tests catch the bug where content wrapped in <div> or <section> tags
+// was silently dropped because the non-greedy regex couldn't match nested blocks.
+// ---------------------------------------------------------------------------
+describe("Wix htmlToRicos — nested wrapper flattening", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => { originalFetch = globalThis.fetch; });
+  afterEach(() => { globalThis.fetch = originalFetch; vi.restoreAllMocks(); });
+
+  function getNodes(calls: { url: string; body: unknown }[]): unknown[] {
+    const createCall = calls.find(c => c.url.includes("/draft-posts") && !c.url.includes("/publish"));
+    if (!createCall) return [];
+    const body = createCall.body as Record<string, unknown>;
+    const richContent = ((body.draftPost as Record<string, unknown>).richContent as Record<string, unknown>);
+    return (richContent?.nodes as unknown[]) ?? [];
+  }
+
+  function allText(nodes: unknown[]): string {
+    return nodes.map((n: unknown) => {
+      const children = ((n as Record<string, unknown>).nodes as unknown[]) ?? [];
+      return children.map((c: unknown) => {
+        const td = (c as Record<string, unknown>).textData as Record<string, unknown> | undefined;
+        return td?.text ?? "";
+      }).join("");
+    }).join(" ");
+  }
+
+  it("NESTED DIV: paragraphs inside a wrapper <div> are not dropped", async () => {
+    const { mockFetch, calls } = setupFetchMock();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+    await publishToWix(CREDS, makeArticle({
+      bodyHtml: `<div class="wrapper"><p>First paragraph.</p><p>Second paragraph.</p></div>`,
+    }));
+    const text = allText(getNodes(calls));
+    expect(text).toContain("First paragraph");
+    expect(text).toContain("Second paragraph");
+  });
+
+  it("NESTED SECTION: headings and paragraphs inside <section> are not dropped", async () => {
+    const { mockFetch, calls } = setupFetchMock();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+    await publishToWix(CREDS, makeArticle({
+      bodyHtml: `<section><h2>Section Heading</h2><p>Section body text.</p></section>`,
+    }));
+    const nodes = getNodes(calls);
+    const headings = nodes.filter((n: unknown) => (n as Record<string, unknown>).type === "HEADING");
+    const headingText = allText(headings);
+    expect(headingText).toContain("Section Heading");
+  });
+
+  it("DEEPLY NESTED: content inside div > section > p is not dropped", async () => {
+    const { mockFetch, calls } = setupFetchMock();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+    await publishToWix(CREDS, makeArticle({
+      bodyHtml: `<div><section><p>Deep content here.</p></section></div>`,
+    }));
+    const text = allText(getNodes(calls));
+    expect(text).toContain("Deep content here");
+  });
+
+  it("FAQ SECTION: FAQ block with h2 + multiple p tags inside a div is fully preserved", async () => {
+    const { mockFetch, calls } = setupFetchMock();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+    await publishToWix(CREDS, makeArticle({
+      bodyHtml: `<div class="faq"><h2>FAQ</h2><p>Q: What is this?</p><p>A: This is a test.</p><p>Q: Why does it matter?</p><p>A: Content must not be dropped.</p></div>`,
+    }));
+    const text = allText(getNodes(calls));
+    expect(text).toContain("What is this");
+    expect(text).toContain("This is a test");
+    expect(text).toContain("Why does it matter");
+    expect(text).toContain("Content must not be dropped");
+  });
+});
