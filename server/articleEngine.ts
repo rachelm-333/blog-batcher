@@ -67,6 +67,99 @@ export const WORD_COUNT_RULES = {
  */
 export const WORD_COUNT_TOLERANCE = 100;
 
+/** Count visible words in an HTML string. */
+export function countHtmlWords(html: string): number {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+/**
+ * Trim an HTML article down to a target word count by removing whole <p>
+ * paragraphs from the bottom up. Robust to large overages.
+ *
+ * Guarantees preserved:
+ *  - The first <p> (opening answer block) is never removed.
+ *  - All headings (h1–h4) are kept.
+ *  - At least `minKeywordMentions` body mentions of the keyword remain, so
+ *    Pass 1 keyword-density does not break.
+ *  - If removing whole paragraphs is not enough, trailing sentences are
+ *    trimmed from the longest remaining body paragraph as a last resort.
+ *
+ * Pure function — no LLM, no DB. Returns the trimmed html + final word count.
+ */
+export function trimHtmlToWordCount(
+  bodyHtml: string,
+  maxWords: number,
+  keyword: string,
+  minKeywordMentions = 5,
+): { bodyHtml: string; wordCount: number; removed: number } {
+  const kwLower = keyword.toLowerCase();
+  const countKw = (s: string) =>
+    (s.toLowerCase().match(new RegExp(kwLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
+
+  let html = bodyHtml;
+  let wordCount = countHtmlWords(html);
+  const startWords = wordCount;
+  if (wordCount <= maxWords) return { bodyHtml: html, wordCount, removed: 0 };
+
+  // Collect all <p> blocks in document order.
+  const pRegex = /<p(?:\s[^>]*)?>[\s\S]*?<\/p>/gi;
+  let pBlocks: string[] = html.match(pRegex) ?? [];
+  if (pBlocks.length <= 1) {
+    // Nothing safely removable as whole paragraphs.
+    return { bodyHtml: html, wordCount, removed: startWords - wordCount };
+  }
+
+  // Candidates: every paragraph except the first (opening answer block),
+  // processed bottom-up so the article's opening and early body survive.
+  const firstP = pBlocks[0];
+  const candidates = pBlocks.slice(1).reverse();
+
+  for (const block of candidates) {
+    if (wordCount <= maxWords) break;
+    if (block === firstP) continue;
+    const idx = html.indexOf(block);
+    if (idx === -1) continue;
+
+    // Preserve a minimum number of keyword mentions in the body.
+    const blockKw = countKw(block.replace(/<[^>]+>/g, " "));
+    if (blockKw > 0) {
+      const remainingKw = countKw(html.replace(block, "").replace(/<[^>]+>/g, " "));
+      if (remainingKw < minKeywordMentions) continue; // keep this one for density
+    }
+
+    const blockWords = countHtmlWords(block);
+    html = html.slice(0, idx) + html.slice(idx + block.length);
+    wordCount -= blockWords;
+  }
+
+  // Last resort: if still over, trim trailing sentences from the longest
+  // remaining non-first body paragraph until under target.
+  if (wordCount > maxWords) {
+    pBlocks = (html.match(pRegex) ?? []).slice(1);
+    // Longest first
+    pBlocks.sort((a, b) => countHtmlWords(b) - countHtmlWords(a));
+    for (const block of pBlocks) {
+      if (wordCount <= maxWords) break;
+      const inner = block.replace(/^<p(?:\s[^>]*)?>/i, "").replace(/<\/p>$/i, "");
+      const sentences = inner.split(/(?<=[.!?])\s+/);
+      if (sentences.length < 2) continue;
+      let kept = sentences;
+      while (kept.length > 1 && wordCount > maxWords) {
+        const dropped = kept[kept.length - 1];
+        kept = kept.slice(0, -1);
+        wordCount -= countHtmlWords(dropped);
+      }
+      const rebuilt = block.replace(inner, kept.join(" ").trim());
+      html = html.replace(block, rebuilt);
+    }
+  }
+
+  return { bodyHtml: html, wordCount: countHtmlWords(html), removed: startWords - countHtmlWords(html) };
+}
+
 // ---------------------------------------------------------------------------
 // Status badge thresholds (from scope Section 6.6)
 // ---------------------------------------------------------------------------
@@ -1551,53 +1644,15 @@ export async function generateSingleArticle(
       const overage = wordCount - ctx.wordCountMax;
       console.log(`[ArticleEngine] Pre-score trim triggered for node ${nodeId}: ${wordCount} words, max is ${ctx.wordCountMax} (overage: ${overage} words)`);
 
-      // DOM-based trim: remove whole <p> blocks that are non-essential.
-      // Priority: remove paragraphs that don't contain the keyword, aren't the first <p>,
-      // and aren't inside a <section class="faq"> or the last <section> (CTA).
-      // We work from the bottom of the article upward to preserve the opening.
-      const kwLower = ctx.primaryKeyword.toLowerCase();
-      // Split into top-level block tokens (tags + text)
-      // Strategy: extract all <p>...</p> blocks that are candidates for removal
-      const pTagRegex = /<p(\s[^>]*)?>([\s\S]*?)<\/p>/gi;
-      interface PBlock { full: string; text: string; index: number }
-      const pBlocks: PBlock[] = [];
-      let m: RegExpExecArray | null;
-      // Reset regex
-      pTagRegex.lastIndex = 0;
-      let tempHtml = bodyHtml;
-      // Collect all <p> blocks with their positions
-      while ((m = pTagRegex.exec(tempHtml)) !== null) {
-        pBlocks.push({ full: m[0], text: m[2].replace(/<[^>]+>/g, " "), index: m.index });
-      }
-
-      // Mark candidates: not the first <p>, not containing keyword, not in FAQ/schema
-      // We'll remove from the end backward to preserve opening
-      const candidates = pBlocks
-        .slice(1) // skip first paragraph (opening answer)
-        .filter(p => !p.text.toLowerCase().includes(kwLower))
-        .reverse(); // remove from bottom up
-
-      let trimmedHtml = bodyHtml;
-      let trimmedWordCount = wordCount;
-      for (const candidate of candidates) {
-        if (trimmedWordCount <= ctx.wordCountMax) break;
-        // Only remove if it's not inside FAQ section (rough check)
-        const candidatePos = trimmedHtml.indexOf(candidate.full);
-        if (candidatePos === -1) continue;
-        const before = trimmedHtml.slice(0, candidatePos + candidate.full.length);
-        const faqOpenBefore = (before.match(/class=["'][^"']*faq[^"']*["']/gi) ?? []).length;
-        const faqCloseBefore = (before.match(/<\/section>/gi) ?? []).length;
-        if (faqOpenBefore > faqCloseBefore) continue; // inside a section, skip
-        const pWordCount = candidate.text.split(/\s+/).filter(Boolean).length;
-        trimmedHtml = trimmedHtml.replace(candidate.full, "");
-        trimmedWordCount -= pWordCount;
-      }
-
-      if (trimmedWordCount < wordCount) {
+      const trimResult = trimHtmlToWordCount(bodyHtml, ctx.wordCountMax, ctx.primaryKeyword);
+      if (trimResult.removed > 0) {
         const prevWordCount = wordCount;
-        bodyHtml = trimmedHtml;
-        wordCount = trimmedWordCount;
+        bodyHtml = trimResult.bodyHtml;
+        wordCount = trimResult.wordCount;
         console.log(`[ArticleEngine] Pre-score trim done for node ${nodeId}: ${prevWordCount} → ${wordCount} words in ${((Date.now() - trimStart) / 1000).toFixed(1)}s (DOM-based, no LLM)`);
+        if (wordCount > ctx.wordCountMax) {
+          console.warn(`[ArticleEngine] Pre-score trim: still ${wordCount - ctx.wordCountMax} words over max after trimming for node ${nodeId}`);
+        }
       } else {
         console.warn(`[ArticleEngine] Pre-score trim: no removable paragraphs found for node ${nodeId} — word count unchanged`);
       }
