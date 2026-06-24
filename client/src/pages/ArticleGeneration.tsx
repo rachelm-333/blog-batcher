@@ -94,6 +94,24 @@ export default function ArticleGeneration() {
     { enabled: !!businessId, staleTime: 0 }
   );
 
+  // Guard: check if at least one keyword is approved before allowing Stage 4
+  const { data: keywordsData, isLoading: keywordsLoading } = trpc.keywords.getAll.useQuery(
+    { businessId },
+    { enabled: !!businessId, staleTime: 0 }
+  );
+  const hasApprovedKeyword = (keywordsData ?? []).some(k => k.keywordApproved === true);
+  // Only redirect once data has loaded (avoid flicker on first load)
+  useEffect(() => {
+    if (!businessId || keywordsLoading || articlesLoading) return;
+    // If articles already exist, the user has already generated — don't redirect
+    if ((articles?.length ?? 0) > 0) return;
+    if (!hasApprovedKeyword) {
+      toast.error("Approve your keyword first — go back to Stage 3 and approve a keyword before generating articles.");
+      setLocation("/keywords");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, keywordsLoading, articlesLoading, hasApprovedKeyword]);
+
   const regenerateSingleMutation = trpc.articles.regenerate.useMutation({
     onSuccess: () => {
       toast.success("Regenerating article… this may take a minute.");
@@ -172,7 +190,7 @@ export default function ArticleGeneration() {
     if (!anyGenerating) setRegenAllRunning(false);
   }, [articles, regenAllRunning]);
 
-  if (userLoading || bizLoading) {
+  if (userLoading || bizLoading || keywordsLoading) {
     return (
       <DashboardLayout>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", minHeight:400 }}>
