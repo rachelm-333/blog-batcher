@@ -1055,7 +1055,7 @@ export default function ArticleReview() {
       <StageStepper currentStage={allApproved ? Math.max(currentStage, 6) : currentStage} activeStage={allApproved ? 6 : 5} />
       <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       {/* ── Left sidebar: article list ─────────────────────────────────── */}
-      <div className="w-72 min-w-[280px] border-r border-border flex flex-col bg-card overflow-y-auto">
+      <div className="w-60 min-w-[220px] border-r border-border flex flex-col bg-card overflow-y-auto">
         {/* Header — green banner when all approved, otherwise normal progress */}
         {allApproved ? (
           <div className="px-4 py-3 border-b border-border bg-emerald-500/10">
@@ -1310,7 +1310,7 @@ export default function ArticleReview() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-[1fr_360px] gap-6 p-6 min-h-full">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6 p-6 min-h-full">
             {/* ── Article body ────────────────────────────────────────── */}
             <div className="bg-card border border-border rounded-xl p-6 overflow-y-auto">
               {/* Article header bar */}
