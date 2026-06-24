@@ -246,11 +246,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 key={item.path}
                 onClick={() => {
                   if (stageLocked) return;
-                  // If batch is complete, redirect all workflow clicks to batch-complete
-                  if (isBatchComplete) {
-                    setLocation("/batch-complete");
-                    return;
-                  }
                   // Business Profile: go to edit mode when stage 1 is already complete
                   if (item.stage === 1 && isStageComplete(1)) {
                     setLocation("/onboarding?edit=1");

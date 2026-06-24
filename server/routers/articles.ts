@@ -804,10 +804,7 @@ export const articlesRouter = router({
       if (!article) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
       await assertBusinessOwnership(ctx.user.id, article.businessId);
 
-      if (article.status === "published") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Published articles cannot be edited here. Edit directly in your CMS." });
-      }
-
+      // Published articles CAN be edited — the user may want to update and re-publish
       // Recount words from the updated HTML
       const wordCount = input.bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
 
@@ -854,10 +851,7 @@ export const articlesRouter = router({
       if (!article) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
       await assertBusinessOwnership(ctx.user.id, article.businessId);
 
-      if (article.status === "published") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Published articles cannot be edited here. Edit directly in your CMS." });
-      }
-
+      // Published articles CAN be AI-edited — the user may want to update and re-publish
       if (!article.bodyHtml) throw new TRPCError({ code: "BAD_REQUEST", message: "Article has no content to edit." });
 
       const systemPrompt = `You are an expert SEO content editor. You will receive an article body (HTML) and an editing instruction from the author.
@@ -1278,6 +1272,31 @@ ${row.bodyHtml ?? ""}
 
       const creds = decryptCredentials(integration.credentialsEncrypted);
       if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt CMS credentials" });
+
+      // ── Pre-publish completeness guard ───────────────────────────────────────────────
+      // Block publishing if the article body looks truncated:
+      //   1. Word count is less than 300 words (clearly incomplete)
+      //   2. Body ends mid-sentence (no closing punctuation or tag in last 100 chars)
+      //   3. Body is missing a closing section (no CTA/conclusion heading or final <p>)
+      const rawBody = row.bodyHtml ?? "";
+      const rawWordCount = rawBody.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+      if (rawWordCount < 300) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Article body appears truncated — only ${rawWordCount} words found (minimum 300 required). Regenerate the article before publishing.`,
+        });
+      }
+      // Check the last 200 characters of plain text for a sentence-ending signal
+      const lastPlainText = rawBody.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(-200);
+      const endsWithSentence = /[.!?"'\u201C\u201D\u2019]\s*$/.test(lastPlainText);
+      const endsWithTag = /<\/(p|div|section|h[1-6]|ul|ol|blockquote|li)>\s*$/i.test(rawBody.trim());
+      if (!endsWithSentence && !endsWithTag) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Article body appears to end mid-sentence and may be truncated. Review the article in the editor before publishing.",
+        });
+      }
+      // ── End completeness guard ────────────────────────────────────────────────────────
 
       // Apply formatting pass to bodyHtml before publishing:
       // - Ensure bullet list items have margin-bottom for Wix/WordPress spacing

@@ -302,3 +302,40 @@ describe("Wix htmlToRicos — nested wrapper flattening", () => {
     expect(text).toContain("Content must not be dropped");
   });
 });
+
+// ---------------------------------------------------------------------------
+// FAQ faq-item div pattern — the exact format used in generated articles
+// ---------------------------------------------------------------------------
+describe("Wix htmlToRicos — faq-item div pattern (real article format)", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => { originalFetch = globalThis.fetch; });
+  afterEach(() => { globalThis.fetch = originalFetch; vi.restoreAllMocks(); });
+
+  function getNodes(calls: { url: string; body: unknown }[]): unknown[] {
+    const createCall = calls.find(c => c.url.includes("/draft-posts") && !c.url.includes("/publish"));
+    if (!createCall) return [];
+    const body = createCall.body as Record<string, unknown>;
+    const richContent = ((body.draftPost as Record<string, unknown>).richContent as Record<string, unknown>);
+    return (richContent?.nodes as unknown[]) ?? [];
+  }
+
+  it("FAQ-ITEM DIV: each faq-item div is fully unwrapped and its Q&A paragraphs preserved", async () => {
+    const { mockFetch, calls } = setupFetchMock();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+    await publishToWix(CREDS, makeArticle({
+      bodyHtml: [
+        "<h2>Frequently Asked Questions</h2>",
+        '<div class="faq-item"><hr><p><strong>Q: What is the first step?</strong></p><p>A: The first step is to plan carefully.</p></div>',
+        '<div class="faq-item"><hr><p><strong>Q: How long does it take?</strong></p><p>A: It typically takes three to six months.</p></div>',
+        '<div class="faq-item"><hr><p><strong>Q: Is it worth the effort?</strong></p><p>A: Yes, the results speak for themselves.</p></div>',
+      ].join(""),
+    }));
+    const allNodeText = JSON.stringify(getNodes(calls));
+    expect(allNodeText).toContain("What is the first step");
+    expect(allNodeText).toContain("plan carefully");
+    expect(allNodeText).toContain("How long does it take");
+    expect(allNodeText).toContain("three to six months");
+    expect(allNodeText).toContain("Is it worth the effort");
+    expect(allNodeText).toContain("results speak for themselves");
+  });
+});

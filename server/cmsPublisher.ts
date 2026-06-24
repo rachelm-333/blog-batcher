@@ -383,29 +383,66 @@ function htmlToRicos(html: string): Record<string, unknown> {
   }
 
   // ── Pre-process: flatten wrapper divs/sections so nested block content is never dropped ──
-  // Replace wrapper tags (div, section, article, header) that contain block-level children
-  // with their inner content, unwrapping one level at a time until stable.
-  // This prevents the non-greedy regex below from swallowing nested blocks.
+  // Strategy: scan the HTML character-by-character to find matching open/close tag pairs.
+  // For each div/section/article/header wrapper, if its content contains block-level children,
+  // replace the wrapper with just its inner content. Repeat until stable.
   function flattenWrappers(input: string): string {
-    // Unwrap div/section/article/header that contain block-level children
-    // We do up to 8 passes to handle deeply nested structures
-    let result = input;
-    for (let pass = 0; pass < 8; pass++) {
-      const prev = result;
-      // Replace <div ...>content</div> (and section/article/header) with just content
-      // when the content contains block-level tags (h1-h6, p, ul, ol, blockquote)
-      result = result.replace(
-        /<(div|section|article|header)[^>]*>((?:[\s\S](?!<(?:div|section|article|header)[^>]*>))*?)<\/\1>/gi,
-        (_match, _tag, inner) => {
-          // If inner contains block-level tags, unwrap
-          if (/<(h[1-6]|p|ul|ol|blockquote|div|section|article|header)[ >]/i.test(inner)) {
-            return inner;
-          }
-          // Otherwise keep as paragraph-worthy content (return as-is, will be caught by blockPattern)
-          return _match;
+    const WRAPPER_TAGS = new Set(["div", "section", "article", "header"]);
+    const BLOCK_TAGS = new Set(["h1","h2","h3","h4","h5","h6","p","ul","ol","blockquote","div","section","article","header"]);
+
+    // Find the matching close tag for an open tag starting at `openStart`.
+    // Returns the index of the start of the closing tag, or -1 if not found.
+    function findMatchingClose(html: string, tagName: string, openStart: number): number {
+      const openTag = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, "gi");
+      const closeTag = new RegExp(`<\\/${tagName}>`, "gi");
+      openTag.lastIndex = openStart + 1; // skip the opening tag itself
+      closeTag.lastIndex = openStart + 1;
+      let depth = 1;
+      let pos = openStart + 1;
+      while (depth > 0 && pos < html.length) {
+        openTag.lastIndex = pos;
+        closeTag.lastIndex = pos;
+        const nextOpen = openTag.exec(html);
+        const nextClose = closeTag.exec(html);
+        if (!nextClose) return -1;
+        if (nextOpen && nextOpen.index < nextClose.index) {
+          depth++;
+          pos = nextOpen.index + nextOpen[0].length;
+        } else {
+          depth--;
+          if (depth === 0) return nextClose.index;
+          pos = nextClose.index + nextClose[0].length;
         }
-      );
-      if (result === prev) break; // stable — no more wrappers to unwrap
+      }
+      return -1;
+    }
+
+    let result = input;
+    for (let pass = 0; pass < 12; pass++) {
+      const prev = result;
+      // Find the first wrapper tag
+      const wrapperPattern = /<(div|section|article|header)(\s[^>]*)?>/ ;
+      const m = wrapperPattern.exec(result);
+      if (!m) break;
+      const tagName = m[1].toLowerCase();
+      const openStart = m.index;
+      const openEnd = openStart + m[0].length;
+      const closeStart = findMatchingClose(result, tagName, openStart);
+      if (closeStart === -1) break; // malformed HTML — stop
+      const closeEnd = closeStart + `</${tagName}>`.length;
+      const inner = result.slice(openEnd, closeStart);
+      // If inner contains block-level tags, unwrap
+      const innerTagMatch = /<(\w+)[\s>]/i.exec(inner);
+      const hasBlockChild = innerTagMatch ? BLOCK_TAGS.has(innerTagMatch[1].toLowerCase()) : false;
+      const hasAnyBlock = /<(h[1-6]|p|ul|ol|blockquote|div|section|article|header)[\s>]/i.test(inner);
+      if (hasBlockChild || hasAnyBlock) {
+        result = result.slice(0, openStart) + inner + result.slice(closeEnd);
+      } else {
+        // No block children — this wrapper is a leaf, skip past it
+        // to avoid infinite loop. We replace it with a <p> so it gets parsed.
+        result = result.slice(0, openStart) + `<p>${inner}</p>` + result.slice(closeEnd);
+      }
+      if (result === prev) break;
     }
     return result;
   }
