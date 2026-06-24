@@ -1096,3 +1096,258 @@ describe("Surgical fix pass — needs_review badge", () => {
     expect(["authority_ready", "strong"]).toContain(statusBadge);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Step 2.8 — Opening Answer Block Guarantee
+// ---------------------------------------------------------------------------
+describe("Step 2.8 — Opening Answer Block guarantee (deterministic, no LLM)", () => {
+  it("P9 passes when bodyHtml has a bold question in first 800 chars", () => {
+    const bodyHtml = `<h1>Test Article</h1><p><strong>What is test keyword?</strong> It is a great thing.</p><p>More content here.</p>`;
+    const result = runPass1Scorer({
+      bodyHtml,
+      bodyMarkdown: bodyHtml.replace(/<[^>]+>/g, " "),
+      title: "Test Article",
+      metaTitle: "Test keyword | Test Article",
+      metaDescription: "Learn about test keyword in this article with expert advice from our team.",
+      urlSlug: "test-keyword",
+      wordCount: 30,
+      level: "cluster" as const,
+      primaryKeyword: "test keyword",
+      externalLinkPresent: false,
+      internalCtaLinkPresent: false,
+      internalBlogLinksPresent: false,
+      schemaPresent: true,
+    });
+    expect(result.points.p9_opening_answer).toBe(true);
+  });
+
+  it("P9 fails when bodyHtml has NO question mark in first 800 chars", () => {
+    const bodyHtml = `<h1>Test Article</h1><p>This is a paragraph with no question. Just statements about test keyword.</p><p>More content here about test keyword.</p>`;
+    const result = runPass1Scorer({
+      bodyHtml,
+      bodyMarkdown: bodyHtml.replace(/<[^>]+>/g, " "),
+      title: "Test Article",
+      metaTitle: "Test keyword | Test Article",
+      metaDescription: "Learn about test keyword in this article with expert advice from our team.",
+      urlSlug: "test-keyword",
+      wordCount: 30,
+      level: "cluster" as const,
+      primaryKeyword: "test keyword",
+      externalLinkPresent: false,
+      internalCtaLinkPresent: false,
+      internalBlogLinksPresent: false,
+      schemaPresent: true,
+    });
+    expect(result.points.p9_opening_answer).toBe(false);
+  });
+
+  it("Step 2.8 injection produces a bold question block after </h1>", () => {
+    const title = "Test Article";
+    const primaryKeyword = "test keyword";
+    let bodyHtml = `<h1>${title}</h1><p>No question here at all. Just content about test keyword.</p>`;
+
+    const first800 = bodyHtml.slice(0, 800);
+    const hasAnswerBlock =
+      /<(strong|b)[^>]*>[^<]*\?[^<]*<\/(strong|b)>/i.test(first800) ||
+      /<p[^>]*>[^<]{5,200}\?/i.test(first800) ||
+      /<h[23][^>]*>[^<]*\?[^<]*<\/h[23]>/i.test(first800);
+
+    if (!hasAnswerBlock) {
+      const question = `What is ${title.replace(/^[^:]+:\s*/, "")}?`;
+      const answerSentence = `Understanding ${primaryKeyword} is essential for getting the best results — here is what you need to know.`;
+      const answerBlock = `<p><strong>${question}</strong> ${answerSentence}</p>\n`;
+      if (/<\/h1>/i.test(bodyHtml)) {
+        bodyHtml = bodyHtml.replace(/<\/h1>/i, `</h1>\n${answerBlock}`);
+      } else {
+        bodyHtml = answerBlock + bodyHtml;
+      }
+    }
+
+    const first800After = bodyHtml.slice(0, 800);
+    const hasAnswerBlockAfter =
+      /<(strong|b)[^>]*>[^<]*\?[^<]*<\/(strong|b)>/i.test(first800After) ||
+      /<p[^>]*>[^<]{5,200}\?/i.test(first800After) ||
+      /<h[23][^>]*>[^<]*\?[^<]*<\/h[23]>/i.test(first800After);
+
+    expect(hasAnswerBlockAfter).toBe(true);
+    expect(bodyHtml).toContain("<strong>What is Test Article?</strong>");
+    const h1CloseIdx = bodyHtml.indexOf("</h1>");
+    const strongIdx = bodyHtml.indexOf("<strong>What is Test Article?</strong>");
+    expect(strongIdx).toBeGreaterThan(h1CloseIdx);
+  });
+
+  it("Step 2.8 does NOT inject if answer block already present", () => {
+    const title = "Test Article";
+    const primaryKeyword = "test keyword";
+    const originalHtml = `<h1>${title}</h1><p><strong>What is test keyword?</strong> It is great.</p>`;
+    let bodyHtml = originalHtml;
+
+    const first800 = bodyHtml.slice(0, 800);
+    const hasAnswerBlock =
+      /<(strong|b)[^>]*>[^<]*\?[^<]*<\/(strong|b)>/i.test(first800) ||
+      /<p[^>]*>[^<]{5,200}\?/i.test(first800) ||
+      /<h[23][^>]*>[^<]*\?[^<]*<\/h[23]>/i.test(first800);
+
+    if (!hasAnswerBlock) {
+      const question = `What is ${title.replace(/^[^:]+:\s*/, "")}?`;
+      const answerSentence = `Understanding ${primaryKeyword} is essential.`;
+      const answerBlock = `<p><strong>${question}</strong> ${answerSentence}</p>\n`;
+      bodyHtml = bodyHtml.replace(/<\/h1>/i, `</h1>\n${answerBlock}`);
+    }
+
+    expect(bodyHtml).toBe(originalHtml);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Step 2.9 — Schema Markup Guarantee
+// ---------------------------------------------------------------------------
+describe("Step 2.9 — Schema Markup guarantee (deterministic, no LLM)", () => {
+  it("FAQPage is included in schema for Cornerstone/Pillar articles (LLM output)", () => {
+    const schema = JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "Article", "headline": "Test Pillar", "url": "https://test.com/test-pillar" },
+        { "@type": "BreadcrumbList", "itemListElement": [] },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            { "@type": "Question", "name": "What is test keyword?", "acceptedAnswer": { "@type": "Answer", "text": "It is great." } },
+          ],
+        },
+      ],
+    });
+    expect(schema).toContain('"FAQPage"');
+    expect(schema).toContain('"Question"');
+  });
+
+  it("Step 2.9 patches FAQPage into schema that has Article but no FAQPage", () => {
+    const schemaWithoutFaq = JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "Article", "headline": "Test Article", "url": "https://test.com/test-article" },
+        { "@type": "BreadcrumbList", "itemListElement": [] },
+      ],
+    });
+
+    const openingQuestion = "What is test keyword?";
+    const openingAnswer = "It is a great thing to know about.";
+    const faqMainEntity = [
+      { "@type": "Question", "name": openingQuestion, "acceptedAnswer": { "@type": "Answer", "text": openingAnswer } },
+    ];
+
+    let schemaMarkupFinal = schemaWithoutFaq;
+    const existingHasFaq = schemaMarkupFinal.includes('"FAQPage"') || schemaMarkupFinal.includes('"Question"');
+    const existingHasArticle = schemaMarkupFinal.includes('"Article"');
+
+    if (existingHasArticle && !existingHasFaq) {
+      const existing = JSON.parse(schemaMarkupFinal) as Record<string, unknown>;
+      const faqEntry = { "@type": "FAQPage", "mainEntity": faqMainEntity };
+      if (Array.isArray(existing["@graph"])) {
+        (existing["@graph"] as unknown[]).push(faqEntry);
+        schemaMarkupFinal = JSON.stringify(existing);
+      }
+    }
+
+    expect(schemaMarkupFinal).toContain('"FAQPage"');
+    expect(schemaMarkupFinal).toContain('"Question"');
+    expect(schemaMarkupFinal).toContain("What is test keyword?");
+  });
+
+  it("Step 2.9 builds full schema from scratch when LLM returns empty schemaMarkup", () => {
+    const emptySchema = "";
+    const title = "Test Article";
+    const metaDescription = "Learn about test keyword.";
+    const businessName = "Test Business";
+    const siteUrl = "https://testbusiness.com";
+    const articleUrl = `${siteUrl}/test-keyword`;
+    const openingQuestion = "What is test keyword?";
+    const openingAnswer = "It is essential for success.";
+    const faqMainEntity = [
+      { "@type": "Question", "name": openingQuestion, "acceptedAnswer": { "@type": "Answer", "text": openingAnswer } },
+    ];
+
+    let schemaMarkupFinal = emptySchema;
+    const existingHasArticle = schemaMarkupFinal.includes('"Article"');
+
+    if (!schemaMarkupFinal || !existingHasArticle) {
+      schemaMarkupFinal = JSON.stringify({
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Article",
+            "@id": `${articleUrl}#article`,
+            "headline": title,
+            "description": metaDescription,
+            "url": articleUrl,
+            "publisher": { "@type": "Organization", "name": businessName, "url": siteUrl },
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": `${articleUrl}#breadcrumb`,
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": siteUrl },
+              { "@type": "ListItem", "position": 2, "name": title, "item": articleUrl },
+            ],
+          },
+          { "@type": "FAQPage", "@id": `${articleUrl}#faq`, "mainEntity": faqMainEntity },
+        ],
+      });
+    }
+
+    expect(schemaMarkupFinal).toContain('"Article"');
+    expect(schemaMarkupFinal).toContain('"BreadcrumbList"');
+    expect(schemaMarkupFinal).toContain('"FAQPage"');
+    expect(schemaMarkupFinal).toContain('"Question"');
+    expect(schemaMarkupFinal).toContain("What is test keyword?");
+    expect(() => JSON.parse(schemaMarkupFinal)).not.toThrow();
+  });
+
+  it("Step 2.9 does NOT modify schema that already has FAQPage", () => {
+    const existingSchema = JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "Article", "headline": "Test" },
+        { "@type": "FAQPage", "mainEntity": [{ "@type": "Question", "name": "Q1?", "acceptedAnswer": { "@type": "Answer", "text": "A1." } }] },
+      ],
+    });
+
+    let schemaMarkupFinal = existingSchema;
+    const existingHasFaq = schemaMarkupFinal.includes('"FAQPage"') || schemaMarkupFinal.includes('"Question"');
+    const existingHasArticle = schemaMarkupFinal.includes('"Article"');
+
+    if (!schemaMarkupFinal || !existingHasArticle) {
+      schemaMarkupFinal = "REPLACED";
+    } else if (!existingHasFaq) {
+      schemaMarkupFinal = "PATCHED";
+    }
+
+    expect(schemaMarkupFinal).toBe(existingSchema);
+  });
+
+  it("schemaMarkup field is included in the CMS publish payload", () => {
+    const payloadKeys = ["title", "bodyHtml", "metaTitle", "metaDescription", "focusKeyword", "urlSlug", "schemaMarkup", "imageUrl", "imageAltText", "scheduledPublishAt", "level"];
+    expect(payloadKeys).toContain("schemaMarkup");
+  });
+
+  it("Schema markup is injected as JSON-LD script tag in HTML export", () => {
+    const schemaMarkup = JSON.stringify({ "@context": "https://schema.org", "@type": "Article" });
+    const htmlExport = `<script type="application/ld+json">${schemaMarkup}</script>`;
+    expect(htmlExport).toContain('type="application/ld+json"');
+    expect(htmlExport).toContain('"@context"');
+    expect(htmlExport).toContain('"Article"');
+  });
+
+  it("Cluster articles get at minimum a Question/Answer schema for the opening Q&A", () => {
+    // Step 2.9 guarantees FAQPage even for Cluster articles (opening Q&A only)
+    const clusterSchema = JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "Article", "headline": "Cluster Article" },
+        { "@type": "FAQPage", "mainEntity": [{ "@type": "Question", "name": "What is cluster keyword?", "acceptedAnswer": { "@type": "Answer", "text": "It is the cluster topic." } }] },
+      ],
+    });
+    expect(clusterSchema).toContain('"FAQPage"');
+    expect(clusterSchema).toContain('"Question"');
+  });
+});

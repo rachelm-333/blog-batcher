@@ -380,6 +380,8 @@ export interface ArticleContext {
   instagramHandle?: string;
   /** Exhaustive allowlist of every URL the article is permitted to link to. */
   linkAllowlist: string[];
+  /** Business website root URL — used for schema markup @id construction. */
+  websiteUrl?: string;
 }
 
 /**
@@ -487,6 +489,7 @@ export async function buildArticleContext(
     // LINK ALLOWLIST — every URL the article is permitted to link to.
     // Nothing outside this list may appear as an href in the generated HTML.
     // -----------------------------------------------------------------------
+    websiteUrl: biz.websiteUrl ?? undefined,
     linkAllowlist: (() => {
       const urls = new Set<string>();
       // Business real pages
@@ -1657,6 +1660,138 @@ export async function generateSingleArticle(
     }
 
     // =========================================================================
+    // STEP 2.8 — OPENING ANSWER BLOCK GUARANTEE (no LLM)
+    // Ensures every article has a <strong>Question?</strong> immediately after
+    // the H1 (Position Zero / Featured Snippet target).
+    // =========================================================================
+    {
+      const first800 = bodyHtml.slice(0, 800);
+      const hasAnswerBlock =
+        /<(strong|b)[^>]*>[^<]*\?[^<]*<\/(strong|b)>/i.test(first800) ||
+        /<p[^>]*>[^<]{5,200}\?/i.test(first800) ||
+        /<h[23][^>]*>[^<]*\?[^<]*<\/h[23]>/i.test(first800);
+
+      if (!hasAnswerBlock) {
+        const question = `What is ${title.replace(/^[^:]+:\s*/, "")}?`;
+        const answerSentence = `Understanding ${ctx.primaryKeyword} is essential for getting the best results — here is what you need to know.`;
+        const answerBlock = `<p><strong>${question}</strong> ${answerSentence}</p>\n`;
+        if (/<\/h1>/i.test(bodyHtml)) {
+          bodyHtml = bodyHtml.replace(/<\/h1>/i, `</h1>\n${answerBlock}`);
+        } else {
+          bodyHtml = answerBlock + bodyHtml;
+        }
+        wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+        console.log(`[ArticleEngine] Step 2.8: injected opening answer block for node ${nodeId}`);
+      } else {
+        console.log(`[ArticleEngine] Step 2.8: opening answer block already present for node ${nodeId}`);
+      }
+    }
+
+    // =========================================================================
+    // STEP 2.9 — SCHEMA MARKUP GUARANTEE (no LLM)
+    // Every article must have at minimum Article + BreadcrumbList + FAQPage
+    // schema, where the FAQPage includes the opening Q&A answer block.
+    // Cluster articles get the opening Q&A only; Cornerstone/Pillar get the
+    // full FAQ list from faqItems as well.
+    // =========================================================================
+    let schemaMarkupFinal = schemaMarkup;
+    {
+      const siteUrl = ctx.websiteUrl || ctx.ctaUrl.replace(/\/[^/]+$/, "") || "https://example.com";
+      const articleUrl = `${siteUrl.replace(/\/$/, "")}/${ctx.urlSlug}`;
+
+      // Extract the opening question from the first <strong>/<b> containing '?'
+      const strongQMatch = bodyHtml.match(/<(strong|b)[^>]*>([^<]*\?[^<]*)<\/(strong|b)>/i);
+      const openingQuestion = strongQMatch ? strongQMatch[2].trim() : `What is ${title}?`;
+      // Extract the answer text from the first <p> (strip the question itself)
+      const firstPMatch = bodyHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+      const firstPText = firstPMatch ? firstPMatch[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "";
+      const openingAnswer = firstPText
+        .replace(openingQuestion, "")
+        .replace(/^[\s.]+/, "")
+        .trim() || `${ctx.primaryKeyword} requires a structured approach to achieve the best results.`;
+
+      // Build the FAQPage mainEntity: opening Q&A + any faqItems (Cornerstone/Pillar only)
+      const faqMainEntity = [
+        {
+          "@type": "Question",
+          "name": openingQuestion,
+          "acceptedAnswer": { "@type": "Answer", "text": openingAnswer },
+        },
+        ...(faqItems ?? []).map(item => ({
+          "@type": "Question",
+          "name": item.question,
+          "acceptedAnswer": { "@type": "Answer", "text": item.answer },
+        })),
+      ];
+
+      const existingHasFaq =
+        schemaMarkupFinal.includes('"FAQPage"') ||
+        schemaMarkupFinal.includes('"Question"');
+      const existingHasArticle = schemaMarkupFinal.includes('"Article"');
+
+      if (!schemaMarkupFinal || !existingHasArticle) {
+        // LLM returned empty/invalid schema — build from scratch
+        schemaMarkupFinal = JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Article",
+              "@id": `${articleUrl}#article`,
+              "headline": title,
+              "description": metaDescription,
+              "url": articleUrl,
+              "publisher": { "@type": "Organization", "name": ctx.businessName, "url": siteUrl },
+            },
+            {
+              "@type": "BreadcrumbList",
+              "@id": `${articleUrl}#breadcrumb`,
+              "itemListElement": [
+                { "@type": "ListItem", "position": 1, "name": "Home", "item": siteUrl },
+                { "@type": "ListItem", "position": 2, "name": title, "item": articleUrl },
+              ],
+            },
+            { "@type": "FAQPage", "@id": `${articleUrl}#faq`, "mainEntity": faqMainEntity },
+          ],
+        });
+        console.log(`[ArticleEngine] Step 2.9: built full schema from scratch for node ${nodeId}`);
+      } else if (!existingHasFaq) {
+        // Schema exists but missing FAQPage — patch it in
+        try {
+          const existing = JSON.parse(schemaMarkupFinal) as Record<string, unknown>;
+          const faqEntry = { "@type": "FAQPage", "@id": `${articleUrl}#faq`, "mainEntity": faqMainEntity };
+          if (Array.isArray(existing["@graph"])) {
+            (existing["@graph"] as unknown[]).push(faqEntry);
+            schemaMarkupFinal = JSON.stringify(existing);
+          } else {
+            schemaMarkupFinal = JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [existing, faqEntry],
+            });
+          }
+          console.log(`[ArticleEngine] Step 2.9: patched FAQPage into existing schema for node ${nodeId}`);
+        } catch {
+          // JSON parse failed — rebuild from scratch
+          schemaMarkupFinal = JSON.stringify({
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "Article",
+                "headline": title,
+                "description": metaDescription,
+                "url": articleUrl,
+                "publisher": { "@type": "Organization", "name": ctx.businessName, "url": siteUrl },
+              },
+              { "@type": "FAQPage", "mainEntity": faqMainEntity },
+            ],
+          });
+          console.log(`[ArticleEngine] Step 2.9: schema parse failed, rebuilt from scratch for node ${nodeId}`);
+        }
+      } else {
+        console.log(`[ArticleEngine] Step 2.9: schema already has FAQPage/Question for node ${nodeId} — no patch needed`);
+      }
+    }
+
+    // =========================================================================
     // STEP 3 — PASS 1 SCORER (rules-based, synchronous)
     // =========================================================================
     const pass1 = runPass1Scorer({
@@ -1672,7 +1807,7 @@ export async function generateSingleArticle(
       externalLinkPresent: bodyHtml.includes("http"),
       internalCtaLinkPresent: bodyHtml.includes(ctx.ctaUrl),
       internalBlogLinksPresent: ctx.allBatchSlugs.some(slug => bodyHtml.includes(slug)),
-      schemaPresent: schemaMarkup.length > 0,
+      schemaPresent: schemaMarkupFinal.length > 0,
     });
     console.log(`[ArticleEngine] Pass 1 done for node ${nodeId}: ${pass1.score}/100 (${Object.values(pass1.points).filter(Boolean).length}/16 checks passed)`);
 
@@ -1923,7 +2058,7 @@ ${bodyHtml}`;
       metaDescription,
       bodyHtml,
       bodyMarkdown,
-      schemaMarkup,
+      schemaMarkup: schemaMarkupFinal,
       faqItems,
       wordCount,
       urlSlug: ctx.urlSlug,
