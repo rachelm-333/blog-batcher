@@ -331,6 +331,45 @@ export function kwPresentInText(keyword: string, text: string): boolean {
   );
 }
 
+/** Title-case a keyword phrase ("psychosocial hazards" -> "Psychosocial Hazards"). */
+export function titleCaseKeyword(keyword: string): string {
+  return keyword
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/**
+ * Ensure the primary keyword appears in at least one H2 heading.
+ * Uses the SAME presence check as the Pass 1 scorer (kwPresentInText), so it
+ * only edits a heading when the scorer would actually fail. When it does need
+ * to insert, it prepends the keyword cleanly as a topic prefix
+ * ("Psychosocial Hazards: Legal Definition and Scope") rather than tacking on
+ * an awkward "...: A Guide to X" suffix.
+ *
+ * Pure, testable, no LLM.
+ */
+export function ensureKeywordInH2(
+  bodyHtml: string,
+  keyword: string,
+): { bodyHtml: string; changed: boolean } {
+  const h2Regex = /<h2(?:\s[^>]*)?>[\s\S]*?<\/h2>/gi;
+  const h2s = bodyHtml.match(h2Regex) ?? [];
+  if (h2s.length === 0) return { bodyHtml, changed: false };
+  // Already satisfies the checker — leave headings untouched.
+  if (h2s.some(h => kwPresentInText(keyword, h))) return { bodyHtml, changed: false };
+
+  const firstH2 = h2s[0];
+  if (!firstH2) return { bodyHtml, changed: false };
+  const parts = firstH2.match(/<h2((?:\s[^>]*)?)>([\s\S]*?)<\/h2>/i);
+  if (!parts) return { bodyHtml, changed: false };
+  const attrs = parts[1] ?? "";
+  const inner = parts[2].trim();
+  const newH2 = `<h2${attrs}>${titleCaseKeyword(keyword)}: ${inner}</h2>`;
+  return { bodyHtml: bodyHtml.replace(firstH2, newH2), changed: true };
+}
+
 // ---------------------------------------------------------------------------
 // Slug generation
 // ---------------------------------------------------------------------------
@@ -1665,8 +1704,9 @@ export async function generateSingleArticle(
     // =========================================================================
     {
       const kw = ctx.primaryKeyword;
-      const kwLower = kw.toLowerCase();
-      const kwPresent = (s: string) => s.toLowerCase().includes(kwLower);
+      // Use the SAME presence check as the Pass 1 scorer so we only edit when
+      // the scorer would actually fail.
+      const kwPresent = (s: string) => kwPresentInText(kw, s);
 
       // 1. Keyword in H1 — if missing, prepend keyword to H1 text
       if (!kwPresent(title)) {
@@ -1674,14 +1714,10 @@ export async function generateSingleArticle(
         console.log(`[ArticleEngine] KW guarantee: prepended keyword to H1 for node ${nodeId}`);
       }
 
-      // 2. Keyword in at least one H2 — if missing, append keyword to first H2
-      const h2Match = bodyHtml.match(/<h2(\s[^>]*)?>([\s\S]*?)<\/h2>/i);
-      if (h2Match && !kwPresent(h2Match[2])) {
-        const originalH2 = h2Match[0];
-        const h2Inner = h2Match[2].replace(/<[^>]+>/g, "").trim();
-        const newH2Inner = `${h2Inner}: A Guide to ${kw}`;
-        const newH2 = originalH2.replace(h2Match[2], newH2Inner);
-        bodyHtml = bodyHtml.replace(originalH2, newH2);
+      // 2. Keyword in at least one H2 — clean topic-prefix insert (no band-aid)
+      const h2Result = ensureKeywordInH2(bodyHtml, kw);
+      if (h2Result.changed) {
+        bodyHtml = h2Result.bodyHtml;
         console.log(`[ArticleEngine] KW guarantee: inserted keyword into first H2 for node ${nodeId}`);
       }
 
