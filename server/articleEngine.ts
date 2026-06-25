@@ -104,22 +104,33 @@ export function trimHtmlToWordCount(
   const startWords = wordCount;
   if (wordCount <= maxWords) return { bodyHtml: html, wordCount, removed: 0 };
 
-  // Collect all <p> blocks in document order.
+  // Protect the closing CTA section: everything from the LAST <h2> onward is
+  // the mandated CTA block and must never be trimmed (keeps the CTA link + a
+  // clean ending). We only trim paragraphs that appear before it.
+  const lastH2Idx = html.toLowerCase().lastIndexOf("<h2");
+  const protectedTailStart = lastH2Idx === -1 ? html.length : lastH2Idx;
+
+  // A paragraph is eligible for removal only if it is: not the first <p>
+  // (opening answer), before the CTA tail, and contains no link (links are
+  // valuable — CTA and authority links must survive).
   const pRegex = /<p(?:\s[^>]*)?>[\s\S]*?<\/p>/gi;
   let pBlocks: string[] = html.match(pRegex) ?? [];
   if (pBlocks.length <= 1) {
-    // Nothing safely removable as whole paragraphs.
     return { bodyHtml: html, wordCount, removed: startWords - wordCount };
   }
-
-  // Candidates: every paragraph except the first (opening answer block),
-  // processed bottom-up so the article's opening and early body survive.
   const firstP = pBlocks[0];
-  const candidates = pBlocks.slice(1).reverse();
+  const isEligible = (block: string): boolean => {
+    if (block === firstP) return false;
+    if (/<a\s[^>]*href=/i.test(block)) return false; // never strip a link
+    const idx = html.indexOf(block);
+    if (idx === -1 || idx >= protectedTailStart) return false; // inside CTA tail
+    return true;
+  };
 
+  // Remove eligible paragraphs bottom-up (preserves opening + early body).
+  const candidates = pBlocks.filter(isEligible).reverse();
   for (const block of candidates) {
     if (wordCount <= maxWords) break;
-    if (block === firstP) continue;
     const idx = html.indexOf(block);
     if (idx === -1) continue;
 
@@ -135,22 +146,21 @@ export function trimHtmlToWordCount(
     wordCount -= blockWords;
   }
 
-  // Last resort: if still over, trim trailing sentences from the longest
-  // remaining non-first body paragraph until under target.
+  // Last resort: trim WHOLE trailing sentences (sentence-boundary safe, never
+  // mid-sentence) from the longest eligible body paragraphs until under target.
   if (wordCount > maxWords) {
-    pBlocks = (html.match(pRegex) ?? []).slice(1);
-    // Longest first
-    pBlocks.sort((a, b) => countHtmlWords(b) - countHtmlWords(a));
-    for (const block of pBlocks) {
+    const eligible = (html.match(pRegex) ?? []).filter(isEligible);
+    eligible.sort((a, b) => countHtmlWords(b) - countHtmlWords(a));
+    for (const block of eligible) {
       if (wordCount <= maxWords) break;
       const inner = block.replace(/^<p(?:\s[^>]*)?>/i, "").replace(/<\/p>$/i, "");
       const sentences = inner.split(/(?<=[.!?])\s+/);
       if (sentences.length < 2) continue;
       let kept = sentences;
-      while (kept.length > 1 && wordCount > maxWords) {
+      while (kept.length > 2 && wordCount > maxWords) {
         const dropped = kept[kept.length - 1];
         kept = kept.slice(0, -1);
-        wordCount -= countHtmlWords(dropped);
+        wordCount -= countHtmlWords(dropped ?? "");
       }
       const rebuilt = block.replace(inner, kept.join(" ").trim());
       html = html.replace(block, rebuilt);
@@ -368,6 +378,31 @@ export function ensureKeywordInH2(
   const inner = parts[2].trim();
   const newH2 = `<h2${attrs}>${titleCaseKeyword(keyword)}: ${inner}</h2>`;
   return { bodyHtml: bodyHtml.replace(firstH2, newH2), changed: true };
+}
+
+/**
+ * Ensure the primary keyword appears in at least one H3 heading — but ONLY if
+ * H3s already exist (the Pass 1 check passes automatically when there are no
+ * H3s, so we never add headings just to satisfy it). Mirrors ensureKeywordInH2.
+ * Pure, testable, no LLM.
+ */
+export function ensureKeywordInH3(
+  bodyHtml: string,
+  keyword: string,
+): { bodyHtml: string; changed: boolean } {
+  const h3Regex = /<h3(?:\s[^>]*)?>[\s\S]*?<\/h3>/gi;
+  const h3s = bodyHtml.match(h3Regex) ?? [];
+  if (h3s.length === 0) return { bodyHtml, changed: false }; // no H3s → check passes anyway
+  if (h3s.some(h => kwPresentInText(keyword, h))) return { bodyHtml, changed: false };
+
+  const firstH3 = h3s[0];
+  if (!firstH3) return { bodyHtml, changed: false };
+  const parts = firstH3.match(/<h3((?:\s[^>]*)?)>([\s\S]*?)<\/h3>/i);
+  if (!parts) return { bodyHtml, changed: false };
+  const attrs = parts[1] ?? "";
+  const inner = parts[2].trim();
+  const newH3 = `<h3${attrs}>${titleCaseKeyword(keyword)}: ${inner}</h3>`;
+  return { bodyHtml: bodyHtml.replace(firstH3, newH3), changed: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -1040,8 +1075,10 @@ ${batchCohesionLine}
 
 Primary keyword: ${primaryKeyword}
 
-Article (first 3000 chars):
-${bodyHtml.slice(0, 3000)}
+IMPORTANT: The FULL article is provided below. Judge completeness against the entire article — do not assume it is unfinished.
+
+Full article (plain text):
+${bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 24000)}
 
 Return JSON: { "score": <0-100 integer>, "reason": "<one sentence explaining the main weakness — be specific about which criterion lost the most points and why>" }`;
 
@@ -1237,6 +1274,10 @@ Primary Keyword: ${ctx.primaryKeyword}
 Secondary Keywords: ${ctx.secondaryKeywords.join(", ") || "None"}
 PAA Question to Answer: ${ctx.paaQuestion || "Not specified — answer the most likely search intent question"}
 Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (MINIMUM: ${ctx.wordCountMin} words — you MUST write at least ${ctx.wordCountMin} words; HARD MAXIMUM: ${ctx.wordCountMax} words — do not exceed).
+⚠️ WORD BUDGET IS A HARD CONSTRAINT — PLAN FOR IT:
+- Before writing, decide how many H2 sections you can FULLY cover within ${ctx.wordCountMax} words, then write only that many. Roughly ${Math.max(4, Math.floor(ctx.wordCountMax / 320))} H2 sections of ~250–320 words each fits the budget.
+- A COMPLETE article that covers every promised point concisely within the limit is REQUIRED. A long article that runs over and gets cut off mid-topic is a FAILURE.
+- If the title promises a "complete" or "step-by-step" guide, cover ALL the essential steps — but keep each one tight. Do not pad. Do not exceed ${ctx.wordCountMax} words.
 
 === INTERNAL LINK CONTEXT ===
 ${internalLinkContext || "No parent/sibling articles yet — this is a Cornerstone."}
@@ -1362,7 +1403,7 @@ CRITICAL RULES FOR OUTPUT FORMAT:
  * Apply mechanical (non-LLM) post-processing: banned-phrase regex scrub,
  * line-spacing normalisation, and word-count recompute.
  */
-function mechanicalPostProcess(bodyHtml: string): { bodyHtml: string; wordCount: number } {
+export function mechanicalPostProcess(bodyHtml: string): { bodyHtml: string; wordCount: number } {
   let html = bodyHtml;
 
   // Regex-replace banned phrases with neutral alternatives (fast, no LLM)
@@ -1723,6 +1764,13 @@ export async function generateSingleArticle(
       if (h2Result.changed) {
         bodyHtml = h2Result.bodyHtml;
         console.log(`[ArticleEngine] KW guarantee: inserted keyword into first H2 for node ${nodeId}`);
+      }
+
+      // 2b. Keyword in at least one H3 (only if H3s exist) — clean topic-prefix
+      const h3Result = ensureKeywordInH3(bodyHtml, kw);
+      if (h3Result.changed) {
+        bodyHtml = h3Result.bodyHtml;
+        console.log(`[ArticleEngine] KW guarantee: inserted keyword into first H3 for node ${nodeId}`);
       }
 
       // 3. Keyword in first 150 words — if missing, append to first <p>

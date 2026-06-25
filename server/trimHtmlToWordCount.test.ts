@@ -71,4 +71,22 @@ describe("trimHtmlToWordCount — the recurring word-count bug", () => {
     const result = trimHtmlToWordCount(html, PILLAR_MAX, KEYWORD);
     expect(result.wordCount).toBeLessThanOrEqual(PILLAR_MAX);
   });
+
+  it("never strips the closing CTA section or its link", () => {
+    const body = buildLongArticle(KEYWORD, 3000);
+    const cta = `\n<h2>Ready to Take the Next Step?</h2>\n<p>Get started today.</p>\n<p>Grab a Box: <a href="https://thestartupdeck.com.au/shop">Grab a Box</a></p>`;
+    const html = body + cta;
+    const result = trimHtmlToWordCount(html, PILLAR_MAX, KEYWORD);
+    expect(result.bodyHtml).toContain("Ready to Take the Next Step?");
+    expect(result.bodyHtml).toContain('href="https://thestartupdeck.com.au/shop"');
+    expect(result.wordCount).toBeLessThanOrEqual(PILLAR_MAX);
+  });
+
+  it("never strips any paragraph containing a link", () => {
+    const body = buildLongArticle(KEYWORD, 2900);
+    const linked = `<p>See the official <a href="https://asic.gov.au">ASIC</a> guidance.</p>`;
+    const html = body + linked;
+    const result = trimHtmlToWordCount(html, PILLAR_MAX, KEYWORD);
+    expect(result.bodyHtml).toContain('href="https://asic.gov.au"');
+  });
 });

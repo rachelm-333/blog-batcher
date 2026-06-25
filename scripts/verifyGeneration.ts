@@ -9,8 +9,10 @@
  */
 import {
   buildGenerationPrompt,
+  mechanicalPostProcess,
   trimHtmlToWordCount,
   ensureKeywordInH2,
+  ensureKeywordInH3,
   runPass1Scorer,
   runPass2Scorer,
   countHtmlWords,
@@ -88,9 +90,10 @@ async function main() {
   const wordsBefore = countHtmlWords(bodyHtml);
   console.log(`Generated in ${elapsed}s — ${wordsBefore} words (raw)\n`);
 
-  // --- Apply the two deterministic fixes (as the engine does pre-scoring) ---
-  const h2res = ensureKeywordInH2(bodyHtml, ctx.primaryKeyword);
-  bodyHtml = h2res.bodyHtml;
+  // --- Apply the SAME deterministic pipeline the engine runs pre-scoring ---
+  bodyHtml = mechanicalPostProcess(bodyHtml).bodyHtml;       // banned-phrase scrub
+  bodyHtml = ensureKeywordInH2(bodyHtml, ctx.primaryKeyword).bodyHtml;
+  bodyHtml = ensureKeywordInH3(bodyHtml, ctx.primaryKeyword).bodyHtml;
   const trim = trimHtmlToWordCount(bodyHtml, max, ctx.primaryKeyword);
   bodyHtml = trim.bodyHtml;
   const wordsAfter = countHtmlWords(bodyHtml);
