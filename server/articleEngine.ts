@@ -1033,9 +1033,9 @@ export async function runPass2Scorer(bodyHtml: string, primaryKeyword: string, u
   const prompt = `You are an SEO content quality auditor. Score the following article on these 5 criteria (each worth 20 points, total 100):
 
 1. SEARCH INTENT RESOLUTION (20 pts): Does it fully resolve what the searcher is looking for?
-2. HUMAN AUTHENTICITY (20 pts): Does it read as written by a real human expert, not AI?
+2. HUMAN AUTHENTICITY (20 pts): Does it avoid AI-fingerprint writing and read naturally? Score this on CONCRETE SPECIFICITY — specific facts, real examples, named tools/standards/processes, concrete steps — and the absence of generic filler. IMPORTANT: Do NOT deduct points for the absence of first-person anecdotes, personal stories, or stated credentials. Fabricating those is prohibited, so their absence is correct and must not be penalised. A specific, accurate, plainly-written article by an anonymous expert should score full marks.
 3. TITLE TERRITORY (20 pts): Does the title own a specific territory and signal clear value?
-4. E-E-A-T AUTHORITY (20 pts): Does it demonstrate Experience, Expertise, Authoritativeness, Trustworthiness?
+4. E-E-A-T AUTHORITY (20 pts): Does it demonstrate Expertise and Trustworthiness through ACCURATE, SPECIFIC topical knowledge (correct terminology, real obligations/standards, concrete how-to detail)? Judge expertise by the accuracy and specificity of the content itself — NOT by personal credentials, bylines, or claimed years of experience, which the article is correctly prohibited from inventing.
 ${batchCohesionLine}
 
 Primary keyword: ${primaryKeyword}
@@ -1291,6 +1291,10 @@ Follow this direction. It takes priority over general guidelines.
    - DO NOT use generic credibility claims such as "industry-leading", "trusted by thousands", "proven track record", or "years of expertise" without specific, verifiable backing.
    - If citing business experience or client numbers, be specific and real — or omit entirely. Fabricated social proof is worse than no social proof.
    - BANNED OPENINGS: Never open the article with a "kitchen table" anecdote, "I remember sitting at...", "I remember staring at...", or any invented personal story not grounded in real customer intelligence provided above. Open with a concrete, useful statement that delivers immediate value to the reader.
+   HOW TO SOUND AUTHENTIC (do this — it is how you earn the authenticity score):
+   - Demonstrate expertise through CONCRETE SPECIFICS, not claims: name the actual standards, laws, obligations, tools, forms, processes, and exact steps relevant to the topic. Specific accurate detail IS the proof of expertise.
+   - Use the real customer intelligence and business details provided above to ground the writing in this business's actual situation.
+   - Write plainly and directly as a knowledgeable practitioner. You do NOT need personal anecdotes, a byline, or stated credentials — a specific, accurate, plainly-written article scores full authenticity marks.
 16. SEARCH INTENT RESOLUTION: The article title makes a promise to the reader. You MUST deliver on that promise.
    HARD RULES — SEARCH INTENT RESOLUTION:
    - If the title promises "how to start X", "how to do X", or "step-by-step guide to X" — deliver actual numbered step-by-step actionable instructions. Do NOT substitute framework overviews.
@@ -1300,9 +1304,9 @@ Follow this direction. It takes priority over general guidelines.
 === PASS 2 QUALITY SCORING — WRITE TO SCORE 80+ ON ALL FIVE ===
 This article will be scored on these five dimensions. Write to score 80+ on all five:
 1. SEARCH INTENT RESOLUTION: Fully resolves what the searcher is looking for. Delivers on the title's promise.
-2. HUMAN AUTHENTICITY: Reads as written by a real human expert. No AI fingerprint patterns. Specific, opinionated, direct.
+2. HUMAN AUTHENTICITY: No AI fingerprint patterns. Scored on concrete specificity — specific facts, named tools/standards/processes, real examples. The absence of personal anecdotes or credentials is NOT penalised.
 3. TITLE TERRITORY: The title owns a specific territory and signals clear value.
-4. E-E-A-T AUTHORITY: Demonstrates Experience, Expertise, Authoritativeness, Trustworthiness.
+4. E-E-A-T AUTHORITY: Demonstrates expertise through accurate, specific topical knowledge (correct terminology, real obligations/standards, concrete how-to detail) — NOT through invented credentials or claimed experience.
 5. BATCH COHESION: Feels like part of a coherent content strategy.
 
 === TITLE RULES ===
