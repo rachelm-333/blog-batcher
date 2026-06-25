@@ -1504,7 +1504,7 @@ export function mechanicalPostProcess(bodyHtml: string): { bodyHtml: string; wor
 /**
  * Enforce meta title: ≤60 chars, contains keyword.
  */
-function enforceMetaTitle(metaTitle: string, primaryKeyword: string): string {
+export function enforceMetaTitle(metaTitle: string, primaryKeyword: string): string {
   let mt = metaTitle;
   // Enforce keyword presence
   if (!kwPresentInText(primaryKeyword.toLowerCase(), mt.toLowerCase())) {
@@ -1523,7 +1523,7 @@ function enforceMetaTitle(metaTitle: string, primaryKeyword: string): string {
 /**
  * Enforce meta description: 140–160 chars, contains keyword.
  */
-function enforceMetaDescription(metaDescription: string, primaryKeyword: string, businessName: string): string {
+export function enforceMetaDescription(metaDescription: string, primaryKeyword: string, businessName: string): string {
   let md = metaDescription;
   // Enforce keyword presence
   if (!kwPresentInText(primaryKeyword.toLowerCase(), md.toLowerCase())) {
