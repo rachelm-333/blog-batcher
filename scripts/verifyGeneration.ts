@@ -11,6 +11,7 @@ import {
   buildGenerationPrompt,
   mechanicalPostProcess,
   validateAndStripLinks,
+  removeOrphanFaqItems,
   trimHtmlToWordCount,
   ensureKeywordInH2,
   ensureKeywordInH3,
@@ -108,6 +109,7 @@ async function main() {
   bodyHtml = mechanicalPostProcess(bodyHtml).bodyHtml;
   const linkRes = await validateAndStripLinks(bodyHtml, ctx.linkAllowlist);
   bodyHtml = linkRes.html;
+  bodyHtml = removeOrphanFaqItems(bodyHtml).bodyHtml;
   bodyHtml = ensureKeywordInH2(bodyHtml, ctx.primaryKeyword).bodyHtml;
   bodyHtml = ensureKeywordInH3(bodyHtml, ctx.primaryKeyword).bodyHtml;
   bodyHtml = trimHtmlToWordCount(bodyHtml, max, ctx.primaryKeyword).bodyHtml;
@@ -152,6 +154,16 @@ async function main() {
   line(h2s.some(h => kwPresentInText(ctx.primaryKeyword, h)), "Keyword in an H2", "");
   console.log(`\nTitle: ${title}`);
   console.log(`Meta:  ${metaDescription}`);
+
+  // 6) SAVE the article so it can be read/opened in a browser
+  const { writeFileSync, mkdirSync } = await import("node:fs");
+  mkdirSync("output", { recursive: true });
+  const page = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
+<style>body{font:17px/1.7 -apple-system,Segoe UI,Roboto,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1a1a2e}h1{font-size:34px;line-height:1.2}h2{margin-top:2em}a{color:#5b4bff}</style>
+</head><body>\n<h1>${title}</h1>\n${bodyHtml}\n</body></html>`;
+  writeFileSync("output/sample-article.html", page);
+  writeFileSync("output/sample-article.txt", `${title}\n\n${bodyHtml.replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*\n+/g, "\n\n").trim()}`);
+  console.log(`\nSaved: output/sample-article.html  and  output/sample-article.txt`);
 }
 
 main().catch(err => {

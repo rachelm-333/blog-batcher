@@ -381,6 +381,26 @@ export function ensureKeywordInH2(
 }
 
 /**
+ * Remove orphan FAQ items — a <div class="faq-item"> that contains a question
+ * but no answer (the model occasionally emits a trailing question with the
+ * answer cut off). An item is kept only if it has at least two non-empty <p>
+ * blocks (question + answer). Pure, testable, no LLM.
+ */
+export function removeOrphanFaqItems(bodyHtml: string): { bodyHtml: string; removed: number } {
+  let removed = 0;
+  const html = bodyHtml.replace(/<div\s+class=["'][^"']*faq-item[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, (block) => {
+    const pTexts = (block.match(/<p(?:\s[^>]*)?>[\s\S]*?<\/p>/gi) ?? [])
+      .map(p => p.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    // A complete FAQ item needs a question AND a non-empty answer (>= 2 paragraphs).
+    if (pTexts.length >= 2) return block;
+    removed++;
+    return "";
+  });
+  return { bodyHtml: html, removed };
+}
+
+/**
  * Ensure the primary keyword appears in at least one H3 heading — but ONLY if
  * H3s already exist (the Pass 1 check passes automatically when there are no
  * H3s, so we never add headings just to satisfy it). Mirrors ensureKeywordInH2.
@@ -1717,6 +1737,14 @@ export async function generateSingleArticle(
     if (linkValidationResult.strippedCount > 0) {
       console.warn(`[ArticleEngine] Link validator stripped ${linkValidationResult.strippedCount} hallucinated href(s) for node ${nodeId}: ${linkValidationResult.strippedUrls.join(", ")}`);
       bodyHtml = linkValidationResult.html;
+      wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    }
+
+    // STEP 2.6b — Remove any FAQ item that has a question but no answer
+    const faqClean = removeOrphanFaqItems(bodyHtml);
+    if (faqClean.removed > 0) {
+      console.log(`[ArticleEngine] Removed ${faqClean.removed} orphan FAQ item(s) (question with no answer) for node ${nodeId}`);
+      bodyHtml = faqClean.bodyHtml;
       wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
     }
 
