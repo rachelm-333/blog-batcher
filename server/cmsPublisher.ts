@@ -313,7 +313,7 @@ export async function testWordPressConnection(
  *   h1-h6, p, ul, ol, li, blockquote, strong, em, a, br
  * All other tags are treated as plain text.
  */
-function htmlToRicos(html: string): Record<string, unknown> {
+export function htmlToRicos(html: string): Record<string, unknown> {
   // Use a simple regex-based parser since we control the HTML structure
   const nodes: Record<string, unknown>[] = [];
   let idCounter = 0;
