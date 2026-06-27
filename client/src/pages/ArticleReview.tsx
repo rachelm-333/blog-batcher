@@ -17,6 +17,7 @@
  */
 
 import { useActiveBusiness } from "@/contexts/BusinessContext";
+import { stripAiDisclosure } from "@shared/stripAiDisclosure";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
 import { Badge } from "@/components/ui/badge";
@@ -1497,7 +1498,7 @@ export default function ArticleReview() {
                       )}
                       <div
                         className="prose prose-sm max-w-none text-foreground"
-                        dangerouslySetInnerHTML={{ __html: (fullArticle.bodyHtml ?? "").replace(/<p[^>]*class="ai-disclosure"[^>]*>[\s\S]*?<\/p>/gi, "").replace(/<p[^>]*>[\s\S]*?This article was researched and drafted with AI assistance[\s\S]*?<\/p>/gi, "").trim() }}
+                        dangerouslySetInnerHTML={{ __html: stripAiDisclosure(fullArticle.bodyHtml ?? "") }}
                       />
                     </div>
                   )}

@@ -603,11 +603,9 @@ export async function publishToWix(
     // 1. Remove the first <h1> tag (Wix renders the post title separately — having it in the body creates a duplicate)
     // 2. Remove the AI disclosure paragraph (it's a meta note, not article content)
     // 3. Prepend the featured image inline so it appears in the post body (Wix featured image only shows in post card/header, not body)
-    let cleanBodyHtml = article.bodyHtml
-      .replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, "")  // strip first H1 (duplicate of title) — multiline
-      .replace(/<p[^>]*class="ai-disclosure"[^>]*>[\s\S]*?<\/p>/i, "") // strip AI disclosure by class
-      .replace(/<p[^>]*>[\s\S]*?This article was researched and drafted with AI assistance[\s\S]*?<\/p>/i, "") // fallback: strip by text content
-      .trim();
+    let cleanBodyHtml = stripAiDisclosure(
+      article.bodyHtml.replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, ""), // strip first H1 (duplicate of title)
+    );
 
     // NOTE: Do NOT prepend image HTML — the htmlToRicos converter skips <figure>/<img> tags.
     // Instead we inject a proper Ricos IMAGE node directly after conversion (see below).
@@ -1097,6 +1095,7 @@ export async function testZapierConnection(
  * The key is derived from JWT_SECRET (already available in env).
  */
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from "crypto";
+import { stripAiDisclosure } from "@shared/stripAiDisclosure";
 
 function deriveKey(): Buffer {
   const secret = process.env.JWT_SECRET ?? "fallback-dev-secret";
