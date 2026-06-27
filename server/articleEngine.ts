@@ -774,73 +774,80 @@ async function checkUrlLive(url: string): Promise<boolean> {
   }
 }
 
+/** Extract the hostname (no www) from an absolute URL, or null if not absolute. */
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decide what to do with a single link WITHOUT any network call:
+ * "keep" | "strip" | "live-check".
+ *  - Exact allowlist match -> keep.  Anchor/mailto/tel -> keep.
+ *  - Relative link not in allowlist -> strip (invented internal page).
+ *  - Absolute URL on one of OUR OWN domains but not an exact match -> strip
+ *    (do NOT live-check our own domain: Wix returns soft 404s as HTTP 200, so a
+ *    dead invented path would falsely pass).
+ *  - Absolute URL on a different (external) domain -> live-check.
+ * Exported for testing.
+ */
+export function classifyLink(
+  href: string,
+  allowedExact: Set<string>,
+  ownDomains: Set<string>,
+): "keep" | "strip" | "live-check" {
+  const norm = href.toLowerCase().replace(/\/$/, "");
+  if (allowedExact.has(norm)) return "keep";
+  if (href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return "keep";
+  if (!/^https?:\/\//i.test(href)) return "strip";
+  const host = hostOf(href);
+  if (host && ownDomains.has(host)) return "strip";
+  return "live-check";
+}
+
 export async function validateAndStripLinks(
   html: string,
-  allowlist: string[]
+  allowlist: string[],
+  ownDomains: string[] = []
 ): Promise<{ html: string; strippedCount: number; strippedUrls: string[] }> {
   const strippedUrls: string[] = [];
+  const allowedExact = new Set(allowlist.map(u => u.toLowerCase().replace(/\/$/, "")));
+  const own = new Set(ownDomains.map(d => d.toLowerCase().replace(/^www\./, "")));
+  for (const a of allowlist) { const h = hostOf(a); if (h) own.add(h); }
 
-  // Build a normalised set for fast lookup
-  const allowed = new Set(allowlist.map(u => u.toLowerCase().replace(/\/$/, "")));
-
-  // ---- Pass 1: collect all <a> tags and identify external URLs to live-check ----
-  const externalHrefs = new Set<string>();
+  const toLiveCheck = new Set<string>();
   const linkPattern = /<a\b([^>]*?)>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = linkPattern.exec(html)) !== null) {
-    const attrs = m[1];
-    const hrefMatch = attrs.match(/href=["']([^"']*)["']/i);
+    const hrefMatch = m[1].match(/href=["']([^"']*)["']/i);
     if (!hrefMatch) continue;
     const href = hrefMatch[1].trim();
-    if (href.startsWith("http://") || href.startsWith("https://")) {
-      const hrefNorm = href.toLowerCase().replace(/\/$/, "");
-      // Only live-check external links NOT already in the allowlist
-      const inAllowlist =
-        allowed.has(hrefNorm) ||
-        allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")));
-      if (!inAllowlist) externalHrefs.add(href);
-    }
+    if (classifyLink(href, allowedExact, own) === "live-check") toLiveCheck.add(href);
   }
 
-  // ---- Pass 2: live-check all external URLs in parallel ----
   const liveResults = new Map<string, boolean>();
-  if (externalHrefs.size > 0) {
-    const checks = Array.from(externalHrefs).map(async url => {
-      const ok = await checkUrlLive(url);
-      liveResults.set(url, ok);
-    });
-    await Promise.all(checks);
+  if (toLiveCheck.size > 0) {
+    await Promise.all(Array.from(toLiveCheck).map(async url => {
+      liveResults.set(url, await checkUrlLive(url));
+    }));
     Array.from(liveResults.entries()).forEach(([url, ok]) => {
-      console.log(`[ArticleEngine] External link live-check: ${ok ? "PASS" : "FAIL"} \u2192 ${url}`);
+      console.log(`[ArticleEngine] External link live-check: ${ok ? "PASS" : "FAIL"} -> ${url}`);
     });
   }
 
-  // ---- Pass 3: replace <a> tags based on results ----
   const cleaned = html.replace(
     /<a\b([^>]*?)>([\s\S]*?)<\/a>/gi,
-    (fullMatch, attrs: string, innerText: string) => {
+    (fullMatch: string, attrs: string, innerText: string) => {
       const hrefMatch = attrs.match(/href=["']([^"']*)["']/i);
-      if (!hrefMatch) return fullMatch; // no href — keep as-is
+      if (!hrefMatch) return fullMatch;
       const href = hrefMatch[1].trim();
-      const hrefNorm = href.toLowerCase().replace(/\/$/, "");
-
-      if (href.startsWith("http://") || href.startsWith("https://")) {
-        // Allowlisted external links always pass
-        if (allowed.has(hrefNorm)) return fullMatch;
-        if (allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")))) return fullMatch;
-        // External authority link — keep only if live-check passed
-        const ok = liveResults.get(href);
-        if (ok === false) {
-          strippedUrls.push(href);
-          return innerText;
-        }
-        return fullMatch;
-      }
-
-      // Relative links — must be in the allowlist
-      if (allowed.has(hrefNorm)) return fullMatch;
-      if (allowlist.some(a => hrefNorm.startsWith(a.toLowerCase().replace(/\/$/, "")))) return fullMatch;
-
+      const verdict = classifyLink(href, allowedExact, own);
+      if (verdict === "keep") return fullMatch;
+      if (verdict === "strip") { strippedUrls.push(href); return innerText; }
+      if (liveResults.get(href) === true) return fullMatch;
       strippedUrls.push(href);
       return innerText;
     }
@@ -1733,7 +1740,11 @@ export async function generateSingleArticle(
     // =========================================================================
     // STEP 2.6 — LINK VALIDATOR (strip any href not in the allowlist)
     // =========================================================================
-    const linkValidationResult = await validateAndStripLinks(bodyHtml, ctx.linkAllowlist);
+    const linkValidationResult = await validateAndStripLinks(
+      bodyHtml,
+      ctx.linkAllowlist,
+      [ctx.websiteUrl ?? "", ctx.ctaUrl].filter(Boolean),
+    );
     if (linkValidationResult.strippedCount > 0) {
       console.warn(`[ArticleEngine] Link validator stripped ${linkValidationResult.strippedCount} hallucinated href(s) for node ${nodeId}: ${linkValidationResult.strippedUrls.join(", ")}`);
       bodyHtml = linkValidationResult.html;
