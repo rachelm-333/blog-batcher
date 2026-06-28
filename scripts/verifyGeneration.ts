@@ -12,6 +12,7 @@ import {
   mechanicalPostProcess,
   validateAndStripLinks,
   removeOrphanFaqItems,
+  splitDenseParagraphs,
   trimHtmlToWordCount,
   ensureKeywordInH2,
   ensureKeywordInH3,
@@ -25,6 +26,7 @@ import {
   type ArticleContext,
 } from "../server/articleEngine";
 import { invokeClaudeWithCost } from "../server/claudeLLM";
+import { auditHtml } from "../server/auditEngine/auditEngine";
 
 const ctx: ArticleContext = {
   businessName: "The Startup Deck",
@@ -110,6 +112,7 @@ async function main() {
   const linkRes = await validateAndStripLinks(bodyHtml, ctx.linkAllowlist);
   bodyHtml = linkRes.html;
   bodyHtml = removeOrphanFaqItems(bodyHtml).bodyHtml;
+  bodyHtml = splitDenseParagraphs(bodyHtml, 4);
   bodyHtml = ensureKeywordInH2(bodyHtml, ctx.primaryKeyword).bodyHtml;
   bodyHtml = ensureKeywordInH3(bodyHtml, ctx.primaryKeyword).bodyHtml;
   bodyHtml = trimHtmlToWordCount(bodyHtml, max, ctx.primaryKeyword).bodyHtml;
@@ -154,6 +157,27 @@ async function main() {
   line(h2s.some(h => kwPresentInText(ctx.primaryKeyword, h)), "Keyword in an H2", "");
   console.log(`\nTitle: ${title}`);
   console.log(`Meta:  ${metaDescription}`);
+
+  // ---- 29-POINT GEO AUDIT on the full published-HTML doc ----
+  const schema = JSON.stringify({ "@context": "https://schema.org", "@graph": [
+    { "@type": "Article" }, { "@type": "Organization" }, { "@type": "Person" }, { "@type": "FAQPage" },
+  ] });
+  // bodyHtml already contains its own <h1>; only add one if missing (avoid a false MIC-01 double-H1).
+  const bodyWithH1 = /<h1[\s>]/i.test(bodyHtml) ? bodyHtml : `<h1>${title}</h1>${bodyHtml}`;
+  const fullDoc = `<html><head><title>${metaTitle}</title><meta name="description" content="${metaDescription}"><script type="application/ld+json">${schema}</script></head><body>${bodyWithH1}</body></html>`;
+  const audit = auditHtml({
+    html: fullDoc,
+    primaryKeyword: ctx.primaryKeyword,
+    hubKeyword: ctx.primaryKeyword,
+    url: `https://thestartupdeck.com.au/guides/${ctx.urlSlug}`,
+    metaTitle, metaDescription,
+  });
+  console.log(`\n=== 29-POINT GEO AUDIT: ${audit.normalized_score}/100 (raw ${audit.total_score}/${audit.applicable_max}) ===`);
+  for (const c of audit.checks) {
+    if (c.passed === false) console.log(`  ❌ ${c.id} (${c.max_points}pt) ${c.parameter} — ${c.detail}`);
+  }
+  const naCount = audit.checks.filter(c => c.passed === null).length;
+  console.log(`  (${audit.checks.filter(c => c.passed === true).length} passed, ${audit.failed_checks.length} failed, ${naCount} N/A)`);
 
   // 6) SAVE the article so it can be read/opened in a browser
   const { writeFileSync, mkdirSync } = await import("node:fs");

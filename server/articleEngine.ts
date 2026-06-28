@@ -341,6 +341,24 @@ export function kwPresentInText(keyword: string, text: string): boolean {
   );
 }
 
+/**
+ * Split any <p> longer than `maxSentences` into multiple <p> blocks at sentence
+ * boundaries (GEO paragraph-density rule MIC-08). Pure, testable, no LLM.
+ */
+export function splitDenseParagraphs(html: string, maxSentences = 4): string {
+  return html.replace(/<p((?:\s[^>]*)?)>([\s\S]*?)<\/p>/gi, (full, attrs: string, inner: string) => {
+    // Don't split paragraphs that contain block/list markup or are short.
+    if (/<(ul|ol|table|h[1-6])\b/i.test(inner)) return full;
+    const sentences = inner.trim().split(/(?<=[.!?])\s+/).filter(Boolean);
+    if (sentences.length <= maxSentences) return full;
+    const chunks: string[] = [];
+    for (let i = 0; i < sentences.length; i += maxSentences) {
+      chunks.push(`<p${attrs}>${sentences.slice(i, i + maxSentences).join(" ")}</p>`);
+    }
+    return chunks.join("\n");
+  });
+}
+
 /** Title-case a keyword phrase ("psychosocial hazards" -> "Psychosocial Hazards"). */
 export function titleCaseKeyword(keyword: string): string {
   return keyword
@@ -1369,6 +1387,16 @@ Follow this direction. It takes priority over general guidelines.
    - Every H2 section MUST contain at least one specific, actionable instruction the reader can execute today.
    - Actionable instructions must be concrete: name the tool, form, website, phone number, or exact action.
 
+=== GEO STRUCTURE (2026/2027 GENERATIVE-ENGINE OPTIMISATION — MANDATORY) ===
+These rules make the article instantly extractable by AI answer engines. They are scored — follow every one.
+G1. H2 QUESTION FRAMING: At least 50% of your <h2> headings MUST be the exact question a user would search — end with "?" or start with Who/What/Where/Why/When/How/Do/Does/Can/Is/Are/Should. (e.g. "How much does ${ctx.primaryKeyword} cost in Australia?")
+G2. ANSWER-FIRST RULE (applies to EVERY H2, not just the opening): The FIRST <p> immediately after every <h2> must be a definitive, fluff-free answer of 40–60 words that directly answers that heading. No introductory filler, no "when it comes to…". Lead with the answer.
+G3. STRUCTURAL HTML (MANDATORY — every article): You MUST include at least ONE <ul> or <ol> list (for steps, options, or key points) AND at least ONE HTML <table> with <tr>/<th>/<td> (a comparison, a pricing/specs table, or an at-a-glance summary table relevant to the topic). AI answer engines extract lists and tables preferentially — both are required, not optional.
+G4. H3 ACTION STEPS: Use <h3> headings beneath <h2>s to break work into concrete, actionable sub-steps.
+G5. PARAGRAPH DENSITY: No <p> may exceed 4 sentences (≈80–100 words). Break dense text into shorter paragraphs or lists.
+G6. AI BLOCKLIST (zero tolerance): Never use: delve, tapestry, bustling, testament, crucial, landscape, realm, beacon, seamless, navigating the complexities, moreover, firstly, in conclusion.
+G7. ACTIVE VOICE: Write in active voice. Avoid "was/were/is/are + past participle" passive constructions.
+
 === PASS 2 QUALITY SCORING — WRITE TO SCORE 80+ ON ALL FIVE ===
 This article will be scored on these five dimensions. Write to score 80+ on all five:
 1. SEARCH INTENT RESOLUTION: Fully resolves what the searcher is looking for. Delivers on the title's promise.
@@ -1759,6 +1787,9 @@ export async function generateSingleArticle(
       wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
     }
 
+    // STEP 2.6c — GEO paragraph density: split any <p> over 4 sentences (MIC-08)
+    bodyHtml = splitDenseParagraphs(bodyHtml, 4);
+
     // =========================================================================
     // STEP 2.5 — DOM-BASED WORD COUNT TRIM (instant, no LLM, fires before scoring)
     // =========================================================================
@@ -1923,6 +1954,17 @@ export async function generateSingleArticle(
               "description": metaDescription,
               "url": articleUrl,
               "publisher": { "@type": "Organization", "name": ctx.businessName, "url": siteUrl },
+            },
+            {
+              "@type": "Organization",
+              "@id": `${siteUrl}#organization`,
+              "name": ctx.businessName,
+              "url": siteUrl,
+            },
+            {
+              "@type": "Person",
+              "@id": `${articleUrl}#author`,
+              "name": ctx.businessName,
             },
             {
               "@type": "BreadcrumbList",

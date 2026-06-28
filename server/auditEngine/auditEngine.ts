@@ -114,7 +114,7 @@ function evaluate(rule: AuditRule, $: cheerio.CheerioAPI, input: AuditInput): { 
       return { passed: inTitle && inDesc, detail: `title=${inTitle}, desc=${inDesc}` };
     }
     case "MAC-05":
-      return { passed: types.has("Article") || types.has("BlogPosting"), detail: [...types].join(",") || "no schema" };
+      return { passed: types.has("Article") || types.has("BlogPosting"), detail: Array.from(types).join(",") || "no schema" };
     case "MAC-06":
       return { passed: types.has("FAQPage"), detail: types.has("FAQPage") ? "FAQPage present" : "missing" };
     case "MAC-07":
