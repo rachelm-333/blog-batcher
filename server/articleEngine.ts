@@ -359,6 +359,27 @@ export function splitDenseParagraphs(html: string, maxSentences = 4): string {
   });
 }
 
+/**
+ * Ensure a user-provided expert quote appears as an attributed <blockquote>
+ * (E-E-A-T check EAT-04). Inserts before the closing CTA section if the model
+ * omitted it. Never invents — only inserts a quote that was provided.
+ */
+export function ensureExpertQuote(
+  bodyHtml: string,
+  expertQuote?: { quote: string; author: string },
+): { bodyHtml: string; inserted: boolean } {
+  if (!expertQuote || !expertQuote.quote || !expertQuote.author) return { bodyHtml, inserted: false };
+  // Already present (a blockquote attributed to a name)?
+  if (/<blockquote[\s>][\s\S]*?[—-]\s*[A-Z]/.test(bodyHtml)) return { bodyHtml, inserted: false };
+  const block = `<blockquote>"${expertQuote.quote}" — ${expertQuote.author}</blockquote>\n`;
+  // Insert before the last <h2> (the CTA section) if present, else append.
+  const lastH2 = bodyHtml.toLowerCase().lastIndexOf("<h2");
+  if (lastH2 !== -1) {
+    return { bodyHtml: bodyHtml.slice(0, lastH2) + block + bodyHtml.slice(lastH2), inserted: true };
+  }
+  return { bodyHtml: bodyHtml + block, inserted: true };
+}
+
 /** Title-case a keyword phrase ("psychosocial hazards" -> "Psychosocial Hazards"). */
 export function titleCaseKeyword(keyword: string): string {
   return keyword
@@ -587,6 +608,10 @@ export interface ArticleContext {
   linkAllowlist: string[];
   /** Business website root URL — used for schema markup @id construction. */
   websiteUrl?: string;
+  /** Fact Bank: verified facts/stats/experiences the AI may use (never invents others). */
+  verifiedFacts?: string[];
+  /** A user-provided, attributable expert quote (E-E-A-T). Never invented. */
+  expertQuote?: { quote: string; author: string };
 }
 
 /**
@@ -1397,6 +1422,14 @@ G5. PARAGRAPH DENSITY: No <p> may exceed 4 sentences (≈80–100 words). Break 
 G6. AI BLOCKLIST (zero tolerance): Never use: delve, tapestry, bustling, testament, crucial, landscape, realm, beacon, seamless, navigating the complexities, moreover, firstly, in conclusion.
 G7. ACTIVE VOICE: Write in active voice. Avoid "was/were/is/are + past participle" passive constructions.
 
+=== VERIFIED FACTS & E-E-A-T (use ONLY what is provided — never invent) ===
+${(ctx.verifiedFacts && ctx.verifiedFacts.length)
+  ? `VERIFIED FACTS you MAY use (these are true and approved — weave them in naturally as concrete evidence, stats, or first-hand experience). Do NOT state any statistic or experience that is not in this list:\n${ctx.verifiedFacts.map(f => `- ${f}`).join("\n")}\n\nFIRST-HAND EXPERIENCE: Frame relevant points using the business's real experience — e.g. "In our experience helping ${ctx.audiences[0] ?? "clients"}…", "When we work with…", "A common mistake we see is…" — grounded in the verified facts and customer intelligence above. Do not fabricate experiences beyond what the facts support.`
+  : `No verified facts were provided. Do NOT invent statistics, first-hand experiences, or case studies. Demonstrate expertise through accurate, specific, general domain knowledge only.`}
+${ctx.expertQuote
+  ? `EXPERT QUOTE (insert verbatim as an attributed blockquote where it fits naturally): <blockquote>"${ctx.expertQuote.quote}" — ${ctx.expertQuote.author}</blockquote>`
+  : `No expert quote was provided — do NOT fabricate a quote or attribute words to a named person.`}
+
 === PASS 2 QUALITY SCORING — WRITE TO SCORE 80+ ON ALL FIVE ===
 This article will be scored on these five dimensions. Write to score 80+ on all five:
 1. SEARCH INTENT RESOLUTION: Fully resolves what the searcher is looking for. Delivers on the title's promise.
@@ -1789,6 +1822,13 @@ export async function generateSingleArticle(
 
     // STEP 2.6c — GEO paragraph density: split any <p> over 4 sentences (MIC-08)
     bodyHtml = splitDenseParagraphs(bodyHtml, 4);
+
+    // STEP 2.6d — Ensure the user-provided expert quote appears (EAT-04)
+    const quoteResult = ensureExpertQuote(bodyHtml, ctx.expertQuote);
+    if (quoteResult.inserted) {
+      console.log(`[ArticleEngine] Inserted attributed expert quote for node ${nodeId}`);
+      bodyHtml = quoteResult.bodyHtml;
+    }
 
     // =========================================================================
     // STEP 2.5 — DOM-BASED WORD COUNT TRIM (instant, no LLM, fires before scoring)

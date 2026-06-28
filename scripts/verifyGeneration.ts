@@ -61,6 +61,16 @@ const ctx: ArticleContext = {
     "https://business.gov.au",
   ],
   websiteUrl: "https://thestartupdeck.com.au",
+  // Simulated Fact Bank (in production these come from the user's reviewed facts)
+  verifiedFacts: [
+    "We have guided over 300 first-time Australian founders through their first year since 2021.",
+    "In our testing, founders who validated with 20+ customer conversations before building were 3x more likely to still be trading at 12 months.",
+    "The most common mistake we see is registering a business name before checking the matching domain and social handles are available.",
+  ],
+  expertQuote: {
+    quote: "The founders who succeed treat their first 90 days as a sequence of experiments, not a launch.",
+    author: "Sarah Chen, Founder of The Startup Deck",
+  },
 };
 
 function line(ok: boolean, label: string, detail: string) {
