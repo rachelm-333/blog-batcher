@@ -360,6 +360,49 @@ export function splitDenseParagraphs(html: string, maxSentences = 4): string {
 }
 
 /**
+ * Insert a hub-and-spoke internal link with EXACT-MATCH anchor text (MAC-09).
+ * Used at PUBLISH time once the parent (pillar/cornerstone) is live and its real
+ * CMS URL is known — so the link never points at an unpublished 404.
+ *
+ *  - Wraps the first plain-text mention of `hubKeyword` in the body in a link to
+ *    `hubUrl` (anchor text === hubKeyword exactly).
+ *  - If the keyword isn't mentioned, appends one natural sentence with the link.
+ *  - Never touches text already inside an <a> or a heading.
+ * Pure, testable.
+ */
+export function insertHubLink(
+  bodyHtml: string,
+  hubUrl: string,
+  hubKeyword: string,
+): { bodyHtml: string; inserted: boolean } {
+  if (!hubUrl || !hubKeyword) return { bodyHtml, inserted: false };
+  // Already linked to this hub?
+  if (new RegExp(`<a\\b[^>]*href=["']${hubUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`, "i").test(bodyHtml)) {
+    return { bodyHtml, inserted: false };
+  }
+  const link = `<a href="${hubUrl}">${hubKeyword}</a>`;
+  // Try to wrap the first plain-text occurrence inside a <p> (not in a heading/link).
+  const pRegex = /<p((?:\s[^>]*)?)>([\s\S]*?)<\/p>/gi;
+  let done = false;
+  const out = bodyHtml.replace(pRegex, (full, attrs: string, inner: string) => {
+    if (done) return full;
+    if (/<a\b/i.test(inner)) return full; // skip paragraphs already containing links
+    const kwRegex = new RegExp(`\\b(${hubKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})\\b`, "i");
+    if (kwRegex.test(inner)) {
+      done = true;
+      return `<p${attrs}>${inner.replace(kwRegex, link)}</p>`;
+    }
+    return full;
+  });
+  if (done) return { bodyHtml: out, inserted: true };
+  // Fallback: append a contextual sentence before the CTA (or at the end).
+  const sentence = `<p>For the full picture, see our guide to ${link}.</p>\n`;
+  const lastH2 = bodyHtml.toLowerCase().lastIndexOf("<h2");
+  if (lastH2 !== -1) return { bodyHtml: bodyHtml.slice(0, lastH2) + sentence + bodyHtml.slice(lastH2), inserted: true };
+  return { bodyHtml: bodyHtml + sentence, inserted: true };
+}
+
+/**
  * Ensure a user-provided expert quote appears as an attributed <blockquote>
  * (E-E-A-T check EAT-04). Inserts before the closing CTA section if the model
  * omitted it. Never invents — only inserts a quote that was provided.
