@@ -128,6 +128,32 @@ Second billable mode. Same 29-point engine.
 
 ---
 
+## Module 8 — Link Anti-Sabotage Gatekeeper — ✅ BUILT (engine)
+`server/auditEngine/linkGatekeeper.ts` — pre-publish hard gatekeeper. Returns
+blocking ERRORS + auto-fixed HTML. 10 tests. **Wiring:** call before publish/export;
+block the action if `errors.length > 0`.
+
+| ID | Rule | Action | Status |
+|---|---|---|---|
+| GATE-01 | Internal anchor == primary keyword | ERROR (cannibalization) | ✅ |
+| GATE-02 | Generic anchor (click here/read more/learn more/link) | ERROR | ✅ |
+| GATE-03 | External anchor == primary keyword | ERROR (keyword bleed) | ✅ |
+| GATE-04 | First external link within first 100 words | ERROR (early exit) | ✅ |
+| GATE-05 | External anchor is a naked URL (http/www) | ERROR | ✅ |
+| GATE-06 | Link to a competitor domain (competitor_blocklist) | ERROR | ✅ |
+| GATE-07 | External TLD in spam list (.info/.biz/.tk/.xyz…) | ERROR | ✅ |
+| GATE-08 | External links missing target=_blank / rel=noopener | AUTO-FIX (inject) | ✅ |
+| GATE-09 | Orphan prevention (no incoming link in sitemap) | needs CMS sitemap | ⬜ |
+| GATE-10 | Wire gatekeeper into publish/export (block on errors) + UI errors | app integration | ⬜ |
+
+## Module 9 — Performance & State (app integration) — ⬜ TO-DO
+| ID | Requirement | Status |
+|---|---|---|
+| PERF-01 | DataForSEO result cache (Redis or DB table), 30-day TTL | ⬜ |
+| PERF-02 | Tier 1 instant (DOM/regex/word counts) vs Tier 2 background (NLP, DataForSEO) via queue | ⬜ |
+| PERF-03 | Skeleton/"Analyzing claims…" UX while Tier 2 runs | ⬜ |
+| PERF-04 | Debounced live audit in editor (1500ms after typing stops) | ⬜ |
+
 ## Build order (phased)
 1. **B. Generator** → write to 100 (verify with the 29-point engine on real generations)
 2. **C. Fact Bank** → grounds E-E-A-T (unblocks GEN-05/06 + EAT checks)
