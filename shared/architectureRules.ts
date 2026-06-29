@@ -17,6 +17,28 @@ export const CLUSTERS_PER_PILLAR = 3;
 export const DEFAULT_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
 export const MIN_CLUSTERS_PER_PILLAR = 0;
 export const MAX_CLUSTERS_PER_PILLAR = 5;
+
+/**
+ * SEO/GEO recommendation for a *topic-cluster series* (not a deliberate
+ * standalone post). A pillar needs ≥4 supporting clusters to signal topical
+ * authority. 0 clusters = intentional standalone (no warning). 1–3 = a partial
+ * series that won't rank as a cluster (advisory warning). 4+ = healthy.
+ * Module 10 (Campaign Architect) defaults Cluster_Count to this value.
+ */
+export const RECOMMENDED_CLUSTERS_PER_PILLAR = 4;
+export const MIN_SERIES_CLUSTERS_PER_PILLAR = 4;
+
+/**
+ * Returns an advisory (non-blocking) warning if a pillar has too few clusters to
+ * function as a topic cluster. Null when it's a deliberate standalone (0) or a
+ * healthy series (>=4). Surface this in the UI / Campaign Architect.
+ */
+export function getClusterSeriesWarning(clustersPerPillar: number): string | null {
+  if (clustersPerPillar >= 1 && clustersPerPillar < MIN_SERIES_CLUSTERS_PER_PILLAR) {
+    return `A topic cluster works best with at least ${MIN_SERIES_CLUSTERS_PER_PILLAR} supporting posts per pillar (you have ${clustersPerPillar}). A pillar with fewer won't signal topical authority — aim for ${MIN_SERIES_CLUSTERS_PER_PILLAR}–5, or use 0 for a deliberate standalone post.`;
+  }
+  return null;
+}
 export const MIN_PILLARS_PER_CORNERSTONE = 1;
 export const MAX_PILLARS_PER_CORNERSTONE = 4;
 export const MIN_CORNERSTONES = 0;

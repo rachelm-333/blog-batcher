@@ -173,7 +173,8 @@ block the action if `errors.length > 0`.
 Fixes Problem 1 (cluster topics from keyword tools are wrong). LLM generates the Hub & Spoke matrix.
 | ID | Requirement | Status |
 |---|---|---|
-| CAMP-01 | Input UI: Broad_Topic, Target_Audience, Cluster_Count | ⬜ |
+| CAMP-00 | Series minimum: recommend 4–5 clusters, advisory warning at 1–3, 0 = deliberate standalone (RECOMMENDED_CLUSTERS_PER_PILLAR=4, getClusterSeriesWarning) | ✅ constants + warning |
+| CAMP-01 | Input UI: Broad_Topic, Target_Audience, Cluster_Count (default 4) | ⬜ |
 | CAMP-02 | LLM matrix: 1 pillar (broad term) + N distinct long-tail clusters as JSON | ⬜ core buildable now |
 | CAMP-03 | Cannibalization guard: run clusters through shared/cannibalizationCheck.ts, regenerate overlaps | ⬜ |
 | CAMP-04 | Hybrid: validate pillar term volume via DataForSEO | ⬜ |
