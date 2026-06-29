@@ -76,9 +76,10 @@ using the parent's actual CMS URL.
 | ID | Requirement | Status |
 |---|---|---|
 | LINK-01 | Cluster links UP to its Pillar; Pillar links UP to its Cornerstone; Cornerstone links to nothing above | ⬜ |
-| LINK-02 | Link inserted only if parent is already published (real live URL) | ⬜ |
-| LINK-03 | Use the parent's real CMS URL (Wix `/post/`, WordPress `/blog/…`) — never a guessed path | ⬜ |
-| LINK-04 | If parent not published → no link + warn the user | ⬜ |
+| LINK-02 | Link inserted only if parent is already published (real live URL) | ✅ resolvePublishLinks (logic) · ⬜ publish wiring |
+| LINK-03 | Use the parent's real CMS URL (Wix `/post/`, WordPress `/blog/…`) — never a guessed path | ✅ resolvePublishLinks (logic) · ⬜ publish wiring |
+| LINK-04 | If parent not published → no link + warn the user | ✅ resolvePublishLinks (logic) · ⬜ publish wiring |
+| LINK-08 | Publish-flow wiring: build linkMap (each batch slug → cmsPostUrl or null), call resolvePublishLinks before CMS conversion | ⬜ app integration |
 | LINK-05 | Exact-match anchor text = parent's primary keyword (satisfies MAC-09) | ✅ variable-injection + insertHubLink guarantee |
 | LINK-06 | Link validator (already fixed) strips any non-allowlisted/invented link | ✅ |
 | LINK-07 | Variable injection: force-feed {{PILLAR_URL}}+{{PILLAR_KEYWORDS}} into prompt + few-shot good/bad anchor examples | ✅ |

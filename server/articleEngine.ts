@@ -360,6 +360,46 @@ export function splitDenseParagraphs(html: string, maxSentences = 4): string {
 }
 
 /**
+ * Resolve placeholder internal links to real published URLs at PUBLISH time.
+ *
+ * `linkMap` maps a batch article's placeholder href (its slug, e.g. "/my-slug")
+ * to its REAL published CMS URL, or null if it is not published yet.
+ *
+ *  - href in map with a real URL  -> rewrite to the real URL (Wix /post/, WP /blog/).
+ *  - href in map but null (unpublished) -> drop the link (keep anchor text) + warn.
+ *  - href NOT in map (e.g. a live business page like /shop) -> leave untouched.
+ *
+ * Guarantees the no-404 rule: an internal blog link only survives if its target
+ * is actually live. Pure + testable.
+ */
+export function resolvePublishLinks(
+  bodyHtml: string,
+  linkMap: Record<string, string | null>,
+): { bodyHtml: string; warnings: string[] } {
+  const warnings: string[] = [];
+  // Normalise keys for lookup
+  const norm = (s: string) => s.toLowerCase().replace(/\/$/, "");
+  const map = new Map<string, string | null>();
+  for (const [k, v] of Object.entries(linkMap)) map.set(norm(k), v);
+
+  const html = bodyHtml.replace(
+    /<a\b([^>]*?)href=["']([^"']+)["']([^>]*)>([\s\S]*?)<\/a>/gi,
+    (full, pre: string, href: string, post: string, anchor: string) => {
+      const key = norm(href);
+      if (!map.has(key)) return full; // not a batch-article link — leave as-is
+      const real = map.get(key);
+      if (real) {
+        return `<a ${pre}href="${real}"${post}>${anchor}</a>`.replace(/\s+href/, " href");
+      }
+      // Target not published — drop the link, keep the text, warn.
+      warnings.push(`Internal link to "${href}" was removed — that post is not published yet. Publish it first, then re-publish this article to restore the link.`);
+      return anchor;
+    },
+  );
+  return { bodyHtml: html, warnings };
+}
+
+/**
  * Insert a hub-and-spoke internal link with EXACT-MATCH anchor text (MAC-09).
  * Used at PUBLISH time once the parent (pillar/cornerstone) is live and its real
  * CMS URL is known — so the link never points at an unpublished 404.
