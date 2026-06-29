@@ -169,6 +169,26 @@ block the action if `errors.length > 0`.
 | PERF-03 | Skeleton/"Analyzing claims…" UX while Tier 2 runs | ⬜ |
 | PERF-04 | Debounced live audit in editor (1500ms after typing stops) | ⬜ |
 
+## Module 10 — Campaign Architect (semantic clustering) — ⬜ TO-DO
+Fixes Problem 1 (cluster topics from keyword tools are wrong). LLM generates the Hub & Spoke matrix.
+| ID | Requirement | Status |
+|---|---|---|
+| CAMP-01 | Input UI: Broad_Topic, Target_Audience, Cluster_Count | ⬜ |
+| CAMP-02 | LLM matrix: 1 pillar (broad term) + N distinct long-tail clusters as JSON | ⬜ core buildable now |
+| CAMP-03 | Cannibalization guard: run clusters through shared/cannibalizationCheck.ts, regenerate overlaps | ⬜ |
+| CAMP-04 | Hybrid: validate pillar term volume via DataForSEO | ⬜ |
+| CAMP-05 | Save Campaign_Instance to DB | ⬜ |
+
+## Module 11 — Retroactive Link Debt Manager — ⬜ TO-DO
+Publish-state link management. UP link already built; this adds DOWN links + state loop.
+| ID | Requirement | Status |
+|---|---|---|
+| DEBT-01 | Track status (Draft/Published) + live_url per pillar & cluster | ✅ DB has status + cmsPostUrl |
+| DEBT-02 | UP-link enforcer (cluster→pillar exact anchor; pending queue if pillar unpublished) | ✅ variable injection + resolvePublishLinks |
+| DEBT-03 | DOWN-link snippet generator (40-word intro + exact cluster-keyword anchor → cluster URL) | ⬜ core buildable now |
+| DEBT-04 | On cluster publish: if pillar is on a SUPPORTED connector → AUTO-UPDATE the live pillar via CMS API (primary path) | ⬜ needs per-connector "update post" op |
+| DEBT-05 | If pillar on an UNSUPPORTED platform → copy-paste HTML alert (LAST-RESORT fallback only) | ⬜ |
+
 ## Build order (phased)
 1. **B. Generator** → write to 100 (verify with the 29-point engine on real generations)
 2. **C. Fact Bank** → grounds E-E-A-T (unblocks GEN-05/06 + EAT checks)
