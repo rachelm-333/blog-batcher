@@ -1486,8 +1486,13 @@ G2. ANSWER-FIRST RULE (applies to EVERY H2, not just the opening): The FIRST <p>
 G3. STRUCTURAL HTML (MANDATORY — every article): You MUST include at least ONE <ul> or <ol> list (for steps, options, or key points) AND at least ONE HTML <table> with <tr>/<th>/<td> (a comparison, a pricing/specs table, or an at-a-glance summary table relevant to the topic). AI answer engines extract lists and tables preferentially — both are required, not optional.
 G4. H3 ACTION STEPS: Use <h3> headings beneath <h2>s to break work into concrete, actionable sub-steps.
 G5. PARAGRAPH DENSITY: No <p> may exceed 4 sentences (≈80–100 words). Break dense text into shorter paragraphs or lists.
-G6. AI BLOCKLIST (zero tolerance): Never use: delve, tapestry, bustling, testament, crucial, landscape, realm, beacon, seamless, navigating the complexities, moreover, firstly, in conclusion.
+G6. ANTI-AI VOCABULARY (zero tolerance — if you are about to use one, pick a simpler, direct, conversational alternative):
+   - Banned verbs: delve, navigate, unpack, elevate, foster, harness, unleash, embark, spearhead.
+   - Banned adjectives/nouns: bustling, seamless, tapestry, landscape, realm, beacon, myriad, paramount, crucial.
+   - Banned transitions: furthermore, moreover, additionally, firstly, in conclusion, ultimately.
+   - Banned phrases: "in today's fast-paced world", "ever-evolving", "double-edged sword", "testament to", "crucial to understand", "navigating the complexities".
 G7. ACTIVE VOICE: Write in active voice. Avoid "was/were/is/are + past participle" passive constructions.
+G8. TONE: Write like a cynical, highly experienced senior executive. Be direct. Do not use metaphor. Omit needless words. Make every sentence earn its place.
 
 === VERIFIED FACTS & E-E-A-T (use ONLY what is provided — never invent) ===
 ${(ctx.verifiedFacts && ctx.verifiedFacts.length)
@@ -1563,6 +1568,41 @@ export function mechanicalPostProcess(bodyHtml: string): { bodyHtml: string; wor
 
   // Regex-replace banned phrases with neutral alternatives (fast, no LLM)
   const BANNED_REPLACEMENTS: [RegExp, string][] = [
+    // Anti-AI vocabulary enforcement (verbs)
+    [/\bdelve\b/gi, "look"],
+    [/\bnavigate\b/gi, "handle"],
+    [/\bnavigating the complexities\b/gi, "handling"],
+    [/\bunpack\b/gi, "break down"],
+    [/\belevate\b/gi, "improve"],
+    [/\bfoster\b/gi, "build"],
+    [/\bharness\b/gi, "use"],
+    [/\bunleash\b/gi, "release"],
+    [/\bembark\b/gi, "start"],
+    [/\bspearhead\b/gi, "lead"],
+    // Anti-AI vocabulary (adjectives/nouns)
+    [/\bbustling\b/gi, "busy"],
+    [/\bseamless\b/gi, "smooth"],
+    [/\btapestry\b/gi, "mix"],
+    [/\blandscape\b/gi, "market"],
+    [/\brealm\b/gi, "area"],
+    [/\bbeacon\b/gi, "example"],
+    [/\bmyriad\b/gi, "many"],
+    [/\bparamount\b/gi, "essential"],
+    [/\bcrucial to understand\b/gi, "important to know"],
+    [/\bcrucial\b/gi, "important"],
+    // Anti-AI transitions
+    [/\bfurthermore,?\s*/gi, ""],
+    [/\bmoreover,?\s*/gi, ""],
+    [/\badditionally,?\s*/gi, ""],
+    [/\bfirstly,?\s*/gi, "first, "],
+    [/\bin conclusion,?\s*/gi, ""],
+    [/\bultimately,?\s*/gi, ""],
+    // Anti-AI phrases
+    [/\bin today's fast-paced world\b/gi, "today"],
+    [/\bever-evolving\b/gi, "changing"],
+    [/\bdouble-edged sword\b/gi, "trade-off"],
+    [/\bis a testament to\b/gi, "shows"],
+    [/\btestament to\b/gi, "shows"],
     [/\bin today's world\b/gi, "today"],
     [/\bit's important to note\b/gi, "notably"],
     [/\bit is important to note\b/gi, "notably"],
