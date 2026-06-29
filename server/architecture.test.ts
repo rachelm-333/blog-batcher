@@ -17,93 +17,70 @@ import {
 // ─── Guardrails Engine Tests (pure logic, no mocks needed) ───────────────────
 
 describe("architectureRules.validateArchitecture", () => {
-  // Blog CREATION is hard-set to a minimum 1 cornerstone × 3 pillars × 5 clusters
-  // = 19 articles. No single-post or pillar-only mode.
+  // Blog CREATION is a FIXED shape: exactly 1 cornerstone × 3 pillars, with
+  // 3–5 clusters per pillar (default 5). Total ranges 13–19. The only lever the
+  // user has is the clusters-per-pillar count.
 
-  // ── 20-pack ────────────────────────────────────────────────────────────────
-
-  it("accepts the minimum 1×3×5 = 19 config without warnings", () => {
-    const result = validateArchitecture(20, 1, 3);
+  it("accepts the full 1×3×5 = 19 config without warnings", () => {
+    const result = validateArchitecture(20, 1, 3, 5);
     expect(result.valid).toBe(true);
     expect(result.warnings).toHaveLength(0);
     expect(result.correctedCornerstones).toBe(1);
     expect(result.correctedPillarsPerCornerstone).toBe(3);
     expect(result.correctedClustersPerPillar).toBe(5);
-    expect(calcTotalArticles(1, 3)).toBe(19); // 1 + 3 + 15 = 19 ≤ 20
+    expect(calcTotalArticles(1, 3, 5)).toBe(19); // 1 + 3 + 15 = 19
   });
 
-  it("clamps cornerstones up to the minimum of 1", () => {
+  it("accepts the reduced 1×3×3 = 13 config without warnings", () => {
+    const result = validateArchitecture(20, 1, 3, 3);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.correctedClustersPerPillar).toBe(3);
+    expect(calcTotalArticles(1, 3, 3)).toBe(13); // 1 + 3 + 9 = 13
+  });
+
+  it("clamps cornerstones up to the fixed value of 1", () => {
     const result = validateArchitecture(20, 0, 3);
     expect(result.correctedCornerstones).toBe(1);
     expect(result.warnings.some((w) => w.includes("Minimum 1 cornerstone"))).toBe(true);
   });
 
-  it("clamps pillars per cornerstone up to the minimum of 3", () => {
+  it("clamps cornerstones down to the fixed value of 1", () => {
+    const result = validateArchitecture(null, 3, 3);
+    expect(result.correctedCornerstones).toBe(1);
+    expect(result.warnings.some((w) => w.includes("Maximum 1 cornerstone"))).toBe(true);
+  });
+
+  it("clamps pillars up to the fixed value of 3", () => {
     const result = validateArchitecture(20, 1, 1);
     expect(result.correctedPillarsPerCornerstone).toBe(3);
     expect(result.warnings.some((w) => w.includes("Minimum 3 pillar"))).toBe(true);
   });
 
-  it("clamps clusters per pillar up to the minimum of 5", () => {
-    const result = validateArchitecture(null, 1, 3, 2);
+  it("clamps pillars down to the fixed value of 3", () => {
+    const result = validateArchitecture(null, 1, 10);
+    expect(result.correctedPillarsPerCornerstone).toBe(3);
+    expect(result.warnings.some((w) => w.includes("Maximum 3 pillar"))).toBe(true);
+  });
+
+  it("clamps clusters per pillar up to the minimum of 3", () => {
+    const result = validateArchitecture(null, 1, 3, 1);
+    expect(result.correctedClustersPerPillar).toBe(3);
+  });
+
+  it("clamps clusters per pillar down to the maximum of 5", () => {
+    const result = validateArchitecture(null, 1, 3, 20);
     expect(result.correctedClustersPerPillar).toBe(5);
   });
 
-  it("auto-corrects 20-pack when total would exceed pack size", () => {
-    // 2 cornerstones × 3 pillars × 5 clusters = 2 + 6 + 30 = 38 > 20
-    const result = validateArchitecture(20, 2, 3);
-    expect(result.valid).toBe(false);
-    expect(result.warnings.length).toBeGreaterThan(0);
-    const correctedTotal = calcTotalArticles(
-      result.correctedCornerstones,
-      result.correctedPillarsPerCornerstone
-    );
-    expect(correctedTotal).toBeLessThanOrEqual(20);
-    expect(correctedTotal).toBeGreaterThanOrEqual(19); // never drops below the floor
-  });
-
-  it("clamps cornerstones to max 4 (no pack constraint)", () => {
-    const result = validateArchitecture(null, 10, 3);
-    expect(result.correctedCornerstones).toBe(4);
-    expect(result.warnings.some((w) => w.includes("Maximum 4"))).toBe(true);
-  });
-
-  it("clamps pillars per cornerstone to max 4 (no pack constraint)", () => {
-    const result = validateArchitecture(null, 1, 10);
-    expect(result.correctedPillarsPerCornerstone).toBe(4);
-    expect(result.warnings.some((w) => w.includes("Maximum 4 pillars"))).toBe(true);
-  });
-
-  it("clamps clusters per pillar to max 8", () => {
-    const result = validateArchitecture(null, 1, 3, 20);
-    expect(result.correctedClustersPerPillar).toBe(8);
-  });
-
-  // ── 50-pack ────────────────────────────────────────────────────────────────
-
-  it("accepts 50-pack with 2 cornerstones × 3 pillars = 38 articles", () => {
-    const total = calcTotalArticles(2, 3);
-    expect(total).toBe(38); // 2 + 6 + 30 = 38
-    const result = validateArchitecture(50, 2, 3);
-    expect(result.valid).toBe(true);
-  });
-
-  it("accepts 50-pack with 2 cornerstones × 4 pillars = 50 articles", () => {
-    const total = calcTotalArticles(2, 4);
-    expect(total).toBe(50); // 2 + 8 + 40 = 50
-    const result = validateArchitecture(50, 2, 4);
-    expect(result.valid).toBe(true);
-  });
-
-  it("auto-corrects 50-pack when total would exceed pack size", () => {
-    // 4 × 4 × 5 = 4 + 16 + 80 = 100 > 50
-    const result = validateArchitecture(50, 4, 4);
+  it("never produces more than the 19-article maximum", () => {
+    const result = validateArchitecture(20, 1, 3, 5);
     const total = calcTotalArticles(
       result.correctedCornerstones,
-      result.correctedPillarsPerCornerstone
+      result.correctedPillarsPerCornerstone,
+      result.correctedClustersPerPillar
     );
-    expect(total).toBeLessThanOrEqual(50);
-    expect(total).toBeGreaterThanOrEqual(19);
+    expect(total).toBe(19);
   });
 });
 

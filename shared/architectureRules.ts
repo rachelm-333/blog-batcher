@@ -1,38 +1,48 @@
 /**
  * Blog Batcher — Architecture Rules Engine
  *
- * Enforces the Cornerstone → Pillar → Cluster hierarchy rules for CREATION:
- *  - Cornerstones: 1–4  (hard minimum 1)
- *  - Pillars per Cornerstone: 3–4  (hard minimum 3)
- *  - Clusters per Pillar: 5–8  (hard minimum 5)
- *  - Minimum total: 1 cornerstone + 3 pillars + 15 clusters = 19 articles
+ * Enforces the Cornerstone → Pillar → Cluster hierarchy for CREATION.
+ * The architecture is a FIXED shape — the only thing the user can adjust is the
+ * number of clusters per pillar (3–5):
+ *  - Cornerstones: exactly 1
+ *  - Pillars per Cornerstone: exactly 3
+ *  - Clusters per Pillar: 3–5  (default 5)
+ *  - Max total: 1 cornerstone + 3 pillars + 15 clusters = 19 articles
+ *  - Min total: 1 cornerstone + 3 pillars + 9 clusters = 13 articles
  */
 
 export const PACK_SIZES = [20, 50] as const;
 export type PackSize = (typeof PACK_SIZES)[number];
 
 /**
- * Blog CREATION is HARD-SET to a full authority cluster: minimum
- * 1 cornerstone × 3 pillars × 5 clusters = 19 articles. No single-post or
+ * Blog CREATION is HARD-SET to one fixed authority cluster: exactly
+ * 1 cornerstone × 3 pillars, with 3–5 clusters per pillar (default 5).
+ * The user may only reduce the clusters per pillar (5 → 3). No single-post or
  * pillar-only mode in creation. (The Auditor side is separate, no minimum.)
  */
 export const CLUSTERS_PER_PILLAR = 5;
 /** Alias for backward compatibility */
 export const DEFAULT_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
-export const MIN_CLUSTERS_PER_PILLAR = 5;
-export const MAX_CLUSTERS_PER_PILLAR = 8;
-/** Hard-set minimum total articles for a creation campaign (1 + 3 + 15). */
-export const MIN_TOTAL_ARTICLES = 19;
+export const MIN_CLUSTERS_PER_PILLAR = 3;
+export const MAX_CLUSTERS_PER_PILLAR = 5;
+/** Max total articles for a creation campaign (1 + 3 + 15). */
+export const MAX_TOTAL_ARTICLES = 19;
+/** Min total articles for a creation campaign (1 + 3 + 9). */
+export const MIN_TOTAL_ARTICLES = 13;
 
 /**
  * Module 10 (Campaign Architect) defaults its Cluster_Count to the hard-set
  * minimum so a generated campaign always meets the 19-article authority floor.
  */
 export const RECOMMENDED_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
+// Cornerstones and pillars are FIXED — exactly 1 and exactly 3.
 export const MIN_PILLARS_PER_CORNERSTONE = 3;
-export const MAX_PILLARS_PER_CORNERSTONE = 4;
+export const MAX_PILLARS_PER_CORNERSTONE = 3;
 export const MIN_CORNERSTONES = 1;
-export const MAX_CORNERSTONES = 4;
+export const MAX_CORNERSTONES = 1;
+/** The fixed, non-negotiable parts of the creation architecture. */
+export const FIXED_CORNERSTONES = 1;
+export const FIXED_PILLARS_PER_CORNERSTONE = 3;
 
 export const ARTICLE_TYPES = [
   "cornerstone_guide",
@@ -192,7 +202,7 @@ export function validateArchitecture(
     cornerstones = MIN_CORNERSTONES;
   }
   if (cornerstones > MAX_CORNERSTONES) {
-    warnings.push(`Maximum 4 cornerstones allowed. Adjusted to ${MAX_CORNERSTONES}.`);
+    warnings.push(`Maximum ${MAX_CORNERSTONES} cornerstone allowed. Adjusted to ${MAX_CORNERSTONES}.`);
     cornerstones = MAX_CORNERSTONES;
   }
 
@@ -202,7 +212,7 @@ export function validateArchitecture(
     pillarsPerCornerstone = MIN_PILLARS_PER_CORNERSTONE;
   }
   if (pillarsPerCornerstone > MAX_PILLARS_PER_CORNERSTONE) {
-    warnings.push(`Maximum 4 pillars per cornerstone allowed. Adjusted to ${MAX_PILLARS_PER_CORNERSTONE}.`);
+    warnings.push(`Maximum ${MAX_PILLARS_PER_CORNERSTONE} pillars per cornerstone allowed. Adjusted to ${MAX_PILLARS_PER_CORNERSTONE}.`);
     pillarsPerCornerstone = MAX_PILLARS_PER_CORNERSTONE;
   }
 
