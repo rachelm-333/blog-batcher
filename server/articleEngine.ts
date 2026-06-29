@@ -56,9 +56,9 @@ export const TOKEN_LIMITS = {
 // Word count rules (from scope Table 4)
 // ---------------------------------------------------------------------------
 export const WORD_COUNT_RULES = {
-  cornerstone: { min: 2000, max: 3200 },
-  pillar: { min: 1500, max: 2200 },
-  cluster: { min: 800, max: 1300 },
+  cornerstone: { min: 2500, max: 3500 },
+  pillar: { min: 1500, max: 2500 },
+  cluster: { min: 800, max: 1200 },
 } as const;
 
 /**
@@ -400,6 +400,26 @@ export function resolvePublishLinks(
 }
 
 /**
+ * Insert a LATERAL link to a sibling cluster (MAC-11) with a descriptive anchor.
+ * Used when the AI didn't add one. Appends a contextual sentence before the CTA.
+ * Pure, testable.
+ */
+export function insertLateralLink(
+  bodyHtml: string,
+  sibling?: { url: string; title: string },
+): { bodyHtml: string; inserted: boolean } {
+  if (!sibling || !sibling.url || !sibling.title) return { bodyHtml, inserted: false };
+  // Already has a link to this sibling, or already has any relative internal link besides the hub? Keep simple: skip if this exact url is linked.
+  if (new RegExp(`href=["']${sibling.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`, "i").test(bodyHtml)) {
+    return { bodyHtml, inserted: false };
+  }
+  const sentence = `<p>Related: <a href="${sibling.url}">${sibling.title}</a>.</p>\n`;
+  const lastH2 = bodyHtml.toLowerCase().lastIndexOf("<h2");
+  if (lastH2 !== -1) return { bodyHtml: bodyHtml.slice(0, lastH2) + sentence + bodyHtml.slice(lastH2), inserted: true };
+  return { bodyHtml: bodyHtml + sentence, inserted: true };
+}
+
+/**
  * Insert a hub-and-spoke internal link with EXACT-MATCH anchor text (MAC-09).
  * Used at PUBLISH time once the parent (pillar/cornerstone) is live and its real
  * CMS URL is known — so the link never points at an unpublished 404.
@@ -701,6 +721,11 @@ export interface ArticleContext {
    * strategy: force-feed this so the AI never guesses the anchor.
    */
   parentKeyword?: string;
+  /**
+   * Sibling clusters (same parent) for LATERAL linking — url (placeholder slug,
+   * resolved to the real URL at publish) + a descriptive title for the anchor.
+   */
+  siblingLinks?: Array<{ url: string; title: string }>;
 }
 
 /**
@@ -1406,6 +1431,15 @@ CRITICAL ANCHOR-TEXT RULES (emulate CORRECT, avoid INCORRECT):
 `
     : "";
 
+  // Lateral links — link sideways to at least one sibling cluster (MAC-11).
+  const lateralBlock = (ctx.siblingLinks && ctx.siblingLinks.length > 0)
+    ? `=== LATERAL LINK (link to a related sibling article) ===
+You MUST include at least ONE internal link to a related sibling article below, using descriptive anchor text (the sibling's topic) — NOT "click here". Place it where it's contextually relevant.
+Sibling articles you may link to:
+${ctx.siblingLinks.map(s => `- ${s.title} -> ${s.url}`).join("\n")}
+`
+    : "";
+
   const optionalPageLinks: string[] = [];
   if (ctx.contactPageUrl) optionalPageLinks.push(`Contact Page: ${ctx.contactPageUrl}`);
   if (ctx.bookingsPageUrl) optionalPageLinks.push(`Bookings/Appointments Page: ${ctx.bookingsPageUrl}`);
@@ -1458,6 +1492,7 @@ Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (MINIMUM: ${ctx.word
 === INTERNAL LINK CONTEXT ===
 ${internalLinkContext || "No parent/sibling articles yet — this is a Cornerstone."}
 ${upBlock}
+${lateralBlock}
 
 === ⚠️ LINK ALLOWLIST — CRITICAL RULE ===
 You may ONLY insert links (href attributes) to URLs from this EXACT list. NEVER invent, guess, construct, or modify any URL. If you have no relevant real URL for a point, do not add a link at all. Inserting a URL that is not on this list is a critical failure that will be automatically detected and removed.
@@ -1984,6 +2019,19 @@ export async function generateSingleArticle(
       if (hubRes.inserted) {
         console.log(`[ArticleEngine] Inserted UP hub link to "${ctx.parentKeyword}" for node ${nodeId}`);
         bodyHtml = hubRes.bodyHtml;
+      }
+    }
+
+    // STEP 2.6f — Lateral link guarantee (MAC-11): link to one sibling cluster
+    if (ctx.siblingLinks && ctx.siblingLinks.length > 0) {
+      const hasLateral = ctx.siblingLinks.some(s =>
+        new RegExp(`href=["']${s.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`, "i").test(bodyHtml));
+      if (!hasLateral) {
+        const latRes = insertLateralLink(bodyHtml, ctx.siblingLinks[0]);
+        if (latRes.inserted) {
+          console.log(`[ArticleEngine] Inserted lateral sibling link for node ${nodeId}`);
+          bodyHtml = latRes.bodyHtml;
+        }
       }
     }
 

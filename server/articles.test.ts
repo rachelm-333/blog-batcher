@@ -89,19 +89,19 @@ describe("Generation order", () => {
     expect(WORD_COUNT_RULES.cluster).toBeDefined();
   });
 
-  it("Cornerstone word count range is 2000–3200", () => {
-    expect(WORD_COUNT_RULES.cornerstone.min).toBe(2000);
-    expect(WORD_COUNT_RULES.cornerstone.max).toBe(3200);
+  it("Cornerstone word count range is 2500–3500", () => {
+    expect(WORD_COUNT_RULES.cornerstone.min).toBe(2500);
+    expect(WORD_COUNT_RULES.cornerstone.max).toBe(3500);
   });
 
-  it("Pillar word count range is 1500–2200", () => {
+  it("Pillar word count range is 1500–2500", () => {
     expect(WORD_COUNT_RULES.pillar.min).toBe(1500);
-    expect(WORD_COUNT_RULES.pillar.max).toBe(2200);
+    expect(WORD_COUNT_RULES.pillar.max).toBe(2500);
   });
 
-  it("Cluster word count range is 800–1300", () => {
+  it("Cluster word count range is 800–1200", () => {
     expect(WORD_COUNT_RULES.cluster.min).toBe(800);
-    expect(WORD_COUNT_RULES.cluster.max).toBe(1300);
+    expect(WORD_COUNT_RULES.cluster.max).toBe(1200);
   });
 
   it("getOrderedNodes sorts cornerstones before pillars before clusters (logic test)", () => {
@@ -135,13 +135,13 @@ describe("Word count enforcement", () => {
   });
 
   it("Pass 1 scorer passes p16 when word count is within 100-word tolerance of minimum", () => {
-    // 1920 words is 80 below the 2000 minimum, within the 100-word tolerance
-    const result = runPass1Scorer(makePass1Params({ wordCount: 1920, level: "cornerstone" }));
+    // 2420 words is 80 below the 2500 minimum, within the 100-word tolerance
+    const result = runPass1Scorer(makePass1Params({ wordCount: 2420, level: "cornerstone" }));
     expect(result.points.p16_word_count).toBe(true);
   });
 
-  it("Pass 1 scorer fails p16 when word count exceeds maximum for cornerstone (3200)", () => {
-    const result = runPass1Scorer(makePass1Params({ wordCount: 3500, level: "cornerstone" }));
+  it("Pass 1 scorer fails p16 when word count exceeds maximum for cornerstone (3500)", () => {
+    const result = runPass1Scorer(makePass1Params({ wordCount: 3700, level: "cornerstone" }));
     expect(result.points.p16_word_count).toBe(false);
   });
 

@@ -78,13 +78,13 @@ export const ARTICLE_LEVEL_INFO: Record<
   { wordMin: number; wordMax: number; description: string }
 > = {
   cornerstone: {
-    wordMin: 2800,
-    wordMax: 3200,
+    wordMin: 2500,
+    wordMax: 3500,
     description: "Authoritative guide post — the trunk of your content tree. Broad topic, high authority.",
   },
   pillar: {
     wordMin: 1500,
-    wordMax: 2000,
+    wordMax: 2500,
     description: "In-depth topic post — branches off the cornerstone. Covers one angle in detail.",
   },
   cluster: {
@@ -96,8 +96,8 @@ export const ARTICLE_LEVEL_INFO: Record<
 
 /** Word count targets from the scope */
 export const WORD_COUNT_TARGETS: Record<"cornerstone" | "pillar" | "cluster", { min: number; max: number }> = {
-  cornerstone: { min: 2800, max: 3200 },
-  pillar: { min: 1500, max: 2000 },
+  cornerstone: { min: 2500, max: 3500 },
+  pillar: { min: 1500, max: 2500 },
   cluster: { min: 800, max: 1200 },
 };
 
