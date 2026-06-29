@@ -57,10 +57,14 @@ const ctx: ArticleContext = {
   linkAllowlist: [
     "https://thestartupdeck.com.au/shop",
     "/starting-a-startup",
+    "/starting-a-business-in-australia",
     "https://asic.gov.au",
     "https://business.gov.au",
   ],
   websiteUrl: "https://thestartupdeck.com.au",
+  // Parent hub (this pillar links UP to its cornerstone) — variable injection
+  parentCornerstoneUrl: "/starting-a-business-in-australia",
+  parentKeyword: "starting a business in Australia",
   // Simulated Fact Bank (in production these come from the user's reviewed facts)
   verifiedFacts: [
     "We have guided over 300 first-time Australian founders through their first year since 2021.",
@@ -178,7 +182,7 @@ async function main() {
   const audit = auditHtml({
     html: fullDoc,
     primaryKeyword: ctx.primaryKeyword,
-    hubKeyword: ctx.primaryKeyword,
+    hubKeyword: ctx.parentKeyword,   // MAC-09: exact-match anchor to the parent hub
     url: `https://thestartupdeck.com.au/guides/${ctx.urlSlug}`,
     metaTitle, metaDescription,
   });

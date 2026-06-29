@@ -79,8 +79,22 @@ using the parent's actual CMS URL.
 | LINK-02 | Link inserted only if parent is already published (real live URL) | ⬜ |
 | LINK-03 | Use the parent's real CMS URL (Wix `/post/`, WordPress `/blog/…`) — never a guessed path | ⬜ |
 | LINK-04 | If parent not published → no link + warn the user | ⬜ |
-| LINK-05 | Exact-match anchor text = parent's primary keyword (satisfies MAC-09) | ⬜ |
+| LINK-05 | Exact-match anchor text = parent's primary keyword (satisfies MAC-09) | ✅ variable-injection + insertHubLink guarantee |
 | LINK-06 | Link validator (already fixed) strips any non-allowlisted/invented link | ✅ |
+| LINK-07 | Variable injection: force-feed {{PILLAR_URL}}+{{PILLAR_KEYWORDS}} into prompt + few-shot good/bad anchor examples | ✅ |
+
+## C2. Content Mapping — Cluster Topic Generation (Problem 1) — ⬜ TO-DO
+Keyword tools surface head terms, NOT the specific problem/scenario sub-topics clusters need.
+| ID | Requirement | Status |
+|---|---|---|
+| MAP-01 | Cornerstone/Pillar = head keyword from DataForSEO (volume) | ✅ exists |
+| MAP-02 | Clusters = AI-generated specific sub-topics/scenarios under the pillar ("how to handle continual lateness"), NOT a picked head keyword | ⬜ |
+| MAP-03 | Optionally validate generated cluster topics against PAA/keyword data | ⬜ |
+
+## Generation gate (close model variance) — ⬜ TO-DO
+| ID | Requirement | Status |
+|---|---|---|
+| GATE-AUDIT-01 | After generation + deterministic fixes, run the 29-point auditHtml(); if specific checks fail (lists, first-hand), run ONE targeted micro-fix so every article reliably scores high | ⬜ |
 
 ---
 

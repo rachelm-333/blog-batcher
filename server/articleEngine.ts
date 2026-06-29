@@ -655,6 +655,12 @@ export interface ArticleContext {
   verifiedFacts?: string[];
   /** A user-provided, attributable expert quote (E-E-A-T). Never invented. */
   expertQuote?: { quote: string; author: string };
+  /**
+   * The parent hub's EXACT primary keyword — the mandatory exact-match anchor
+   * text for the UP link (cluster→pillar, pillar→cornerstone). Variable-injection
+   * strategy: force-feed this so the AI never guesses the anchor.
+   */
+  parentKeyword?: string;
 }
 
 /**
@@ -1343,6 +1349,23 @@ function buildSinglePassPrompt(ctx: ArticleContext, currentYear: number): string
     .filter(Boolean)
     .join("\n");
 
+  // Variable-injection UP link: a cluster links up to its pillar; a pillar links
+  // up to its cornerstone. Anchor text MUST be the parent's exact keyword.
+  const upUrl = ctx.parentPillarUrl || ctx.parentCornerstoneUrl;
+  const upBlock = (upUrl && ctx.parentKeyword)
+    ? `=== MANDATORY UP-LINK (Variable Injection — exact-match anchor) ===
+You MUST include exactly ONE internal hyperlink pointing UP to the parent hub page.
+- Target URL: ${upUrl}
+- Mandatory anchor text (use VERBATIM, do not alter wording or capitalisation): "${ctx.parentKeyword}"
+- Write a grammatically natural sentence that incorporates the phrase "${ctx.parentKeyword}" exactly as written, and wrap ONLY those words in an <a href="${upUrl}"> link.
+
+CRITICAL ANCHOR-TEXT RULES (emulate CORRECT, avoid INCORRECT):
+- INCORRECT (generic): To learn more about our policies, <a>click here</a>.
+- INCORRECT (over-optimised/awkward): It is important to understand <a>Australian termination laws compliance software for businesses</a> to avoid fines.
+- CORRECT (natural, exact-match): Before taking disciplinary action, ensure your managers understand <a href="${upUrl}">${ctx.parentKeyword}</a> to protect your business from unfair dismissal claims.
+`
+    : "";
+
   const optionalPageLinks: string[] = [];
   if (ctx.contactPageUrl) optionalPageLinks.push(`Contact Page: ${ctx.contactPageUrl}`);
   if (ctx.bookingsPageUrl) optionalPageLinks.push(`Bookings/Appointments Page: ${ctx.bookingsPageUrl}`);
@@ -1394,6 +1417,7 @@ Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (MINIMUM: ${ctx.word
 
 === INTERNAL LINK CONTEXT ===
 ${internalLinkContext || "No parent/sibling articles yet — this is a Cornerstone."}
+${upBlock}
 
 === ⚠️ LINK ALLOWLIST — CRITICAL RULE ===
 You may ONLY insert links (href attributes) to URLs from this EXACT list. NEVER invent, guess, construct, or modify any URL. If you have no relevant real URL for a point, do not add a link at all. Inserting a URL that is not on this list is a critical failure that will be automatically detected and removed.
@@ -1873,6 +1897,16 @@ export async function generateSingleArticle(
       bodyHtml = quoteResult.bodyHtml;
     }
 
+    // STEP 2.6e — Hub-and-spoke UP link guarantee (MAC-09): exact-match anchor to parent
+    const hubUrl = ctx.parentPillarUrl || ctx.parentCornerstoneUrl;
+    if (hubUrl && ctx.parentKeyword) {
+      const hubRes = insertHubLink(bodyHtml, hubUrl, ctx.parentKeyword);
+      if (hubRes.inserted) {
+        console.log(`[ArticleEngine] Inserted UP hub link to "${ctx.parentKeyword}" for node ${nodeId}`);
+        bodyHtml = hubRes.bodyHtml;
+      }
+    }
+
     // =========================================================================
     // STEP 2.5 — DOM-BASED WORD COUNT TRIM (instant, no LLM, fires before scoring)
     // =========================================================================
@@ -1910,6 +1944,13 @@ export async function generateSingleArticle(
       if (!kwPresent(title)) {
         title = `${kw}: ${title}`;
         console.log(`[ArticleEngine] KW guarantee: prepended keyword to H1 for node ${nodeId}`);
+      }
+      // 1b. Keyword in the BODY <h1> too (the audit + Google read the body H1, not the meta title)
+      const bodyH1 = bodyHtml.match(/<h1(\s[^>]*)?>([\s\S]*?)<\/h1>/i);
+      if (bodyH1 && !kwPresent(bodyH1[2])) {
+        const newH1 = bodyH1[0].replace(bodyH1[2], `${titleCaseKeyword(kw)}: ${bodyH1[2].trim()}`);
+        bodyHtml = bodyHtml.replace(bodyH1[0], newH1);
+        console.log(`[ArticleEngine] KW guarantee: inserted keyword into body <h1> for node ${nodeId}`);
       }
 
       // 2. Keyword in at least one H2 — clean topic-prefix insert (no band-aid)
