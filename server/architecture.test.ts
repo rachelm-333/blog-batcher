@@ -17,25 +17,41 @@ import {
 // ─── Guardrails Engine Tests (pure logic, no mocks needed) ───────────────────
 
 describe("architectureRules.validateArchitecture", () => {
+  // Blog CREATION is hard-set to a minimum 1 cornerstone × 3 pillars × 5 clusters
+  // = 19 articles. No single-post or pillar-only mode.
+
   // ── 20-pack ────────────────────────────────────────────────────────────────
 
-  it("accepts the default 20-pack config (2×2) without warnings", () => {
-    const result = validateArchitecture(20, 2, 2);
+  it("accepts the minimum 1×3×5 = 19 config without warnings", () => {
+    const result = validateArchitecture(20, 1, 3);
     expect(result.valid).toBe(true);
     expect(result.warnings).toHaveLength(0);
-    expect(result.correctedCornerstones).toBe(2);
-    expect(result.correctedPillarsPerCornerstone).toBe(2);
+    expect(result.correctedCornerstones).toBe(1);
+    expect(result.correctedPillarsPerCornerstone).toBe(3);
+    expect(result.correctedClustersPerPillar).toBe(5);
+    expect(calcTotalArticles(1, 3)).toBe(19); // 1 + 3 + 15 = 19 ≤ 20
   });
 
-  it("accepts 20-pack with 1 cornerstone × 1 pillar (minimum valid)", () => {
+  it("clamps cornerstones up to the minimum of 1", () => {
+    const result = validateArchitecture(20, 0, 3);
+    expect(result.correctedCornerstones).toBe(1);
+    expect(result.warnings.some((w) => w.includes("Minimum 1 cornerstone"))).toBe(true);
+  });
+
+  it("clamps pillars per cornerstone up to the minimum of 3", () => {
     const result = validateArchitecture(20, 1, 1);
-    expect(result.valid).toBe(true);
-    expect(calcTotalArticles(1, 1)).toBe(5); // 1 + 1 + 3 = 5 ≤ 20 (default 3 clusters)
+    expect(result.correctedPillarsPerCornerstone).toBe(3);
+    expect(result.warnings.some((w) => w.includes("Minimum 3 pillar"))).toBe(true);
+  });
+
+  it("clamps clusters per pillar up to the minimum of 5", () => {
+    const result = validateArchitecture(null, 1, 3, 2);
+    expect(result.correctedClustersPerPillar).toBe(5);
   });
 
   it("auto-corrects 20-pack when total would exceed pack size", () => {
-    // 4 cornerstones × 4 pillars × 3 clusters = 4 + 16 + 48 = 68 > 20
-    const result = validateArchitecture(20, 4, 4);
+    // 2 cornerstones × 3 pillars × 5 clusters = 2 + 6 + 30 = 38 > 20
+    const result = validateArchitecture(20, 2, 3);
     expect(result.valid).toBe(false);
     expect(result.warnings.length).toBeGreaterThan(0);
     const correctedTotal = calcTotalArticles(
@@ -43,84 +59,80 @@ describe("architectureRules.validateArchitecture", () => {
       result.correctedPillarsPerCornerstone
     );
     expect(correctedTotal).toBeLessThanOrEqual(20);
+    expect(correctedTotal).toBeGreaterThanOrEqual(19); // never drops below the floor
   });
 
-  it("clamps cornerstones to max 4", () => {
-    const result = validateArchitecture(50, 10, 2);
+  it("clamps cornerstones to max 4 (no pack constraint)", () => {
+    const result = validateArchitecture(null, 10, 3);
     expect(result.correctedCornerstones).toBe(4);
     expect(result.warnings.some((w) => w.includes("Maximum 4"))).toBe(true);
   });
 
-  it("clamps cornerstones to min 0 (pillar-only mode is valid)", () => {
-    const result = validateArchitecture(20, 0, 2);
-    // 0 cornerstones is valid (pillar-only mode) — no clamping needed
-    expect(result.correctedCornerstones).toBe(0);
-    expect(result.warnings).toHaveLength(0);
-  });
-
-  it("clamps pillars per cornerstone to max 4", () => {
-    const result = validateArchitecture(50, 1, 10);
+  it("clamps pillars per cornerstone to max 4 (no pack constraint)", () => {
+    const result = validateArchitecture(null, 1, 10);
     expect(result.correctedPillarsPerCornerstone).toBe(4);
     expect(result.warnings.some((w) => w.includes("Maximum 4 pillars"))).toBe(true);
   });
 
-  it("clamps pillars per cornerstone to min 1", () => {
-    const result = validateArchitecture(20, 2, 0);
-    expect(result.correctedPillarsPerCornerstone).toBe(1);
-    expect(result.warnings.some((w) => w.includes("Minimum 1 pillar"))).toBe(true);
+  it("clamps clusters per pillar to max 8", () => {
+    const result = validateArchitecture(null, 1, 3, 20);
+    expect(result.correctedClustersPerPillar).toBe(8);
   });
 
   // ── 50-pack ────────────────────────────────────────────────────────────────
 
-  it("accepts the default 50-pack config (4×3) without warnings", () => {
-    // 4 + 12 + 36 = 52 > 50 — the scope says 'adjusted to fit 50'
-    // Our engine should auto-correct this
-    const result = validateArchitecture(50, 4, 3);
-    const total = calcTotalArticles(result.correctedCornerstones, result.correctedPillarsPerCornerstone);
+  it("accepts 50-pack with 2 cornerstones × 3 pillars = 38 articles", () => {
+    const total = calcTotalArticles(2, 3);
+    expect(total).toBe(38); // 2 + 6 + 30 = 38
+    const result = validateArchitecture(50, 2, 3);
+    expect(result.valid).toBe(true);
+  });
+
+  it("accepts 50-pack with 2 cornerstones × 4 pillars = 50 articles", () => {
+    const total = calcTotalArticles(2, 4);
+    expect(total).toBe(50); // 2 + 8 + 40 = 50
+    const result = validateArchitecture(50, 2, 4);
+    expect(result.valid).toBe(true);
+  });
+
+  it("auto-corrects 50-pack when total would exceed pack size", () => {
+    // 4 × 4 × 5 = 4 + 16 + 80 = 100 > 50
+    const result = validateArchitecture(50, 4, 4);
+    const total = calcTotalArticles(
+      result.correctedCornerstones,
+      result.correctedPillarsPerCornerstone
+    );
     expect(total).toBeLessThanOrEqual(50);
-  });
-
-  it("accepts 50-pack with 3 cornerstones × 3 pillars = 39 articles", () => {
-    const total = calcTotalArticles(3, 3);
-    expect(total).toBe(39); // 3 + 9 + 27 = 39
-    const result = validateArchitecture(50, 3, 3);
-    expect(result.valid).toBe(true);
-  });
-
-  it("accepts 50-pack with 4 cornerstones × 2 pillars = 36 articles", () => {
-    const total = calcTotalArticles(4, 2);
-    expect(total).toBe(36); // 4 + 8 + 24 = 36
-    const result = validateArchitecture(50, 4, 2);
-    expect(result.valid).toBe(true);
+    expect(total).toBeGreaterThanOrEqual(19);
   });
 });
 
 // ─── calcTotalArticles ────────────────────────────────────────────────────────
 
 describe("architectureRules.calcTotalArticles", () => {
-  it("calculates correctly for 2×2 config", () => {
-    // 2 cornerstones + 4 pillars + 12 clusters = 18
-    expect(calcTotalArticles(2, 2)).toBe(18);
+  it("calculates correctly for 2×2 config (default 5 clusters)", () => {
+    // 2 cornerstones + 4 pillars + 20 clusters = 26
+    expect(calcTotalArticles(2, 2)).toBe(26);
   });
 
-  it("calculates correctly for 1×1 config", () => {
-    // 1 + 1 + 3 = 5
-    expect(calcTotalArticles(1, 1)).toBe(5);
+  it("calculates correctly for 1×1 config (default 5 clusters)", () => {
+    // 1 + 1 + 5 = 7
+    expect(calcTotalArticles(1, 1)).toBe(7);
   });
 
-  it("calculates correctly for 4×4 config", () => {
-    // 4 + 16 + 48 = 68
-    expect(calcTotalArticles(4, 4)).toBe(68);
+  it("calculates correctly for 4×4 config (default 5 clusters)", () => {
+    // 4 + 16 + 80 = 100
+    expect(calcTotalArticles(4, 4)).toBe(100);
   });
 
-  it("defaults to 3 clusters per pillar", () => {
-    expect(CLUSTERS_PER_PILLAR).toBe(3);
+  it("defaults to 5 clusters per pillar", () => {
+    expect(CLUSTERS_PER_PILLAR).toBe(5);
     const total = calcTotalArticles(2, 3);
-    // 2 + 6 + 18 = 26
-    expect(total).toBe(26);
+    // 2 + 6 + 30 = 38
+    expect(total).toBe(38);
   });
 
-  it("calculates correctly with 2 clusters per pillar (min)", () => {
+  it("calculates correctly with an explicit 2 clusters per pillar", () => {
     // 2 cornerstones + 6 pillars + 12 clusters = 20
     expect(calcTotalArticles(2, 3, 2)).toBe(20);
   });
@@ -146,12 +158,12 @@ describe("architectureRules.calcTotalArticles", () => {
 // ─── calcBreakdown ────────────────────────────────────────────────────────────
 
 describe("architectureRules.calcBreakdown", () => {
-  it("returns correct breakdown for 2×2", () => {
+  it("returns correct breakdown for 2×2 (default 5 clusters)", () => {
     const b = calcBreakdown(2, 2);
     expect(b.cornerstones).toBe(2);
     expect(b.totalPillars).toBe(4);
-    expect(b.totalClusters).toBe(12);
-    expect(b.total).toBe(18);
+    expect(b.totalClusters).toBe(20);
+    expect(b.total).toBe(26);
   });
 });
 
@@ -166,8 +178,8 @@ describe("architectureRules.generateNodes", () => {
 
     expect(cornerstones).toHaveLength(2);
     expect(pillars).toHaveLength(4); // 2 cornerstones × 2 pillars
-    expect(clusters).toHaveLength(12); // 4 pillars × 3 clusters
-    expect(nodes).toHaveLength(18);
+    expect(clusters).toHaveLength(20); // 4 pillars × 5 clusters
+    expect(nodes).toHaveLength(26);
   });
 
   it("assigns cornerstone_guide to all cornerstone nodes", () => {
@@ -192,14 +204,14 @@ describe("architectureRules.generateNodes", () => {
     expect(nodes.find((n) => n.label === "Cluster 2.2.3")).toBeTruthy();
   });
 
-  it("generates 1×1 config with 5 nodes", () => {
+  it("generates 1×1 config with 7 nodes", () => {
     const nodes = generateNodes(1, 1);
-    expect(nodes).toHaveLength(5); // 1 + 1 + 3
+    expect(nodes).toHaveLength(7); // 1 + 1 + 5
   });
 
-  it("generates 4×4 config with 68 nodes", () => {
+  it("generates 4×4 config with 100 nodes", () => {
     const nodes = generateNodes(4, 4);
-    expect(nodes).toHaveLength(68); // 4 + 16 + 48
+    expect(nodes).toHaveLength(100); // 4 + 16 + 80
   });
 
   it("all pillar nodes have a valid cornerstoneIndex", () => {
@@ -421,7 +433,7 @@ describe("architecture.confirm", () => {
     // confirm now calls regenerateNodes which does select().from().where() (no .limit).
     // where() calls that are awaited directly must return a Promise resolving to an array.
     // where() calls followed by .limit() must return an object with a limit mock.
-    const fakeArch = { id: 5, packSize: 20, cornerstoneCount: 2, pillarCount: 2, clustersPerPillar: 3, confirmed: true };
+    const fakeArch = { id: 5, packSize: 20, cornerstoneCount: 1, pillarCount: 3, clustersPerPillar: 5, confirmed: true };
     const db = makeDb({});
     db.where = vi.fn()
       // 1. assertBusinessOwnership → .limit()

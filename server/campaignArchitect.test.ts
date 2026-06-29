@@ -6,11 +6,11 @@ import {
 } from "./campaignArchitect";
 
 describe("Module 10 — Campaign Architect", () => {
-  it("prompt defaults to 4 clusters and includes the topic + audience", () => {
+  it("prompt defaults to 5 clusters and includes the topic + audience", () => {
     const p = buildCampaignMatrixPrompt({ broadTopic: "employment law", targetAudience: "AU small business" });
     expect(p).toContain("employment law");
     expect(p).toContain("AU small business");
-    expect(p).toContain("4 Cluster Pages");
+    expect(p).toContain("5 Cluster Pages");
     expect(p).toContain("COMPLETELY DISTINCT");
   });
 

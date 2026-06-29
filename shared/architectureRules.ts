@@ -1,47 +1,37 @@
 /**
  * Blog Batcher — Architecture Rules Engine
  *
- * Enforces the Cornerstone → Pillar → Cluster hierarchy rules:
- *  - Cornerstones: 0–4  (0 = pillar-only mode)
- *  - Pillars per Cornerstone: 1–4  (minimum 1)
- *  - Clusters per Pillar: 0–5  (default 3)
- *  - Minimum total: 0 cornerstones + 1 pillar + 0 clusters = 1 article (pillar-only mode)
+ * Enforces the Cornerstone → Pillar → Cluster hierarchy rules for CREATION:
+ *  - Cornerstones: 1–4  (hard minimum 1)
+ *  - Pillars per Cornerstone: 3–4  (hard minimum 3)
+ *  - Clusters per Pillar: 5–8  (hard minimum 5)
+ *  - Minimum total: 1 cornerstone + 3 pillars + 15 clusters = 19 articles
  */
 
 export const PACK_SIZES = [20, 50] as const;
 export type PackSize = (typeof PACK_SIZES)[number];
 
-/** Default clusters per pillar */
-export const CLUSTERS_PER_PILLAR = 3;
+/**
+ * Blog CREATION is HARD-SET to a full authority cluster: minimum
+ * 1 cornerstone × 3 pillars × 5 clusters = 19 articles. No single-post or
+ * pillar-only mode in creation. (The Auditor side is separate, no minimum.)
+ */
+export const CLUSTERS_PER_PILLAR = 5;
 /** Alias for backward compatibility */
 export const DEFAULT_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
-export const MIN_CLUSTERS_PER_PILLAR = 0;
-export const MAX_CLUSTERS_PER_PILLAR = 5;
+export const MIN_CLUSTERS_PER_PILLAR = 5;
+export const MAX_CLUSTERS_PER_PILLAR = 8;
+/** Hard-set minimum total articles for a creation campaign (1 + 3 + 15). */
+export const MIN_TOTAL_ARTICLES = 19;
 
 /**
- * SEO/GEO recommendation for a *topic-cluster series* (not a deliberate
- * standalone post). A pillar needs ≥4 supporting clusters to signal topical
- * authority. 0 clusters = intentional standalone (no warning). 1–3 = a partial
- * series that won't rank as a cluster (advisory warning). 4+ = healthy.
- * Module 10 (Campaign Architect) defaults Cluster_Count to this value.
+ * Module 10 (Campaign Architect) defaults its Cluster_Count to the hard-set
+ * minimum so a generated campaign always meets the 19-article authority floor.
  */
-export const RECOMMENDED_CLUSTERS_PER_PILLAR = 4;
-export const MIN_SERIES_CLUSTERS_PER_PILLAR = 4;
-
-/**
- * Returns an advisory (non-blocking) warning if a pillar has too few clusters to
- * function as a topic cluster. Null when it's a deliberate standalone (0) or a
- * healthy series (>=4). Surface this in the UI / Campaign Architect.
- */
-export function getClusterSeriesWarning(clustersPerPillar: number): string | null {
-  if (clustersPerPillar >= 1 && clustersPerPillar < MIN_SERIES_CLUSTERS_PER_PILLAR) {
-    return `A topic cluster works best with at least ${MIN_SERIES_CLUSTERS_PER_PILLAR} supporting posts per pillar (you have ${clustersPerPillar}). A pillar with fewer won't signal topical authority — aim for ${MIN_SERIES_CLUSTERS_PER_PILLAR}–5, or use 0 for a deliberate standalone post.`;
-  }
-  return null;
-}
-export const MIN_PILLARS_PER_CORNERSTONE = 1;
+export const RECOMMENDED_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
+export const MIN_PILLARS_PER_CORNERSTONE = 3;
 export const MAX_PILLARS_PER_CORNERSTONE = 4;
-export const MIN_CORNERSTONES = 0;
+export const MIN_CORNERSTONES = 1;
 export const MAX_CORNERSTONES = 4;
 
 export const ARTICLE_TYPES = [
@@ -103,9 +93,10 @@ export const WORD_COUNT_TARGETS: Record<"cornerstone" | "pillar" | "cluster", { 
 
 // ─── Default architectures ────────────────────────────────────────────────────
 
+// Default = the hard-set minimum creation campaign: 1×3×5 = 19 articles.
 export const DEFAULT_ARCHITECTURE = {
-  cornerstones: 2,
-  pillarsPerCornerstone: 2,
+  cornerstones: 1,
+  pillarsPerCornerstone: 3,
   clustersPerPillar: CLUSTERS_PER_PILLAR,
 };
 
@@ -207,7 +198,7 @@ export function validateArchitecture(
 
   // ── Clamp pillars per cornerstone ─────────────────────────────────────────
   if (pillarsPerCornerstone < MIN_PILLARS_PER_CORNERSTONE) {
-    warnings.push(`Minimum 1 pillar per cornerstone required. Adjusted to ${MIN_PILLARS_PER_CORNERSTONE}.`);
+    warnings.push(`Minimum ${MIN_PILLARS_PER_CORNERSTONE} pillars per cornerstone required. Adjusted to ${MIN_PILLARS_PER_CORNERSTONE}.`);
     pillarsPerCornerstone = MIN_PILLARS_PER_CORNERSTONE;
   }
   if (pillarsPerCornerstone > MAX_PILLARS_PER_CORNERSTONE) {
