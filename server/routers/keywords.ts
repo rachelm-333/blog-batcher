@@ -35,6 +35,7 @@ import {
   checkCannibalization,
   type KeywordEntry,
 } from "../../shared/cannibalizationCheck";
+import { allocateKeywords } from "../../shared/keywordAllocation";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -173,6 +174,71 @@ Example using your actual node IDs: {"${nodes[0]?.id ?? 1}": "pitch deck consult
 }
 
 // ---------------------------------------------------------------------------
+// AI cluster derivation — generate distinct long-tail cluster topics that drill
+// into a pillar keyword, avoiding overlap with already-assigned keywords.
+// ---------------------------------------------------------------------------
+
+/** Templated long-tail fallbacks used only if the LLM under-delivers. */
+function clusterFallbackPatterns(pillarKeyword: string): string[] {
+  const kw = pillarKeyword.trim();
+  return [
+    `how to choose ${kw}`,
+    `${kw} for small business`,
+    `${kw} mistakes to avoid`,
+    `${kw} checklist`,
+    `${kw} examples`,
+    `${kw} step by step`,
+    `${kw} vs alternatives`,
+    `best ${kw} tips`,
+  ];
+}
+
+async function deriveClusterTopics(
+  pillarKeyword: string,
+  count: number,
+  avoid: string[],
+  businessName: string,
+  industry: string,
+  userId?: number | null,
+): Promise<string[]> {
+  if (count <= 0) return [];
+  const avoidText = avoid.length
+    ? `\nDo NOT duplicate or semantically overlap with any of these existing keywords: ${avoid.join(", ")}.`
+    : "";
+  const prompt = `You are an expert SEO strategist. The PILLAR topic is "${pillarKeyword}" for ${businessName} (${industry || "business"}).
+Produce ${count} highly specific, long-tail CLUSTER keywords — real scenario/question searches that drill into "${pillarKeyword}".
+Rules:
+- Each MUST be a specific sub-topic, question or scenario of the pillar (NOT the broad pillar term itself).
+- 3-6 words each, real phrases people search.
+- Every cluster COMPLETELY DISTINCT from the others (no cannibalization).${avoidText}
+Return ONLY valid JSON: {"clusters": ["...", "..."]} with exactly ${count} entries.`;
+  try {
+    const resp = await invokeLLMWithCost(
+      {
+        messages: [
+          { role: "system", content: "You are an expert SEO strategist. Return only valid JSON with real, specific long-tail keywords." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      },
+      { userId, feature: "keyword_research" },
+    );
+    let content = resp?.choices?.[0]?.message?.content ?? '{"clusters":[]}';
+    if (typeof content !== "string") content = JSON.stringify(content);
+    const braceMatch = content.match(/\{[\s\S]*\}/);
+    if (braceMatch) content = braceMatch[0];
+    const parsed = JSON.parse(content) as { clusters?: unknown };
+    const out = Array.isArray(parsed.clusters)
+      ? parsed.clusters.map((s) => String(s).trim()).filter(Boolean)
+      : [];
+    return out.slice(0, count);
+  } catch (err) {
+    console.warn(`[Keywords] cluster derivation failed for "${pillarKeyword}":`, err);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -183,7 +249,13 @@ export const keywordsRouter = router({
   // Uses DataForSEO for keyword data; falls back to Claude if unavailable.
   // -------------------------------------------------------------------------
   assignAll: protectedProcedure
-    .input(z.object({ businessId: z.number() }))
+    .input(
+      z.object({
+        businessId: z.number(),
+        /** selected_keywords.id the user picked as the cornerstone subject. */
+        primarySelectionId: z.number().int().positive().nullable().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
@@ -248,6 +320,109 @@ export const keywordsRouter = router({
         .from(selectedKeywords)
         .where(eq(selectedKeywords.businessId, input.businessId))
         .orderBy(selectedKeywords.sortOrder);
+
+      // ── Selection-driven allocation (preferred) ────────────────────────────
+      // When the user has saved keywords, anchor the architecture deterministically:
+      //   chosen primary → cornerstone; next-broadest → pillars; specific → clusters;
+      //   empty cluster slots → distinct AI-derived long-tail topics off the pillar.
+      // Keywords are written VERBATIM from the saved selections so the "assigned vs
+      // unassigned" panel matches exactly.
+      if (savedSelectedRows.length > 0) {
+        const selections = savedSelectedRows.map((r) => ({
+          id: r.id,
+          keyword: r.keyword,
+          msv: r.msv ?? null,
+          sortOrder: r.sortOrder ?? 0,
+        }));
+        const nodeInputs = nodes.map((n) => ({
+          id: n.id,
+          level: n.level as "cornerstone" | "pillar" | "cluster",
+          parentCornerstoneId: n.parentCornerstoneId ?? null,
+          parentPillarId: n.parentPillarId ?? null,
+          sortOrder: n.sortOrder,
+        }));
+        const alloc = allocateKeywords(selections, nodeInputs, input.primarySelectionId ?? null);
+
+        const selById = new Map(savedSelectedRows.map((r) => [r.id, r]));
+        const pillarKwByNode = new Map<number, string>();
+        for (const a of alloc.assignments) {
+          if (a.level === "pillar" && a.keyword) pillarKwByNode.set(a.nodeId, a.keyword);
+        }
+        // Keywords already in play — AI-derived clusters must avoid these.
+        const existingKeywords = alloc.assignments
+          .filter((a) => a.keyword)
+          .map((a) => a.keyword!) as string[];
+
+        // Derive AI cluster topics per pillar to fill empty slots.
+        const aiByPillar = new Map<number, number[]>(); // pillarNodeId → cluster nodeIds
+        for (const slot of alloc.aiClusterSlots) {
+          const arr = aiByPillar.get(slot.pillarNodeId) ?? [];
+          arr.push(slot.nodeId);
+          aiByPillar.set(slot.pillarNodeId, arr);
+        }
+        const aiKeywordByNode = new Map<number, string>();
+        for (const [pillarNodeId, clusterNodeIds] of Array.from(aiByPillar.entries())) {
+          const pk = pillarKwByNode.get(pillarNodeId) ?? biz.name;
+          const topics = await deriveClusterTopics(
+            pk, clusterNodeIds.length, existingKeywords, biz.name, biz.industry ?? "", ctx.user.id,
+          );
+          // Top up from templated fallbacks if the LLM under-delivered.
+          if (topics.length < clusterNodeIds.length) {
+            for (const pat of clusterFallbackPatterns(pk)) {
+              if (topics.length >= clusterNodeIds.length) break;
+              if (!existingKeywords.includes(pat) && !topics.includes(pat)) topics.push(pat);
+            }
+          }
+          clusterNodeIds.forEach((nodeId, i) => {
+            const kw = topics[i] ?? `${pk} ${i + 1}`;
+            aiKeywordByNode.set(nodeId, kw);
+            existingKeywords.push(kw);
+          });
+        }
+
+        // Enrich AI-derived keywords with real MSV data where possible.
+        const aiKws = Array.from(aiKeywordByNode.values());
+        const aiDfs = new Map<string, { msv: number | null; comp: "high" | "medium" | "low" | null }>();
+        if (aiKws.length && process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
+          try {
+            const res = await getKeywordData(aiKws);
+            for (const r of res) aiDfs.set(r.keyword, { msv: r.monthlySearchVolume, comp: r.competitionLevel });
+          } catch (err) {
+            console.warn("[Keywords] AI cluster enrichment failed:", err);
+          }
+        }
+
+        const insertRowsSel = alloc.assignments.map((a) => {
+          let keyword = a.keyword;
+          let msv: number | null = null;
+          let comp: "high" | "medium" | "low" | null = null;
+          if (a.selectionId != null) {
+            const sel = selById.get(a.selectionId);
+            msv = sel?.msv ?? null;
+            comp = (sel?.competitionLevel as "high" | "medium" | "low" | null) ?? null;
+          } else {
+            keyword = aiKeywordByNode.get(a.nodeId) ?? keyword;
+            const e = keyword ? aiDfs.get(keyword) : undefined;
+            msv = e?.msv ?? null;
+            comp = e?.comp ?? null;
+          }
+          if (!keyword) keyword = `${biz.name} ${a.level}`.toLowerCase().replace(/\s+/g, " ").trim();
+          return {
+            articleNodeId: a.nodeId,
+            businessId: input.businessId,
+            batchNumber: activeBatch,
+            primaryKeyword: keyword,
+            monthlySearchVolume: msv,
+            competitionLevel: comp,
+            keywordApproved: false,
+            paaApproved: false,
+            cannibalizationWarning: false,
+          };
+        });
+
+        await db.insert(keywords).values(insertRowsSel);
+        return { assigned: insertRowsSel.length };
+      }
 
       let keywordPool: Array<{ keyword: string; msv: number | null; competition: string | null }> = [];
       let dfsData: Map<string, { msv: number | null; comp: "high" | "medium" | "low" | null }> = new Map();

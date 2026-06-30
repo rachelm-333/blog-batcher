@@ -363,6 +363,8 @@ export default function Keywords() {
   );
   const [showSelectionPanel, setShowSelectionPanel] = useState(false);
   const [pendingSwapKw, setPendingSwapKw] = useState<string | null>(null);
+  // The saved keyword the user picks as the cornerstone subject (primary keyword).
+  const [primarySelectionId, setPrimarySelectionId] = useState<number | null>(null);
 
   // Reset local state when the active business changes (belt-and-suspenders guard;
   // the primary protection is the key={selectedBizId} in App.tsx which remounts
@@ -372,7 +374,15 @@ export default function Keywords() {
     setSwapTarget(null);
     setShowSelectionPanel(false);
     setPendingSwapKw(null);
+    setPrimarySelectionId(null);
   }, [businessId]);
+
+  // Default the primary keyword to the user's first saved selection once loaded.
+  useEffect(() => {
+    if (primarySelectionId == null && savedSelections && savedSelections.length > 0) {
+      setPrimarySelectionId(savedSelections[0].id);
+    }
+  }, [savedSelections, primarySelectionId]);
 
   // Article count comes directly from the DB article_nodes for this batch.
   // Architecture.confirm is the single source of truth — it always regenerates
@@ -507,9 +517,38 @@ export default function Keywords() {
           <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Location:</span> {(business.location as string | undefined) ?? "—"}</div>
           <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Industry:</span> {(business.industry as string | undefined) ?? "—"}</div>
         </div>
+
+        {/* Cornerstone primary-keyword picker */}
+        {(savedSelections?.length ?? 0) > 0 && (
+          <div style={{ marginBottom:20 }}>
+            <label style={{ display:"block", fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>
+              Cornerstone keyword (your primary subject)
+            </label>
+            <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 8px", lineHeight:1.5 }}>
+              This becomes the broad subject of your cornerstone article. Your other saved keywords fill the
+              3 pillars (segments) and clusters (specific topics) beneath it.
+            </p>
+            <Select
+              value={primarySelectionId != null ? String(primarySelectionId) : undefined}
+              onValueChange={(v) => setPrimarySelectionId(Number(v))}
+            >
+              <SelectTrigger style={{ fontSize:13 }}>
+                <SelectValue placeholder="Choose your cornerstone keyword…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(savedSelections ?? []).map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.keyword}{s.msv != null ? ` · ${s.msv.toLocaleString()} MSV` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <button
           className="btn-primary"
-          onClick={() => assignMutation.mutate({ businessId })}
+          onClick={() => assignMutation.mutate({ businessId, primarySelectionId })}
           disabled={assignMutation.isPending}
         >
           {assignMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Assigning…</> : <><Sparkles style={{ width:14, height:14 }} /> Assign Keywords</>}
@@ -692,8 +731,8 @@ export default function Keywords() {
             className="btn-ghost"
             style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"#6b7280" }}
             onClick={() => {
-              if (window.confirm("Re-assign all keywords? This will replace the current keywords with a fresh AI-generated set based on your business services.")) {
-                assignMutation.mutate({ businessId });
+              if (window.confirm("Re-assign all keywords? This will replace the current keywords, anchoring the cornerstone to your chosen primary keyword.")) {
+                assignMutation.mutate({ businessId, primarySelectionId });
               }
             }}
             disabled={assignMutation.isPending}
