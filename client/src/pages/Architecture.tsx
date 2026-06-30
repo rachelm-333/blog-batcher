@@ -18,11 +18,9 @@ import {
   ARTICLE_TYPES,
   DEFAULT_CLUSTERS_PER_PILLAR,
   MAX_CLUSTERS_PER_PILLAR,
-  MAX_CORNERSTONES,
-  MAX_PILLARS_PER_CORNERSTONE,
   MIN_CLUSTERS_PER_PILLAR,
-  MIN_CORNERSTONES,
-  MIN_PILLARS_PER_CORNERSTONE,
+  FIXED_CORNERSTONES,
+  FIXED_PILLARS_PER_CORNERSTONE,
   VALID_TYPES_BY_LEVEL,
   calcBreakdown,
   type ArticleType,
@@ -122,13 +120,6 @@ function LiveArchMap({
 }) {
   // Helper: find the saved DB node for a pillar by cornerstone+pillar index (1-based)
   const savedPillarNode = (csIdx: number, pIdx: number): ArchNode | undefined => {
-    if (cornerstones === 0) {
-      // In pillar-only mode, savedNodes pillars have parentCornerstoneId = null
-      const savedPillars = savedNodes
-        .filter((n) => n.level === "pillar")
-        .sort((a, b) => a.sortOrder - b.sortOrder);
-      return savedPillars[pIdx];
-    }
     const savedCornerstones = savedNodes
       .filter((n) => n.level === "cornerstone")
       .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -142,7 +133,7 @@ function LiveArchMap({
 
   // Render a single pillar column with its cluster children
   const renderPillarColumn = (csIdx: number, pIdx: number) => {
-    const label = cornerstones === 0 ? `${pIdx + 1}` : `${csIdx + 1}.${pIdx + 1}`;
+    const label = `${csIdx + 1}.${pIdx + 1}`;
     const saved = savedPillarNode(csIdx, pIdx);
     const pillarType: ArticleType = (saved?.articleType as ArticleType) ?? "how_to";
 
@@ -234,25 +225,6 @@ function LiveArchMap({
     );
   };
 
-  // ── Pillar-only mode (cornerstones = 0) ──────────────────────────────────────
-  if (cornerstones === 0) {
-    return (
-      <div style={{ overflowX: "auto" }}>
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            minWidth: "max-content",
-            paddingBottom: 4,
-          }}
-        >
-          {Array.from({ length: pillars }, (_, pIdx) => renderPillarColumn(0, pIdx))}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Standard hierarchy mode (cornerstones > 0) ───────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, overflowX: "auto" }}>
       {Array.from({ length: cornerstones }, (_, csIdx) => (
@@ -359,10 +331,10 @@ export default function Architecture() {
   const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
 
-  // Local slider state (optimistic, before saving)
-  // Defaults: 1 cornerstone, 1 pillar, 3 clusters
-  const [localCornerstones, setLocalCornerstones] = useState(1);
-  const [localPillars, setLocalPillars] = useState(MIN_PILLARS_PER_CORNERSTONE);
+  // The architecture is a FIXED shape: exactly 1 cornerstone × 3 pillars.
+  // The only thing the user can change is the clusters-per-pillar count (3–5).
+  const localCornerstones = FIXED_CORNERSTONES;
+  const localPillars = FIXED_PILLARS_PER_CORNERSTONE;
   const [localClusters, setLocalClusters] = useState(DEFAULT_CLUSTERS_PER_PILLAR);
   const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
 
@@ -394,18 +366,15 @@ export default function Architecture() {
     }
   }, [archLoading, businessId, archData?.architecture]);
 
-  // Sync sliders with DB values when arch loads
+  // Sync the clusters slider with the saved DB value when arch loads.
+  // (Cornerstones and pillars are fixed, so they are never read back.)
   useEffect(() => {
     if (arch) {
-      setLocalCornerstones(arch.cornerstoneCount);
-      setLocalPillars(arch.pillarCount);
       setLocalClusters(arch.clustersPerPillar ?? DEFAULT_CLUSTERS_PER_PILLAR);
     }
-  }, [arch?.cornerstoneCount, arch?.pillarCount, arch?.clustersPerPillar]);
+  }, [arch?.clustersPerPillar]);
 
-  // Slider handlers — strict hierarchy, no standalone modes
-  const handleCornerstonesChange = (v: number) => setLocalCornerstones(v);
-  const handlePillarsChange = (v: number) => setLocalPillars(v);
+  // Only the clusters-per-pillar count is adjustable.
   const handleClustersChange = (v: number) => setLocalClusters(v);
 
   // Live breakdown (raw slider values, no guardrail correction)
@@ -470,7 +439,7 @@ export default function Architecture() {
             Stage 2 — Blog Architecture
           </h1>
           <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4, marginBottom: 0 }}>
-            Define the structure of your content batch. Drag the sliders to set the number of cornerstones, pillars, and clusters.
+            Your content batch is built as one authority cluster — 1 cornerstone and 3 pillars. Choose how many cluster articles sit under each pillar.
           </p>
         </div>
       </div>
@@ -489,8 +458,8 @@ export default function Architecture() {
                   <HelpLink slug="cornerstone-pillar-cluster" label="What are Cornerstone, Pillar, and Cluster articles?" />
                 </div>
                 <CardDescription style={{ marginTop: 4 }}>
-                  Use the sliders to set how many cornerstones, pillars per cornerstone, and clusters per pillar you want.
-                  The total article count updates live as you drag.
+                  The cornerstone and pillar counts are fixed (1 × 3). Use the slider to set how many cluster articles
+                  sit under each pillar — the total updates live.
                 </CardDescription>
               </div>
               {locked && (
@@ -545,32 +514,19 @@ export default function Architecture() {
               ))}
             </div>
 
-            {/* Sliders */}
-            <SliderRow
-              label="Cornerstones"
-              subtitle="Authoritative guide posts — 2,800–3,200 words. The trunk of your content tree."
-              value={localCornerstones}
-              min={MIN_CORNERSTONES}
-              max={MAX_CORNERSTONES}
-              colour="text-violet-600"
-              disabled={locked}
-              onChange={handleCornerstonesChange}
-            />
+            {/* Fixed structure notice */}
+            <div className="rounded-lg bg-violet-500/5 border border-violet-500/20 px-4 py-3 text-sm text-muted-foreground">
+              Every content batch is built as one proven authority cluster:{" "}
+              <strong className="text-violet-600">1 cornerstone</strong>{" → "}
+              <strong className="text-sky-600">3 pillars</strong>{" → "}
+              clusters under each pillar. The cornerstone and pillar counts are fixed;
+              you only choose how many cluster articles sit under each pillar.
+            </div>
 
-            <SliderRow
-              label={localCornerstones === 0 ? "Standalone Pillar Posts" : "Pillar Posts (per cornerstone post)"}
-              subtitle="In-depth topic posts — 1,500–2,200 words. Each pillar links back to its cornerstone."
-              value={localPillars}
-              min={MIN_PILLARS_PER_CORNERSTONE}
-              max={MAX_PILLARS_PER_CORNERSTONE}
-              colour="text-sky-600"
-              disabled={locked}
-              onChange={handlePillarsChange}
-            />
-
+            {/* The only adjustable lever — clusters per pillar (3–5) */}
             <SliderRow
               label="Cluster Articles (per pillar post)"
-              subtitle="Specific, focused posts — 800–1,200 words. Each cluster links back to its pillar and cornerstone."
+              subtitle="Specific, focused posts — 800–1,200 words. Each cluster links back to its pillar and cornerstone. Choose 3–5 per pillar."
               value={localClusters}
               min={MIN_CLUSTERS_PER_PILLAR}
               max={MAX_CLUSTERS_PER_PILLAR}
@@ -581,25 +537,10 @@ export default function Architecture() {
 
             {/* Architecture summary sentence */}
             <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-4 py-3">
-              {localCornerstones === 0 && localClusters === 0 ? (
-                <>
-                  <strong>{localPillars}</strong> standalone pillar post{localPillars !== 1 ? "s" : ""}
-                  {" = "}<strong>{liveBreakdown.total} article{liveBreakdown.total !== 1 ? "s" : ""} total</strong>
-                </>
-              ) : localCornerstones === 0 ? (
-                <>
-                  <strong>{localPillars}</strong> pillar post{localPillars !== 1 ? "s" : ""}
-                  {" × "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} each
-                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
-                </>
-              ) : (
-                <>
-                  <strong>{localCornerstones}</strong> cornerstone{localCornerstones !== 1 ? "s" : ""}
-                  {" × "}<strong>{localPillars}</strong> pillar{localPillars !== 1 ? "s" : ""} per cornerstone
-                  {" × "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} per pillar
-                  {" = "}<strong>{liveBreakdown.total} articles total</strong>
-                </>
-              )}
+              <strong>{localCornerstones}</strong> cornerstone
+              {" × "}<strong>{localPillars}</strong> pillars
+              {" × "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} per pillar
+              {" = "}<strong>{liveBreakdown.total} articles total</strong>
             </p>
 
             {!locked && (
@@ -756,22 +697,19 @@ export default function Architecture() {
               <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>Why architecture matters</span>
             </div>
 
-            {/* Highlighted tip: Standalone post setup */}
+            {/* Highlighted tip: the fixed authority cluster */}
             <div style={{ background: "#faf5ff", border: "1.5px solid #c4b5fd", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed", background: "#ede9ff", padding: "2px 8px", borderRadius: 99 }}>
-                  ✦ "Standalone post" setup
+                  ✦ One complete authority cluster
                 </span>
               </div>
               <p style={{ fontSize: 12, color: "#4c1d95", lineHeight: 1.65, margin: "0 0 8px" }}>
-                Set <strong>Cornerstones to 0</strong>, <strong>Pillars to 1</strong>, <strong>Clusters to 0</strong>.
-              </p>
-              <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.65, margin: "0 0 8px" }}>
-                This generates a single focused article — ideal for comparative posts like
-                &ldquo;The 10 Best X in Y&rdquo; or &ldquo;X vs Y: Which Is Right for You?&rdquo;
+                Every batch is a fixed <strong>1 cornerstone → 3 pillars → clusters</strong> structure —
+                the proven shape that signals topical authority to search engines.
               </p>
               <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.65, margin: 0, fontStyle: "italic" }}>
-                We recommend this for your first post on a new topic.
+                Choose 3–5 clusters per pillar (13–19 articles total). More clusters = deeper topical coverage.
               </p>
             </div>
 
