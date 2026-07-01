@@ -634,7 +634,48 @@ export default function Keywords() {
   /* ── Keyword Review sub-stage ── */
   const renderKeywordReview = () => (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      {/* Architecture is the single source of truth — no mismatch banner needed */}
+      {/* Cornerstone primary-keyword picker + re-assign */}
+      {(savedSelections?.length ?? 0) > 0 && (
+        <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:"14px 20px", display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+          <div style={{ flex:1, minWidth:240 }}>
+            <label style={{ display:"block", fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:4 }}>
+              Cornerstone keyword (your primary subject)
+            </label>
+            <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 8px", lineHeight:1.5 }}>
+              Pick your primary keyword, then re-assign — it anchors the cornerstone, with pillars (segments) and clusters (specific topics) filled beneath it.
+            </p>
+            <Select
+              value={primarySelectionId != null ? String(primarySelectionId) : undefined}
+              onValueChange={(v) => setPrimarySelectionId(Number(v))}
+            >
+              <SelectTrigger style={{ fontSize:13, maxWidth:420 }}>
+                <SelectValue placeholder="Choose your cornerstone keyword…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(savedSelections ?? []).map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.keyword}{s.msv != null ? ` · ${s.msv.toLocaleString()} MSV` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <button
+            className="btn-primary"
+            style={{ flexShrink:0, alignSelf:"flex-end" }}
+            disabled={assignMutation.isPending || primarySelectionId == null}
+            onClick={() => {
+              if (window.confirm("Re-assign all keywords with this cornerstone? This replaces the current keyword assignments.")) {
+                assignMutation.mutate({ businessId, primarySelectionId });
+              }
+            }}
+          >
+            {assignMutation.isPending
+              ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Re-assigning…</>
+              : <><RefreshCw style={{ width:14, height:14 }} /> Set cornerstone & re-assign</>}
+          </button>
+        </div>
+      )}
       {/* Cannibalization warning */}
       {cannibalizationConflicts.length > 0 && (
         <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"12px 16px", display:"flex", gap:10 }}>
