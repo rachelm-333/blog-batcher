@@ -41,6 +41,8 @@ export interface PublishResult {
   cmsPostId?: string;
   cmsPostUrl?: string;
   error?: string;
+  /** raw API response snippet — used by the backfill smoke test for diagnosis */
+  raw?: string;
 }
 
 export interface WordPressCredentials {
@@ -919,6 +921,89 @@ export async function publishToWix(
       return { success: false, error: "Cannot reach Wix API — check your API key and Site ID" };
     }
     return { success: false, error: msg };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wix — update an existing post's body and re-publish (Phase 2b backfill).
+// Updates ONLY the rich content of the existing draft, then re-publishes it, so
+// internal links can be switched on without creating a duplicate post.
+// Fail-safe: if any step errors, the currently-live post is left untouched.
+// ---------------------------------------------------------------------------
+
+export async function updateWixPostBody(
+  credentials: WixCredentials,
+  postId: string,
+  newBodyHtml: string,
+): Promise<PublishResult> {
+  const { apiKey, siteId } = credentials;
+  const headers: Record<string, string> = {
+    Authorization: apiKey,
+    "wix-site-id": siteId,
+    "Content-Type": "application/json",
+    "User-Agent": "BlogBatcher/1.0",
+  };
+  try {
+    const cleanBody = stripAiDisclosure(newBodyHtml.replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, ""));
+    const richContent = htmlToRicos(cleanBody);
+
+    // Update the draft's rich content only.
+    const patchRes = await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${postId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ draftPost: { id: postId, richContent }, fieldMask: { paths: ["richContent"] } }),
+    });
+    const patchText = await patchRes.text();
+    if (!patchRes.ok) {
+      return { success: false, error: `Wix update failed (${patchRes.status})`, raw: patchText.slice(0, 1200) };
+    }
+
+    // Re-publish the updated draft.
+    const pubRes = await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${postId}/publish`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(credentials.memberId ? { memberId: credentials.memberId } : {}),
+    });
+    const pubText = await pubRes.text();
+    if (!pubRes.ok) {
+      return { success: false, error: `Wix re-publish failed (${pubRes.status})`, raw: pubText.slice(0, 1200) };
+    }
+    let url = "";
+    let id = postId;
+    try {
+      const data = JSON.parse(pubText) as { post?: { id?: string; url?: string } };
+      url = data.post?.url ?? "";
+      id = data.post?.id ?? postId;
+    } catch { /* keep defaults */ }
+    return { success: true, cmsPostId: id, cmsPostUrl: url, raw: pubText.slice(0, 600) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Look up a Wix post ID by its slug (fallback when cmsPostId wasn't stored). */
+export async function findWixPostIdBySlug(
+  credentials: WixCredentials,
+  slug: string,
+): Promise<string | null> {
+  const { apiKey, siteId } = credentials;
+  const headers: Record<string, string> = {
+    Authorization: apiKey,
+    "wix-site-id": siteId,
+    "Content-Type": "application/json",
+    "User-Agent": "BlogBatcher/1.0",
+  };
+  const cleanSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
+  try {
+    const res = await fetch(
+      `https://www.wixapis.com/blog/v3/posts/slugs/${encodeURIComponent(cleanSlug)}`,
+      { headers },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { post?: { id?: string } };
+    return data.post?.id ?? null;
+  } catch {
+    return null;
   }
 }
 

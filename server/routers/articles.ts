@@ -60,6 +60,8 @@ import {
   publishToWebflow,
   publishToSquarespace,
   publishToGhost,
+  updateWixPostBody,
+  findWixPostIdBySlug,
   decryptCredentials,
   type ArticlePayload,
 } from "../cmsPublisher";
@@ -272,6 +274,76 @@ export const articlesRouter = router({
         restoredLinks: t.restoredLinks,
         hasCmsId: !!t.cmsPostId,
       }));
+    }),
+
+  /**
+   * Apply the internal-link backfill to ONE published post (manual smoke test).
+   * Re-resolves its body against the live batch link map and re-pushes it to Wix
+   * so links to now-live posts are switched on. Wix only for now. Fail-safe: on
+   * any error the live post is left untouched. Returns the raw Wix response.
+   */
+  applyBackfillOne: protectedProcedure
+    .input(z.object({ businessId: z.number(), articleId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
+
+      const batchRows = await db
+        .select({
+          id: articles.id,
+          title: articles.title,
+          urlSlug: articles.urlSlug,
+          cmsPostId: articles.cmsPostId,
+          cmsPostUrl: articles.cmsPostUrl,
+          status: articles.status,
+          bodyHtml: articles.bodyHtml,
+        })
+        .from(articles)
+        .where(and(eq(articles.businessId, input.businessId), eq(articles.batchNumber, activeBatch)));
+
+      const target = batchRows.find((r) => r.id === input.articleId);
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found in this batch" });
+      if (target.status !== "published") throw new TRPCError({ code: "BAD_REQUEST", message: "Article is not published yet" });
+
+      // Re-resolve the body against the live batch link map + match publish formatting.
+      const linkMap = buildLinkMap(batchRows);
+      let body = resolvePublishLinks(target.bodyHtml ?? "", linkMap).bodyHtml;
+      body = body
+        .replace(/<li>/g, '<li style="margin-bottom:0.75em">')
+        .replace(/<li /g, '<li style="margin-bottom:0.75em" ');
+
+      const [integration] = await db
+        .select({ credentialsEncrypted: integrations.credentialsEncrypted })
+        .from(integrations)
+        .where(and(eq(integrations.businessId, input.businessId), eq(integrations.platform, "wix")))
+        .limit(1);
+      if (!integration?.credentialsEncrypted) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No Wix credentials found." });
+      }
+      const creds = decryptCredentials(integration.credentialsEncrypted);
+      if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt Wix credentials" });
+      const wixCreds = { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" };
+
+      let postId = target.cmsPostId;
+      if (!postId && target.urlSlug) {
+        postId = await findWixPostIdBySlug(wixCreds, target.urlSlug);
+        if (postId) {
+          await db.update(articles).set({ cmsPostId: postId }).where(eq(articles.id, target.id));
+        }
+      }
+      if (!postId) {
+        return { success: false, error: "Could not resolve the Wix post ID (not stored and slug lookup failed).", raw: null, cmsPostUrl: null };
+      }
+
+      const result = await updateWixPostBody(wixCreds, postId, body);
+      return {
+        success: result.success,
+        error: result.error ?? null,
+        raw: result.raw ?? null,
+        cmsPostUrl: result.cmsPostUrl ?? null,
+      };
     }),
 
   /**

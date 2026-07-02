@@ -171,6 +171,18 @@ export default function PublishSchedule() {
     { businessId: business?.id ?? 0 },
     { enabled: false }
   );
+  // Apply backfill to ONE post (manual smoke test — re-pushes to Wix).
+  const applyBackfill = trpc.articles.applyBackfillOne.useMutation({
+    onSuccess: (r) => {
+      if (r.success) {
+        toast.success("Link switched on and re-published to Wix.");
+        backfillPreview.refetch();
+      } else {
+        toast.error(r.error ?? "Backfill failed", { description: r.raw ?? undefined, duration: 12000 });
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const { data: scheduleData, isLoading: scheduleLoading, refetch: refetchSchedule } =
     trpc.schedule.get.useQuery(
@@ -487,7 +499,18 @@ export default function PublishSchedule() {
                 <ul className="space-y-2">
                   {backfillPreview.data.map((t) => (
                     <li key={t.articleId} className="rounded-md border border-border p-3">
-                      <div className="font-medium text-foreground text-sm">{t.title || `Article ${t.articleId}`}</div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="font-medium text-foreground text-sm">{t.title || `Article ${t.articleId}`}</div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs shrink-0"
+                          disabled={applyBackfill.isPending}
+                          onClick={() => business?.id && applyBackfill.mutate({ businessId: business.id, articleId: t.articleId })}
+                        >
+                          {applyBackfill.isPending && applyBackfill.variables?.articleId === t.articleId ? "Applying…" : "Apply to this post (test)"}
+                        </Button>
+                      </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         Would restore {t.restoredLinks.length} link{t.restoredLinks.length !== 1 ? "s" : ""}:
                         <ul className="list-disc ml-5 mt-1">
