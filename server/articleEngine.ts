@@ -400,6 +400,29 @@ export function resolvePublishLinks(
 }
 
 /**
+ * Build the publish-time link map for a batch: each article's slug → its real
+ * published CMS URL (or null if not live yet). Keys include both "slug" and
+ * "/slug" forms so it matches however the internal href was written.
+ *
+ * A target counts as live only when its status is "published" AND it has a real
+ * cmsPostUrl. Pure + testable — feeds resolvePublishLinks().
+ */
+export function buildLinkMap(
+  rows: Array<{ urlSlug: string | null; cmsPostUrl: string | null; status: string | null }>,
+): Record<string, string | null> {
+  const map: Record<string, string | null> = {};
+  for (const r of rows) {
+    if (!r.urlSlug) continue;
+    const slug = r.urlSlug.replace(/^\/+/, "").replace(/\/+$/, "");
+    if (!slug) continue;
+    const live = r.status === "published" && r.cmsPostUrl ? r.cmsPostUrl : null;
+    map[`/${slug}`] = live;
+    map[slug] = live;
+  }
+  return map;
+}
+
+/**
  * Insert a LATERAL link to a sibling cluster (MAC-11) with a descriptive anchor.
  * Used when the AI didn't add one. Appends a contextual sentence before the CTA.
  * Pure, testable.

@@ -36,6 +36,7 @@ import {
   decryptCredentials,
   type ArticlePayload,
 } from "./cmsPublisher";
+import { resolvePublishLinks, buildLinkMap } from "./articleEngine";
 import { createHeartbeatJob, deleteHeartbeatJob, updateHeartbeatJob } from "./_core/heartbeat";
 import { notifyOwner } from "./_core/notification";
 
@@ -233,9 +234,25 @@ export async function executeScheduledPublish(
     attemptNumber: ctx.attemptNumber,
   });
 
+  // No-404 internal-link resolution: rewrite links to live URLs, drop links to
+  // posts not yet published (keep anchor text). This is the staggered-publish path.
+  let scheduledBodyHtml = row.bodyHtml ?? "";
+  {
+    const batchRows = await db
+      .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
+      .from(articles)
+      .where(eq(articles.businessId, row.businessId));
+    const linkMap = buildLinkMap(batchRows);
+    const resolved = resolvePublishLinks(scheduledBodyHtml, linkMap);
+    scheduledBodyHtml = resolved.bodyHtml;
+    if (resolved.warnings.length) {
+      console.log(`[Scheduler] Held back ${resolved.warnings.length} not-yet-live internal link(s) for "${row.title}"`);
+    }
+  }
+
   const payload: ArticlePayload = {
     title: row.title ?? "",
-    bodyHtml: row.bodyHtml ?? "",
+    bodyHtml: scheduledBodyHtml,
     metaTitle: row.metaTitle ?? row.title ?? "",
     metaDescription: row.metaDescription ?? "",
     focusKeyword: row.focusKeyword ?? "",

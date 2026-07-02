@@ -48,6 +48,8 @@ import {
   deriveStatusBadge,
   validateAndStripLinks,
   buildArticleContext,
+  resolvePublishLinks,
+  buildLinkMap,
 } from "../articleEngine";
 import {
   publishToWordPress,
@@ -1222,6 +1224,7 @@ ${row.bodyHtml ?? ""}
         .select({
           id: articles.id,
           businessId: articles.businessId,
+          batchNumber: articles.batchNumber,
           title: articles.title,
           bodyHtml: articles.bodyHtml,
           metaTitle: articles.metaTitle,
@@ -1308,6 +1311,22 @@ ${row.bodyHtml ?? ""}
       publishBodyHtml = publishBodyHtml
         .replace(/<p>\s*Q:\s*/g, '<hr><p><strong>Q: ')
         .replace(/<\/strong>\s*<\/p>\s*<p>\s*A:\s*/g, '</strong></p><p>A: ');
+
+      // ── No-404 internal-link resolution ────────────────────────────────────
+      // Rewrite internal links to real published URLs; drop links to posts that
+      // are not live yet (keep the anchor text) so nothing publishes a 404.
+      {
+        const batchRows = await db
+          .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
+          .from(articles)
+          .where(and(eq(articles.businessId, row.businessId), eq(articles.batchNumber, row.batchNumber)));
+        const linkMap = buildLinkMap(batchRows);
+        const resolved = resolvePublishLinks(publishBodyHtml, linkMap);
+        publishBodyHtml = resolved.bodyHtml;
+        if (resolved.warnings.length) {
+          console.log(`[Publish] Held back ${resolved.warnings.length} not-yet-live internal link(s) for "${row.title}":`, resolved.warnings);
+        }
+      }
 
       const payload: ArticlePayload = {
         title: row.title ?? "",
@@ -1472,10 +1491,20 @@ ${row.bodyHtml ?? ""}
       let failed = 0;
       const failures: { title: string; error: string }[] = [];
 
+      // Build the batch link map once; it grows as each post publishes so later
+      // posts in this run can link to earlier ones. Links to still-unpublished
+      // posts are dropped (no 404s) — Phase 2 backfill fills them in afterwards.
+      const linkRows = await db
+        .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
+        .from(articles)
+        .where(eq(articles.businessId, input.businessId));
+      const linkMap = buildLinkMap(linkRows);
+
       for (const row of rows) {
+        const resolvedBulk = resolvePublishLinks(row.bodyHtml ?? "", linkMap);
         const payload: ArticlePayload = {
           title: row.title ?? "",
-          bodyHtml: row.bodyHtml ?? "",
+          bodyHtml: resolvedBulk.bodyHtml,
           metaTitle: row.metaTitle ?? row.title ?? "",
           metaDescription: row.metaDescription ?? "",
           focusKeyword: row.focusKeyword ?? "",
@@ -1543,6 +1572,11 @@ ${row.bodyHtml ?? ""}
             })
             .where(eq(articles.id, row.id));
           published++;
+          // Make this post's real URL available to later posts in this run.
+          if (!isScheduled && row.urlSlug && result.cmsPostUrl) {
+            const slug = row.urlSlug.replace(/^\/+/, "").replace(/\/+$/, "");
+            if (slug) { linkMap[`/${slug}`] = result.cmsPostUrl; linkMap[slug] = result.cmsPostUrl; }
+          }
         } else {
           await db
             .update(articles)

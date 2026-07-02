@@ -1,5 +1,45 @@
 import { describe, it, expect } from "vitest";
-import { resolvePublishLinks } from "./articleEngine";
+import { resolvePublishLinks, buildLinkMap } from "./articleEngine";
+
+describe("buildLinkMap — batch slug → live URL map", () => {
+  it("maps published posts to their real URL and unpublished to null", () => {
+    const map = buildLinkMap([
+      { urlSlug: "/branding-strategies", cmsPostUrl: "https://skt.com/post/branding-strategies", status: "published" },
+      { urlSlug: "brand-positioning", cmsPostUrl: null, status: "approved" },
+    ]);
+    // both "/slug" and "slug" key forms present
+    expect(map["/branding-strategies"]).toBe("https://skt.com/post/branding-strategies");
+    expect(map["branding-strategies"]).toBe("https://skt.com/post/branding-strategies");
+    // approved-but-not-published → null (so its inbound links get dropped)
+    expect(map["/brand-positioning"]).toBeNull();
+    expect(map["brand-positioning"]).toBeNull();
+  });
+
+  it("treats published-without-a-URL as not live (null)", () => {
+    const map = buildLinkMap([{ urlSlug: "x", cmsPostUrl: null, status: "published" }]);
+    expect(map["/x"]).toBeNull();
+  });
+
+  it("end-to-end: a cornerstone published before its cluster drops the down-link, no 404", () => {
+    // Cornerstone body links down to a cluster that isn't live yet.
+    const body = `<p>See <a href="/handling-lateness">handling lateness</a>.</p>`;
+    const map = buildLinkMap([
+      { urlSlug: "handling-lateness", cmsPostUrl: null, status: "approved" }, // not live yet
+    ]);
+    const r = resolvePublishLinks(body, map);
+    expect(r.bodyHtml).not.toContain("<a "); // link dropped
+    expect(r.bodyHtml).toContain("handling lateness"); // text kept
+    expect(r.warnings).toHaveLength(1);
+
+    // Later, once the cluster is live, the SAME source body resolves to a real link.
+    const mapLive = buildLinkMap([
+      { urlSlug: "handling-lateness", cmsPostUrl: "https://skt.com/post/handling-lateness", status: "published" },
+    ]);
+    const r2 = resolvePublishLinks(body, mapLive);
+    expect(r2.bodyHtml).toContain('href="https://skt.com/post/handling-lateness"');
+    expect(r2.warnings).toHaveLength(0);
+  });
+});
 
 describe("resolvePublishLinks — publish-time link resolution (no-404 rule)", () => {
   it("rewrites a placeholder slug to the parent's real published CMS URL", () => {
