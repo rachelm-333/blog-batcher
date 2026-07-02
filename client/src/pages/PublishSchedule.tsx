@@ -166,6 +166,12 @@ export default function PublishSchedule() {
     { enabled: !!business?.id }
   );
 
+  // Dry-run preview of internal-link backfill (Phase 2 — no changes made).
+  const backfillPreview = trpc.articles.previewBackfill.useQuery(
+    { businessId: business?.id ?? 0 },
+    { enabled: false }
+  );
+
   const { data: scheduleData, isLoading: scheduleLoading, refetch: refetchSchedule } =
     trpc.schedule.get.useQuery(
       { businessId: business?.id ?? 0 },
@@ -453,6 +459,53 @@ export default function PublishSchedule() {
             </div>
           </div>
         )}
+
+        {/* Internal-link backfill preview (dry run) */}
+        <section className="rounded-lg border border-border bg-white p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-base font-bold text-foreground">Internal-link backfill (preview)</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Shows published posts whose links to later-published posts can now be switched on. This is a dry run — nothing is changed.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              disabled={backfillPreview.isFetching || !business?.id}
+              onClick={() => backfillPreview.refetch()}
+            >
+              {backfillPreview.isFetching ? "Checking…" : "Preview backfill"}
+            </Button>
+          </div>
+          {backfillPreview.data !== undefined && (
+            <div className="mt-3 text-sm">
+              {backfillPreview.data.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No links need switching on right now — every published post's internal links are already live.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {backfillPreview.data.map((t) => (
+                    <li key={t.articleId} className="rounded-md border border-border p-3">
+                      <div className="font-medium text-foreground text-sm">{t.title || `Article ${t.articleId}`}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Would restore {t.restoredLinks.length} link{t.restoredLinks.length !== 1 ? "s" : ""}:
+                        <ul className="list-disc ml-5 mt-1">
+                          {t.restoredLinks.map((l) => (
+                            <li key={l.slug}>→ {l.url}</li>
+                          ))}
+                        </ul>
+                        {!t.hasCmsId && (
+                          <span className="text-amber-600">⚠ No stored Wix post ID — will be looked up by slug at re-push.</span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
 
         {/* Publishing Method */}
         <section>

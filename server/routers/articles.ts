@@ -51,6 +51,7 @@ import {
   resolvePublishLinks,
   buildLinkMap,
 } from "../articleEngine";
+import { findBackfillTargets } from "../../shared/backfillLinks";
 import {
   publishToWordPress,
   publishToWix,
@@ -223,6 +224,56 @@ async function generateAndSave(
 // ---------------------------------------------------------------------------
 
 export const articlesRouter = router({
+  /**
+   * DRY RUN — preview which already-published posts would have an internal link
+   * "switched on" because a post they reference has since gone live. Makes no
+   * changes; used by the manual backfill test button before any live re-push.
+   */
+  previewBackfill: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
+
+      const rows = await db
+        .select({
+          id: articles.id,
+          title: articles.title,
+          urlSlug: articles.urlSlug,
+          cmsPostId: articles.cmsPostId,
+          cmsPostUrl: articles.cmsPostUrl,
+          status: articles.status,
+          publishedAt: articles.publishedAt,
+          bodyHtml: articles.bodyHtml,
+        })
+        .from(articles)
+        .where(and(eq(articles.businessId, input.businessId), eq(articles.batchNumber, activeBatch)));
+
+      const titleById = new Map(rows.map((r) => [r.id, r.title ?? ""]));
+      const targets = findBackfillTargets(
+        rows.map((r) => ({
+          id: r.id,
+          urlSlug: r.urlSlug,
+          cmsPostId: r.cmsPostId,
+          cmsPostUrl: r.cmsPostUrl,
+          status: r.status,
+          publishedAt: r.publishedAt ? r.publishedAt.getTime() : null,
+          bodyHtml: r.bodyHtml,
+        })),
+      );
+
+      return targets.map((t) => ({
+        articleId: t.articleId,
+        title: titleById.get(t.articleId) ?? "",
+        cmsPostId: t.cmsPostId,
+        urlSlug: t.urlSlug,
+        restoredLinks: t.restoredLinks,
+        hasCmsId: !!t.cmsPostId,
+      }));
+    }),
+
   /**
    * Start batch generation for a business.
    * Runs articles one at a time in Cornerstone → Pillar → Cluster order.
