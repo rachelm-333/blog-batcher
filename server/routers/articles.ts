@@ -52,6 +52,7 @@ import {
   buildLinkMap,
 } from "../articleEngine";
 import { findBackfillTargets } from "../../shared/backfillLinks";
+import { slugFromHref } from "../../shared/slug";
 import {
   publishToWordPress,
   publishToWix,
@@ -266,14 +267,39 @@ export const articlesRouter = router({
         })),
       );
 
-      return targets.map((t) => ({
-        articleId: t.articleId,
-        title: titleById.get(t.articleId) ?? "",
-        cmsPostId: t.cmsPostId,
-        urlSlug: t.urlSlug,
-        restoredLinks: t.restoredLinks,
-        hasCmsId: !!t.cmsPostId,
+      // Diagnostics — so we can see exactly why links do/don't match.
+      const batch = rows.map((r) => ({
+        title: r.title ?? "",
+        urlSlug: r.urlSlug ?? "(none)",
+        status: r.status ?? "",
+        hasUrl: !!r.cmsPostUrl,
+        cmsPostUrl: r.cmsPostUrl ?? "",
       }));
+      const publishedLinks = rows
+        .filter((r) => r.status === "published")
+        .map((r) => {
+          const hrefs: string[] = [];
+          const re = /<a\b[^>]*href=["']([^"']+)["']/gi;
+          const body = r.bodyHtml ?? "";
+          let m: RegExpExecArray | null;
+          while ((m = re.exec(body)) !== null) {
+            const s = slugFromHref(m[1]);
+            hrefs.push(`${m[1]}  (slug: ${s ?? "—"})`);
+          }
+          return { title: r.title ?? "", hrefs };
+        });
+
+      return {
+        targets: targets.map((t) => ({
+          articleId: t.articleId,
+          title: titleById.get(t.articleId) ?? "",
+          cmsPostId: t.cmsPostId,
+          urlSlug: t.urlSlug,
+          restoredLinks: t.restoredLinks,
+          hasCmsId: !!t.cmsPostId,
+        })),
+        diag: { batch, publishedLinks },
+      };
     }),
 
   /**

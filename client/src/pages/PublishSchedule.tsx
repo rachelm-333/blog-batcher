@@ -501,11 +501,11 @@ export default function PublishSchedule() {
           </div>
           {backfillPreview.data !== undefined && (
             <div className="mt-3 text-sm">
-              {backfillPreview.data.length === 0 ? (
+              {backfillPreview.data.targets.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No links need switching on right now — every published post's internal links are already live.</p>
               ) : (
                 <ul className="space-y-2">
-                  {backfillPreview.data.map((t) => (
+                  {backfillPreview.data.targets.map((t) => (
                     <li key={t.articleId} className="rounded-md border border-border p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="font-medium text-foreground text-sm">{t.title || `Article ${t.articleId}`}</div>
@@ -533,6 +533,19 @@ export default function PublishSchedule() {
                     </li>
                   ))}
                 </ul>
+              )}
+
+              {/* Diagnostics — raw links found + batch slugs, to explain matches */}
+              {backfillPreview.data.diag && (
+                <details className="mt-4">
+                  <summary className="text-xs text-muted-foreground cursor-pointer">Diagnostics (why links match or not)</summary>
+                  <div className="mt-2 text-xs font-mono whitespace-pre-wrap bg-muted/40 rounded-md p-3 overflow-x-auto">
+                    {"BATCH POSTS (slug · status · has real URL):\n"}
+                    {backfillPreview.data.diag.batch.map((b) => `• ${b.urlSlug} · ${b.status} · ${b.hasUrl ? "URL ✓" : "URL ✗"}${b.cmsPostUrl ? `  ${b.cmsPostUrl}` : ""}`).join("\n")}
+                    {"\n\nLINKS INSIDE PUBLISHED POSTS:\n"}
+                    {backfillPreview.data.diag.publishedLinks.map((p) => `▸ ${p.title}\n${p.hrefs.length ? p.hrefs.map((h) => `   ${h}`).join("\n") : "   (no <a> links found)"}`).join("\n")}
+                  </div>
+                </details>
               )}
             </div>
           )}
