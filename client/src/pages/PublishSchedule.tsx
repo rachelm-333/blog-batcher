@@ -530,6 +530,32 @@ export default function PublishSchedule() {
           )}
         </section>
 
+        {/* Fix links in already-published posts (in-place re-sync, no duplicate) */}
+        {articlesData?.some((a) => a.status === "published") && (
+          <section className="rounded-lg border border-border bg-white p-4">
+            <h2 className="text-base font-bold text-foreground">Fix links in already-published posts</h2>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+              Re-pushes a live post to Wix <strong>in place</strong> (no duplicate) — removes links to posts that aren't published yet (fixing 404s) and points links at the real URLs of posts that are live.
+            </p>
+            <ul className="space-y-2">
+              {articlesData!.filter((a) => a.status === "published").map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5">
+                  <span className="text-sm text-foreground">{a.title || `Article ${a.id}`}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs shrink-0"
+                    disabled={applyBackfill.isPending}
+                    onClick={() => business?.id && applyBackfill.mutate({ businessId: business.id, articleId: a.id })}
+                  >
+                    {applyBackfill.isPending && applyBackfill.variables?.articleId === a.id ? "Re-syncing…" : "Re-sync links to Wix"}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* Publishing Method */}
         <section>
           <div className="flex items-center gap-1.5 mb-1">
