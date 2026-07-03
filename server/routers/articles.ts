@@ -1765,6 +1765,7 @@ ${row.bodyHtml ?? ""}
         .select({
           id: articles.id,
           businessId: articles.businessId,
+          batchNumber: articles.batchNumber,
           status: articles.status,
           title: articles.title,
           bodyHtml: articles.bodyHtml,
@@ -1858,9 +1859,17 @@ ${row.bodyHtml ?? ""}
       }
 
       // ── All other cases: call CMS API now ────────────────────────────────────
+      // Resolve internal links against the live batch map — drop links to
+      // not-yet-published posts (no 404s), rewrite live ones to real URLs.
+      const psBatchRows = await db
+        .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
+        .from(articles)
+        .where(and(eq(articles.businessId, row.businessId), eq(articles.batchNumber, row.batchNumber)));
+      const psResolvedBody = resolvePublishLinks(row.bodyHtml ?? "", buildLinkMap(psBatchRows)).bodyHtml;
+
       const payload: ArticlePayload = {
         title: row.title ?? "",
-        bodyHtml: row.bodyHtml ?? "",
+        bodyHtml: psResolvedBody,
         metaTitle: row.metaTitle ?? row.title ?? "",
         metaDescription: row.metaDescription ?? "",
         focusKeyword: row.focusKeyword ?? "",

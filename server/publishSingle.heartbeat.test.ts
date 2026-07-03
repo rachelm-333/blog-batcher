@@ -191,12 +191,15 @@ describe("publishSingle — Heartbeat job creation", () => {
   it("does NOT create a Heartbeat job when publishAs is live and no scheduledAt", async () => {
     let callCount = 0;
     const mockWhere = vi.fn().mockImplementation(() => ({
+      // The batch-link-map query awaits where() directly (no .limit) → resolve to [].
+      then: (resolve: (v: unknown[]) => unknown) => resolve([]),
       limit: vi.fn().mockImplementation(async () => {
         callCount++;
         if (callCount === 1) {
           return [{
             id: 43,
             businessId: 7,
+            batchNumber: 1,
             status: "approved",
             title: "Test Article",
             bodyHtml: "<p>Body</p>",
