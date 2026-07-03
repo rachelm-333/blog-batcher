@@ -637,6 +637,7 @@ export const articlesRouter = router({
           id: articles.id,
           articleNodeId: articles.articleNodeId,
           businessId: articles.businessId,
+          batchNumber: articles.batchNumber,
           title: articles.title,
           bodyHtml: articles.bodyHtml,
           bodyMarkdown: articles.bodyMarkdown,
@@ -675,7 +676,20 @@ export const articlesRouter = router({
       // Verify ownership
       await assertBusinessOwnership(ctx.user.id, row.businessId);
 
-      return row;
+      // Resolve internal links exactly as they will publish, so the preview shows
+      // reality: links to live posts become real URLs, links to not-yet-published
+      // posts show as plain text (no in-app 404s).
+      const batchRows = await db
+        .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
+        .from(articles)
+        .where(and(eq(articles.businessId, row.businessId), eq(articles.batchNumber, row.batchNumber)));
+      const resolved = resolvePublishLinks(row.bodyHtml ?? "", buildLinkMap(batchRows));
+
+      return {
+        ...row,
+        resolvedBodyHtml: resolved.bodyHtml,
+        pendingLinkCount: resolved.warnings.length,
+      };
     }),
 
   /**

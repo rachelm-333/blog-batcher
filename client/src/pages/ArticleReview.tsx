@@ -1496,9 +1496,14 @@ export default function ArticleReview() {
                           📌 Position Zero Answer Block
                         </div>
                       )}
+                      {((fullArticle as any).pendingLinkCount ?? 0) > 0 && (
+                        <div className="mb-4 px-3 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 font-medium">
+                          🔗 {(fullArticle as any).pendingLinkCount} internal link{(fullArticle as any).pendingLinkCount !== 1 ? "s" : ""} shown as plain text — {(fullArticle as any).pendingLinkCount !== 1 ? "they" : "it"} will become {(fullArticle as any).pendingLinkCount !== 1 ? "live links" : "a live link"} once the target post{(fullArticle as any).pendingLinkCount !== 1 ? "s are" : " is"} published.
+                        </div>
+                      )}
                       <div
                         className="prose prose-sm max-w-none text-foreground"
-                        dangerouslySetInnerHTML={{ __html: stripAiDisclosure(fullArticle.bodyHtml ?? "") }}
+                        dangerouslySetInnerHTML={{ __html: stripAiDisclosure(((fullArticle as any).resolvedBodyHtml ?? fullArticle.bodyHtml) ?? "") }}
                       />
                     </div>
                   )}
