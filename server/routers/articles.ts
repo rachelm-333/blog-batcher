@@ -309,7 +309,8 @@ export const articlesRouter = router({
 
       // Re-resolve the body against the live batch link map + match publish formatting.
       const linkMap = buildLinkMap(batchRows);
-      let body = resolvePublishLinks(target.bodyHtml ?? "", linkMap).bodyHtml;
+      const resolvedResult = resolvePublishLinks(target.bodyHtml ?? "", linkMap);
+      let body = resolvedResult.bodyHtml;
       body = body
         .replace(/<li>/g, '<li style="margin-bottom:0.75em">')
         .replace(/<li /g, '<li style="margin-bottom:0.75em" ');
@@ -343,6 +344,8 @@ export const articlesRouter = router({
         error: result.error ?? null,
         raw: result.raw ?? null,
         cmsPostUrl: result.cmsPostUrl ?? null,
+        linksNowLive: resolvedResult.rewritten,
+        linksPending: resolvedResult.warnings.length,
       };
     }),
 

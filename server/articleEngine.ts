@@ -376,8 +376,9 @@ export function splitDenseParagraphs(html: string, maxSentences = 4): string {
 export function resolvePublishLinks(
   bodyHtml: string,
   linkMap: Record<string, string | null>,
-): { bodyHtml: string; warnings: string[] } {
+): { bodyHtml: string; warnings: string[]; rewritten: number } {
   const warnings: string[] = [];
+  let rewritten = 0;
   // Index the batch link map by bare slug (last path segment). buildLinkMap
   // provides both "slug" and "/slug"; we key on the bare slug for matching.
   const bySlug = new Map<string, string | null>();
@@ -396,6 +397,7 @@ export function resolvePublishLinks(
       const real = bySlug.get(slug);
       if (real) {
         // Rewrite to the real published URL (correct Wix /post/ or WP /blog/ path).
+        rewritten++;
         return `<a ${pre}href="${real}"${post}>${anchor}</a>`.replace(/\s+href/, " href");
       }
       // Target not published yet — drop the link, keep the text, warn.
@@ -403,7 +405,7 @@ export function resolvePublishLinks(
       return anchor;
     },
   );
-  return { bodyHtml: html, warnings };
+  return { bodyHtml: html, warnings, rewritten };
 }
 
 /**

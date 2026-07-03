@@ -175,7 +175,15 @@ export default function PublishSchedule() {
   const applyBackfill = trpc.articles.applyBackfillOne.useMutation({
     onSuccess: (r) => {
       if (r.success) {
-        toast.success("Link switched on and re-published to Wix.");
+        const live = r.linksNowLive ?? 0;
+        const pending = r.linksPending ?? 0;
+        if (live > 0) {
+          toast.success(`Re-synced to Wix: ${live} link${live !== 1 ? "s" : ""} now live${pending > 0 ? `, ${pending} still pending (target not published yet)` : ""}.`);
+        } else if (pending > 0) {
+          toast.warning(`Re-synced, but 0 links went live — ${pending} still pending. The linked post(s) aren't published yet, or their Wix URL wasn't captured (re-publish them after the latest fix).`, { duration: 12000 });
+        } else {
+          toast.success("Re-synced to Wix (no internal links in this post).");
+        }
         backfillPreview.refetch();
       } else {
         toast.error(r.error ?? "Backfill failed", { description: r.raw ?? undefined, duration: 12000 });
