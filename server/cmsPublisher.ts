@@ -909,18 +909,47 @@ export async function publishToWix(
       return { success: false, error: errMsg };
     }
 
-    const publishData = (await publishRes.json()) as { post?: { id?: string; url?: string } };
-    return {
-      success: true,
-      cmsPostId: publishData.post?.id ?? draftId,
-      cmsPostUrl: publishData.post?.url ?? "",
-    };
+    const publishData = (await publishRes.json()) as { post?: WixPostShape };
+    const postId = publishData.post?.id ?? draftId;
+    let cmsPostUrl = buildWixUrl(publishData.post);
+    // The publish response often omits the URL — fetch the post to get it.
+    if (!cmsPostUrl && postId) cmsPostUrl = await fetchWixPostUrl(baseHeaders, postId);
+    return { success: true, cmsPostId: postId, cmsPostUrl };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND")) {
       return { success: false, error: "Cannot reach Wix API — check your API key and Site ID" };
     }
     return { success: false, error: msg };
+  }
+}
+
+/** Wix post URL comes back as { base, path } (or occasionally a plain string). */
+interface WixPostShape {
+  id?: string;
+  url?: string | { base?: string; path?: string };
+}
+
+/** Build a usable absolute URL from a Wix post's url field ({base,path} or string). */
+function buildWixUrl(post: WixPostShape | undefined): string {
+  if (!post || !post.url) return "";
+  const u = post.url;
+  if (typeof u === "string") return u;
+  const base = (u.base ?? "").replace(/\/+$/, "");
+  const path = u.path ?? "";
+  if (!base && !path) return "";
+  return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
+/** Fetch a published Wix post to read its canonical URL (fallback when publish omits it). */
+async function fetchWixPostUrl(headers: Record<string, string>, postId: string): Promise<string> {
+  try {
+    const res = await fetch(`https://www.wixapis.com/blog/v3/posts/${postId}`, { headers });
+    if (!res.ok) return "";
+    const data = (await res.json()) as { post?: WixPostShape };
+    return buildWixUrl(data.post);
+  } catch {
+    return "";
   }
 }
 
@@ -971,10 +1000,11 @@ export async function updateWixPostBody(
     let url = "";
     let id = postId;
     try {
-      const data = JSON.parse(pubText) as { post?: { id?: string; url?: string } };
-      url = data.post?.url ?? "";
+      const data = JSON.parse(pubText) as { post?: WixPostShape };
+      url = buildWixUrl(data.post);
       id = data.post?.id ?? postId;
     } catch { /* keep defaults */ }
+    if (!url && id) url = await fetchWixPostUrl(headers, id);
     return { success: true, cmsPostId: id, cmsPostUrl: url, raw: pubText.slice(0, 600) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
