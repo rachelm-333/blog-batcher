@@ -35,6 +35,7 @@ import {
 import { invokeLLM } from "./_core/llm";
 import { invokeClaudeWithCost as invokeLLMWithCost } from "./claudeLLM";
 import { getDb } from "./db";
+import { slugFromHref } from "../shared/slug";
 
 // ---------------------------------------------------------------------------
 // Token limits per generation pass (single source of truth)
@@ -377,21 +378,27 @@ export function resolvePublishLinks(
   linkMap: Record<string, string | null>,
 ): { bodyHtml: string; warnings: string[] } {
   const warnings: string[] = [];
-  // Normalise keys for lookup
-  const norm = (s: string) => s.toLowerCase().replace(/\/$/, "");
-  const map = new Map<string, string | null>();
-  for (const [k, v] of Object.entries(linkMap)) map.set(norm(k), v);
+  // Index the batch link map by bare slug (last path segment). buildLinkMap
+  // provides both "slug" and "/slug"; we key on the bare slug for matching.
+  const bySlug = new Map<string, string | null>();
+  for (const [k, v] of Object.entries(linkMap)) {
+    const s = slugFromHref(k);
+    if (s) bySlug.set(s, v);
+  }
 
   const html = bodyHtml.replace(
     /<a\b([^>]*?)href=["']([^"']+)["']([^>]*)>([\s\S]*?)<\/a>/gi,
     (full, pre: string, href: string, post: string, anchor: string) => {
-      const key = norm(href);
-      if (!map.has(key)) return full; // not a batch-article link — leave as-is
-      const real = map.get(key);
+      const slug = slugFromHref(href);
+      // Not an internal batch-article link (external URL, anchor, mailto, CTA,
+      // or a slug we don't own) — leave it untouched.
+      if (!slug || !bySlug.has(slug)) return full;
+      const real = bySlug.get(slug);
       if (real) {
+        // Rewrite to the real published URL (correct Wix /post/ or WP /blog/ path).
         return `<a ${pre}href="${real}"${post}>${anchor}</a>`.replace(/\s+href/, " href");
       }
-      // Target not published — drop the link, keep the text, warn.
+      // Target not published yet — drop the link, keep the text, warn.
       warnings.push(`Internal link to "${href}" was removed — that post is not published yet. Publish it first, then re-publish this article to restore the link.`);
       return anchor;
     },

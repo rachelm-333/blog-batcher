@@ -36,18 +36,22 @@ export interface BackfillTarget {
   restoredLinks: Array<{ slug: string; url: string }>;
 }
 
+import { slugFromHref } from "./slug";
+
 const stripSlug = (s: string): string => s.toLowerCase().replace(/^\/+/, "").replace(/\/+$/, "");
 
-/** Extract the set of internal /slug hrefs referenced in a body. */
+/**
+ * Extract the set of internal slugs referenced in a body — relative OR absolute
+ * (guessed) hrefs. External links are filtered later by matching against the
+ * batch's own slugs.
+ */
 function referencedSlugs(bodyHtml: string): Set<string> {
   const slugs = new Set<string>();
   const re = /<a\b[^>]*?href=["']([^"']+)["']/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(bodyHtml)) !== null) {
-    const href = m[1];
-    // Only internal relative slugs (e.g. "/handling-lateness"), not absolute URLs.
-    if (/^https?:\/\//i.test(href)) continue;
-    slugs.add(stripSlug(href));
+    const s = slugFromHref(m[1]);
+    if (s) slugs.add(s);
   }
   return slugs;
 }

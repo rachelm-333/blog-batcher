@@ -20,6 +20,35 @@ describe("buildLinkMap — batch slug → live URL map", () => {
     expect(map["/x"]).toBeNull();
   });
 
+  it("catches an ABSOLUTE guessed URL to an unpublished post and drops it (no 404)", () => {
+    // The exact live bug: link written as a full guessed URL, target not live.
+    const body = `<p>Effective <a href="https://www.skrt.com.au/brand-positioning">brand positioning</a> matters.</p>`;
+    const map = buildLinkMap([{ urlSlug: "brand-positioning", cmsPostUrl: null, status: "approved" }]);
+    const r = resolvePublishLinks(body, map);
+    expect(r.bodyHtml).not.toContain("<a "); // guessed live link removed
+    expect(r.bodyHtml).toContain("brand positioning"); // text kept
+    expect(r.warnings).toHaveLength(1);
+  });
+
+  it("rewrites an ABSOLUTE guessed URL to the real Wix /post/ URL once live", () => {
+    const body = `<p><a href="https://www.skrt.com.au/brand-positioning">brand positioning</a></p>`;
+    const map = buildLinkMap([
+      { urlSlug: "brand-positioning", cmsPostUrl: "https://www.skrt.com.au/post/brand-positioning", status: "published" },
+    ]);
+    const r = resolvePublishLinks(body, map);
+    expect(r.bodyHtml).toContain('href="https://www.skrt.com.au/post/brand-positioning"');
+    expect(r.warnings).toHaveLength(0);
+  });
+
+  it("leaves genuine external links and the homepage untouched", () => {
+    const body = `<p><a href="https://gov.au/fair-work">Fair Work</a> and <a href="https://www.skrt.com.au">home</a>.</p>`;
+    const map = buildLinkMap([{ urlSlug: "brand-positioning", cmsPostUrl: "https://www.skrt.com.au/post/brand-positioning", status: "published" }]);
+    const r = resolvePublishLinks(body, map);
+    expect(r.bodyHtml).toContain('href="https://gov.au/fair-work"');
+    expect(r.bodyHtml).toContain('href="https://www.skrt.com.au"');
+    expect(r.warnings).toHaveLength(0);
+  });
+
   it("end-to-end: a cornerstone published before its cluster drops the down-link, no 404", () => {
     // Cornerstone body links down to a cluster that isn't live yet.
     const body = `<p>See <a href="/handling-lateness">handling lateness</a>.</p>`;
