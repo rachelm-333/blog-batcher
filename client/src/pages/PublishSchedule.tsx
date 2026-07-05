@@ -501,11 +501,11 @@ export default function PublishSchedule() {
           </div>
           {backfillPreview.data !== undefined && (
             <div className="mt-3 text-sm">
-              {backfillPreview.data.targets.length === 0 ? (
+              {(backfillPreview.data.targets ?? []).length === 0 ? (
                 <p className="text-xs text-muted-foreground">No links need switching on right now — every published post's internal links are already live.</p>
               ) : (
                 <ul className="space-y-2">
-                  {backfillPreview.data.targets.map((t) => (
+                  {(backfillPreview.data.targets ?? []).map((t) => (
                     <li key={t.articleId} className="rounded-md border border-border p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="font-medium text-foreground text-sm">{t.title || `Article ${t.articleId}`}</div>
