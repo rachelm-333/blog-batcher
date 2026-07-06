@@ -953,6 +953,17 @@ async function fetchWixPostUrl(headers: Record<string, string>, postId: string):
   }
 }
 
+/** Look up a published Wix post's canonical URL from its stored post ID (repairs empty cmsPostUrl). */
+export async function getWixPostUrlById(credentials: WixCredentials, postId: string): Promise<string> {
+  const headers: Record<string, string> = {
+    Authorization: credentials.apiKey,
+    "wix-site-id": credentials.siteId,
+    "Content-Type": "application/json",
+    "User-Agent": "BlogBatcher/1.0",
+  };
+  return fetchWixPostUrl(headers, postId);
+}
+
 // ---------------------------------------------------------------------------
 // Wix — update an existing post's body and re-publish (Phase 2b backfill).
 // Updates ONLY the rich content of the existing draft, then re-publishes it, so

@@ -63,6 +63,7 @@ import {
   publishToGhost,
   updateWixPostBody,
   findWixPostIdBySlug,
+  getWixPostUrlById,
   decryptCredentials,
   type ArticlePayload,
 } from "../cmsPublisher";
@@ -333,14 +334,7 @@ export const articlesRouter = router({
       if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found in this batch" });
       if (target.status !== "published") throw new TRPCError({ code: "BAD_REQUEST", message: "Article is not published yet" });
 
-      // Re-resolve the body against the live batch link map + match publish formatting.
-      const linkMap = buildLinkMap(batchRows);
-      const resolvedResult = resolvePublishLinks(target.bodyHtml ?? "", linkMap);
-      let body = resolvedResult.bodyHtml;
-      body = body
-        .replace(/<li>/g, '<li style="margin-bottom:0.75em">')
-        .replace(/<li /g, '<li style="margin-bottom:0.75em" ');
-
+      // Load Wix creds first — needed to repair missing URLs before resolving.
       const [integration] = await db
         .select({ credentialsEncrypted: integrations.credentialsEncrypted })
         .from(integrations)
@@ -353,6 +347,29 @@ export const articlesRouter = router({
       if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt Wix credentials" });
       const wixCreds = { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" };
 
+      // Self-heal: older publishes saved an empty cmsPostUrl (Wix returns url as an
+      // object). For any published post that has an ID but no URL, fetch the real
+      // URL from Wix and persist it — so the link map below is accurate.
+      let repaired = 0;
+      for (const r of batchRows) {
+        if (r.status === "published" && r.cmsPostId && !r.cmsPostUrl) {
+          const url = await getWixPostUrlById(wixCreds, r.cmsPostId);
+          if (url) {
+            r.cmsPostUrl = url;
+            await db.update(articles).set({ cmsPostUrl: url }).where(eq(articles.id, r.id));
+            repaired++;
+          }
+        }
+      }
+
+      // Re-resolve the body against the (now-repaired) live batch link map.
+      const linkMap = buildLinkMap(batchRows);
+      const resolvedResult = resolvePublishLinks(target.bodyHtml ?? "", linkMap);
+      let body = resolvedResult.bodyHtml;
+      body = body
+        .replace(/<li>/g, '<li style="margin-bottom:0.75em">')
+        .replace(/<li /g, '<li style="margin-bottom:0.75em" ');
+
       let postId = target.cmsPostId;
       if (!postId && target.urlSlug) {
         postId = await findWixPostIdBySlug(wixCreds, target.urlSlug);
@@ -361,10 +378,17 @@ export const articlesRouter = router({
         }
       }
       if (!postId) {
-        return { success: false, error: "Could not resolve the Wix post ID (not stored and slug lookup failed).", raw: null, cmsPostUrl: null };
+        return { success: false, error: "Could not resolve the Wix post ID (not stored and slug lookup failed).", raw: null, cmsPostUrl: null, linksNowLive: 0, linksPending: 0, repaired };
       }
 
       const result = await updateWixPostBody(wixCreds, postId, body);
+      // Persist the target's own captured URL/id going forward.
+      if (result.success) {
+        const upd: Record<string, string> = {};
+        if (result.cmsPostUrl) upd.cmsPostUrl = result.cmsPostUrl;
+        if (result.cmsPostId) upd.cmsPostId = result.cmsPostId;
+        if (Object.keys(upd).length) await db.update(articles).set(upd).where(eq(articles.id, target.id));
+      }
       return {
         success: result.success,
         error: result.error ?? null,
@@ -372,6 +396,7 @@ export const articlesRouter = router({
         cmsPostUrl: result.cmsPostUrl ?? null,
         linksNowLive: resolvedResult.rewritten,
         linksPending: resolvedResult.warnings.length,
+        repaired,
       };
     }),
 
