@@ -535,17 +535,17 @@ export default function PublishSchedule() {
                 </ul>
               )}
 
-              {/* Diagnostics — raw links found + batch slugs, to explain matches */}
+              {/* Diagnostics — always visible so it's easy to screenshot */}
               {backfillPreview.data.diag && (
-                <details className="mt-4">
-                  <summary className="text-xs text-muted-foreground cursor-pointer">Diagnostics (why links match or not)</summary>
-                  <div className="mt-2 text-xs font-mono whitespace-pre-wrap bg-muted/40 rounded-md p-3 overflow-x-auto">
+                <div className="mt-4">
+                  <p className="text-xs font-semibold text-foreground mb-1">Diagnostics (why links match or not)</p>
+                  <div className="text-xs font-mono whitespace-pre-wrap bg-muted/40 border border-border rounded-md p-3 overflow-x-auto">
                     {"BATCH POSTS (slug · status · has real URL):\n"}
                     {backfillPreview.data.diag.batch.map((b) => `• ${b.urlSlug} · ${b.status} · ${b.hasUrl ? "URL ✓" : "URL ✗"}${b.cmsPostUrl ? `  ${b.cmsPostUrl}` : ""}`).join("\n")}
                     {"\n\nLINKS INSIDE PUBLISHED POSTS:\n"}
                     {backfillPreview.data.diag.publishedLinks.map((p) => `▸ ${p.title}\n${p.hrefs.length ? p.hrefs.map((h) => `   ${h}`).join("\n") : "   (no <a> links found)"}`).join("\n")}
                   </div>
-                </details>
+                </div>
               )}
             </div>
           )}
