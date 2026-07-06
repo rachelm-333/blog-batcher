@@ -10,8 +10,10 @@
  *   node --import tsx scripts/diagnoseLinks.ts
  */
 import { getDb } from "../server/db";
-import { articles } from "../drizzle/schema";
+import { articles, integrations } from "../drizzle/schema";
+import { and, eq } from "drizzle-orm";
 import { slugFromHref } from "../shared/slug";
+import { decryptCredentials, getWixPostUrlById } from "../server/cmsPublisher";
 
 async function main() {
   const db = await getDb();
@@ -23,6 +25,7 @@ async function main() {
   const rows = await db
     .select({
       id: articles.id,
+      businessId: articles.businessId,
       title: articles.title,
       status: articles.status,
       urlSlug: articles.urlSlug,
@@ -32,6 +35,21 @@ async function main() {
     })
     .from(articles);
 
+  // Load + cache Wix creds per business so we can test the live URL fetch.
+  const wixCredsByBiz = new Map<number, { apiKey: string; siteId: string; memberId: string } | null>();
+  async function wixCredsFor(businessId: number) {
+    if (wixCredsByBiz.has(businessId)) return wixCredsByBiz.get(businessId)!;
+    const [integ] = await db!
+      .select({ credentialsEncrypted: integrations.credentialsEncrypted })
+      .from(integrations)
+      .where(and(eq(integrations.businessId, businessId), eq(integrations.platform, "wix")))
+      .limit(1);
+    const creds = integ?.credentialsEncrypted ? decryptCredentials(integ.credentialsEncrypted) : null;
+    const wc = creds ? { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" } : null;
+    wixCredsByBiz.set(businessId, wc);
+    return wc;
+  }
+
   console.log(`\n=== ${rows.length} article(s) ===\n`);
   for (const r of rows) {
     console.log(`▸ ${r.title ?? `Article ${r.id}`}`);
@@ -39,6 +57,16 @@ async function main() {
     console.log(`    our slug:   ${r.urlSlug ?? "(none)"}`);
     console.log(`    cmsPostId:  ${r.cmsPostId ?? "EMPTY"}`);
     console.log(`    cmsPostUrl: ${r.cmsPostUrl ?? "EMPTY"}`);
+    // Live test: can we fetch the real URL from Wix using the stored post ID?
+    if (r.status === "published" && r.cmsPostId && !r.cmsPostUrl) {
+      const wc = await wixCredsFor(r.businessId);
+      if (!wc) {
+        console.log(`    Wix fetch:  (no Wix credentials for business ${r.businessId})`);
+      } else {
+        const fetched = await getWixPostUrlById(wc, r.cmsPostId);
+        console.log(`    Wix fetch:  ${fetched ? fetched : "FAILED (empty — ID may be a draft id, not a post id)"}`);
+      }
+    }
     const body = r.bodyHtml ?? "";
     const hrefs: string[] = [];
     const re = /<a\b[^>]*href=["']([^"']+)["']/gi;
