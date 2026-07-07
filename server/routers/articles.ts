@@ -63,7 +63,7 @@ import {
   publishToGhost,
   updateWixPostBody,
   findWixPostIdBySlug,
-  getWixPostUrlById,
+  resolveWixPublishedUrl,
   decryptCredentials,
   type ArticlePayload,
 } from "../cmsPublisher";
@@ -352,11 +352,20 @@ export const articlesRouter = router({
       // URL from Wix and persist it — so the link map below is accurate.
       let repaired = 0;
       for (const r of batchRows) {
-        if (r.status === "published" && r.cmsPostId && !r.cmsPostUrl) {
-          const url = await getWixPostUrlById(wixCreds, r.cmsPostId);
-          if (url) {
-            r.cmsPostUrl = url;
-            await db.update(articles).set({ cmsPostUrl: url }).where(eq(articles.id, r.id));
+        if (r.status === "published" && !r.cmsPostUrl) {
+          const resolved = await resolveWixPublishedUrl(wixCreds, {
+            postId: r.cmsPostId,
+            slug: r.urlSlug,
+            title: r.title,
+          });
+          if (resolved.url) {
+            r.cmsPostUrl = resolved.url;
+            const upd: Record<string, string> = { cmsPostUrl: resolved.url };
+            if (resolved.id && resolved.id !== r.cmsPostId) {
+              upd.cmsPostId = resolved.id;
+              r.cmsPostId = resolved.id;
+            }
+            await db.update(articles).set(upd).where(eq(articles.id, r.id));
             repaired++;
           }
         }

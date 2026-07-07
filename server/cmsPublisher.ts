@@ -910,10 +910,15 @@ export async function publishToWix(
     }
 
     const publishData = (await publishRes.json()) as { post?: WixPostShape };
-    const postId = publishData.post?.id ?? draftId;
+    let postId = publishData.post?.id ?? draftId;
     let cmsPostUrl = buildWixUrl(publishData.post);
-    // The publish response often omits the URL — fetch the post to get it.
-    if (!cmsPostUrl && postId) cmsPostUrl = await fetchWixPostUrl(baseHeaders, postId);
+    // The publish response often omits the URL and the id we have may be a draft
+    // id — resolve robustly (by id, then slug, then title) to get the real URL.
+    if (!cmsPostUrl) {
+      const r = await resolveWixPublishedUrl(credentials, { postId, slug: article.urlSlug, title: article.title });
+      cmsPostUrl = r.url;
+      if (r.id) postId = r.id;
+    }
     return { success: true, cmsPostId: postId, cmsPostUrl };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -927,7 +932,64 @@ export async function publishToWix(
 /** Wix post URL comes back as { base, path } (or occasionally a plain string). */
 interface WixPostShape {
   id?: string;
+  title?: string;
   url?: string | { base?: string; path?: string };
+}
+
+/**
+ * Robustly resolve a PUBLISHED Wix post's canonical URL. Tries, in order:
+ *  1. GET the post by id (fails if the stored id is a draft id),
+ *  2. GET the post by slug (fails if Wix appended a -1 suffix),
+ *  3. LIST published posts and match by exact title (most reliable).
+ * Returns the url + the real published post id when found.
+ */
+export async function resolveWixPublishedUrl(
+  credentials: WixCredentials,
+  opts: { postId?: string | null; slug?: string | null; title?: string | null },
+): Promise<{ url: string; id: string | null }> {
+  const headers: Record<string, string> = {
+    Authorization: credentials.apiKey,
+    "wix-site-id": credentials.siteId,
+    "Content-Type": "application/json",
+    "User-Agent": "BlogBatcher/1.0",
+  };
+
+  // 1. By post id
+  if (opts.postId) {
+    const u = await fetchWixPostUrl(headers, opts.postId);
+    if (u) return { url: u, id: opts.postId };
+  }
+
+  // 2. By slug
+  if (opts.slug) {
+    const clean = opts.slug.replace(/^\/+/, "").replace(/\/+$/, "");
+    try {
+      const res = await fetch(`https://www.wixapis.com/blog/v3/posts/slugs/${encodeURIComponent(clean)}`, { headers });
+      if (res.ok) {
+        const d = (await res.json()) as { post?: WixPostShape };
+        const u = buildWixUrl(d.post);
+        if (u) return { url: u, id: d.post?.id ?? opts.postId ?? null };
+      }
+    } catch { /* fall through */ }
+  }
+
+  // 3. List published posts and match by exact title
+  if (opts.title) {
+    const want = opts.title.toLowerCase().trim();
+    try {
+      const res = await fetch(`https://www.wixapis.com/blog/v3/posts?paging.limit=100`, { headers });
+      if (res.ok) {
+        const d = (await res.json()) as { posts?: WixPostShape[] };
+        const match = (d.posts ?? []).find((p) => (p.title ?? "").toLowerCase().trim() === want);
+        if (match) {
+          const u = buildWixUrl(match);
+          if (u) return { url: u, id: match.id ?? opts.postId ?? null };
+        }
+      }
+    } catch { /* fall through */ }
+  }
+
+  return { url: "", id: opts.postId ?? null };
 }
 
 /** Build a usable absolute URL from a Wix post's url field ({base,path} or string). */

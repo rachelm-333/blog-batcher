@@ -15,8 +15,7 @@ import { getDb } from "../server/db";
 import { articles, integrations } from "../drizzle/schema";
 import {
   decryptCredentials,
-  getWixPostUrlById,
-  findWixPostIdBySlug,
+  resolveWixPublishedUrl,
   type WixCredentials,
 } from "../server/cmsPublisher";
 
@@ -72,20 +71,14 @@ async function main() {
       continue;
     }
 
-    let url = "";
-    let foundId = r.cmsPostId ?? null;
-
-    // Method 1: by stored post ID
-    if (r.cmsPostId) url = await getWixPostUrlById(wc, r.cmsPostId);
-
-    // Method 2: by slug → id → url
-    if (!url && r.urlSlug) {
-      const pid = await findWixPostIdBySlug(wc, r.urlSlug);
-      if (pid) {
-        foundId = pid;
-        url = await getWixPostUrlById(wc, pid);
-      }
-    }
+    // Resolve by id → slug → title (title match is the reliable one).
+    const resolved = await resolveWixPublishedUrl(wc, {
+      postId: r.cmsPostId,
+      slug: r.urlSlug,
+      title: r.title,
+    });
+    const url = resolved.url;
+    const foundId = resolved.id;
 
     if (url) {
       const upd: Record<string, string> = { cmsPostUrl: url };
