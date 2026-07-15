@@ -72,6 +72,16 @@ async function main() {
 
   if (post.cmsPostId) {
     await probe("GET post by stored id", `https://www.wixapis.com/blog/v3/posts/${post.cmsPostId}`);
+    // Print the EXACT shape of the url field so we can fix parsing.
+    try {
+      const res = await fetch(`https://www.wixapis.com/blog/v3/posts/${post.cmsPostId}`, { headers });
+      if (res.ok) {
+        const data = (await res.json()) as { post?: Record<string, unknown> };
+        const p = data.post ?? {};
+        console.log(`>>> url FIELD SHAPE: ${JSON.stringify(p.url)}`);
+        console.log(`>>> post top-level keys: ${Object.keys(p).join(", ")}\n`);
+      }
+    } catch { /* ignore */ }
   }
   if (post.urlSlug) {
     const clean = post.urlSlug.replace(/^\/+/, "").replace(/\/+$/, "");
