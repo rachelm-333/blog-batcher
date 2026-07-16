@@ -72,13 +72,13 @@ async function main() {
 
   if (post.cmsPostId) {
     await probe("GET post by stored id", `https://www.wixapis.com/blog/v3/posts/${post.cmsPostId}`);
-    // Print the EXACT shape of the url field so we can fix parsing.
+    // Print the url field WITH the fieldsets=URL param (Wix omits url otherwise).
     try {
-      const res = await fetch(`https://www.wixapis.com/blog/v3/posts/${post.cmsPostId}`, { headers });
+      const res = await fetch(`https://www.wixapis.com/blog/v3/posts/${post.cmsPostId}?fieldsets=URL`, { headers });
       if (res.ok) {
         const data = (await res.json()) as { post?: Record<string, unknown> };
         const p = data.post ?? {};
-        console.log(`>>> url FIELD SHAPE: ${JSON.stringify(p.url)}`);
+        console.log(`>>> url FIELD (with fieldsets=URL): ${JSON.stringify(p.url)}`);
         console.log(`>>> post top-level keys: ${Object.keys(p).join(", ")}\n`);
       }
     } catch { /* ignore */ }

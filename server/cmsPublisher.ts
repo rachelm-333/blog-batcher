@@ -964,7 +964,7 @@ export async function resolveWixPublishedUrl(
   if (opts.slug) {
     const clean = opts.slug.replace(/^\/+/, "").replace(/\/+$/, "");
     try {
-      const res = await fetch(`https://www.wixapis.com/blog/v3/posts/slugs/${encodeURIComponent(clean)}`, { headers });
+      const res = await fetch(`https://www.wixapis.com/blog/v3/posts/slugs/${encodeURIComponent(clean)}?fieldsets=URL`, { headers });
       if (res.ok) {
         const d = (await res.json()) as { post?: WixPostShape };
         const u = buildWixUrl(d.post);
@@ -977,7 +977,7 @@ export async function resolveWixPublishedUrl(
   if (opts.title) {
     const want = opts.title.toLowerCase().trim();
     try {
-      const res = await fetch(`https://www.wixapis.com/blog/v3/posts?paging.limit=100`, { headers });
+      const res = await fetch(`https://www.wixapis.com/blog/v3/posts?paging.limit=100&fieldsets=URL`, { headers });
       if (res.ok) {
         const d = (await res.json()) as { posts?: WixPostShape[] };
         const match = (d.posts ?? []).find((p) => (p.title ?? "").toLowerCase().trim() === want);
@@ -1003,10 +1003,14 @@ function buildWixUrl(post: WixPostShape | undefined): string {
   return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
-/** Fetch a published Wix post to read its canonical URL (fallback when publish omits it). */
+/**
+ * Fetch a published Wix post to read its canonical URL. Wix v3 only returns the
+ * `url` field when explicitly requested via ?fieldsets=URL — without it the post
+ * object has no url at all.
+ */
 async function fetchWixPostUrl(headers: Record<string, string>, postId: string): Promise<string> {
   try {
-    const res = await fetch(`https://www.wixapis.com/blog/v3/posts/${postId}`, { headers });
+    const res = await fetch(`https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=URL`, { headers });
     if (!res.ok) return "";
     const data = (await res.json()) as { post?: WixPostShape };
     return buildWixUrl(data.post);
