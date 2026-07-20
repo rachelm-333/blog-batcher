@@ -575,6 +575,41 @@ export function removeOrphanFaqItems(bodyHtml: string): { bodyHtml: string; remo
 }
 
 /**
+ * Render the authoritative FAQ items into the body's FAQ section. The model often
+ * puts the Q&A in the faqItems JSON but emits empty <div class="faq-item"> shells
+ * in the HTML — leaving a blank FAQ on the published page. This strips any
+ * existing faq-item divs and rebuilds them from faqItems, inserted right after the
+ * "Frequently Asked Questions" heading (appending the heading if it's missing).
+ * Pure, testable, no LLM.
+ */
+export function renderFaqIntoBody(
+  bodyHtml: string,
+  faqItems: Array<{ question: string; answer: string }> | null | undefined,
+): string {
+  if (!faqItems || faqItems.length === 0) return bodyHtml;
+  const items = faqItems.filter((it) => it && it.question && it.answer);
+  if (items.length === 0) return bodyHtml;
+
+  const faqHtml = items
+    .map(
+      (it) =>
+        `<div class="faq-item"><hr><p><strong>Q: ${it.question}</strong></p><p>A: ${it.answer}</p></div>`,
+    )
+    .join("\n");
+
+  // Remove existing faq-item divs (usually empty shells).
+  let out = bodyHtml.replace(/<div\s+class=["'][^"']*faq-item[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, "");
+
+  const headingRe = /(<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>)/i;
+  if (headingRe.test(out)) {
+    out = out.replace(headingRe, `$1\n${faqHtml}`);
+  } else {
+    out = `${out}\n<h2>Frequently Asked Questions</h2>\n${faqHtml}`;
+  }
+  return out;
+}
+
+/**
  * Ensure the primary keyword appears in at least one H3 heading — but ONLY if
  * H3s already exist (the Pass 1 check passes automatically when there are no
  * H3s, so we never add headings just to satisfy it). Mirrors ensureKeywordInH2.
@@ -2032,6 +2067,19 @@ export async function generateSingleArticle(
       console.log(`[ArticleEngine] Removed ${faqClean.removed} orphan FAQ item(s) (question with no answer) for node ${nodeId}`);
       bodyHtml = faqClean.bodyHtml;
       wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    }
+
+    // STEP 2.6b2 — Render the authoritative faqItems into the FAQ section. The
+    // model often leaves the HTML faq-item divs empty while putting the real Q&A
+    // in the faqItems JSON, which publishes a blank FAQ. This guarantees the body
+    // FAQ matches the saved items.
+    if (faqItems && faqItems.length > 0) {
+      const before = bodyHtml;
+      bodyHtml = renderFaqIntoBody(bodyHtml, faqItems);
+      if (bodyHtml !== before) {
+        console.log(`[ArticleEngine] Rendered ${faqItems.length} FAQ item(s) into the body for node ${nodeId}`);
+        wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+      }
     }
 
     // STEP 2.6c — GEO paragraph density: split any <p> over 4 sentences (MIC-08)
