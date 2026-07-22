@@ -53,6 +53,7 @@ import {
 } from "../articleEngine";
 import { findBackfillTargets } from "../../shared/backfillLinks";
 import { slugFromHref } from "../../shared/slug";
+import { autoBackfillLinks } from "../autoBackfill";
 import {
   publishToWordPress,
   publishToWix,
@@ -2003,6 +2004,11 @@ ${row.bodyHtml ?? ""}
           .where(eq(articles.id, input.articleId));
         // Advance business to stage 6 (Publish & schedule)
         await advanceBusinessStage(row.businessId, 6);
+        // Auto-backfill: now this post is live, switch on any links to it in
+        // earlier-published posts (in place, no duplicate). Fail-safe.
+        if (!isDraft && !isScheduled && input.platform === "wix") {
+          await autoBackfillLinks(row.businessId, row.batchNumber);
+        }
         return {
           success: true,
           cmsPostUrl: result.cmsPostUrl ?? null,

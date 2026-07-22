@@ -37,6 +37,7 @@ import {
   type ArticlePayload,
 } from "./cmsPublisher";
 import { resolvePublishLinks, buildLinkMap } from "./articleEngine";
+import { autoBackfillLinks } from "./autoBackfill";
 import { createHeartbeatJob, deleteHeartbeatJob, updateHeartbeatJob } from "./_core/heartbeat";
 import { notifyOwner } from "./_core/notification";
 
@@ -130,6 +131,7 @@ export async function executeScheduledPublish(
     .select({
       id: articles.id,
       businessId: articles.businessId,
+      batchNumber: articles.batchNumber,
       title: articles.title,
       bodyHtml: articles.bodyHtml,
       metaTitle: articles.metaTitle,
@@ -333,6 +335,12 @@ export async function executeScheduledPublish(
         scheduleCronTaskUid: null, // job is done
       })
       .where(eq(articles.id, ctx.articleId));
+
+    // Auto-backfill: this scheduled post is now live — switch on links to it in
+    // earlier-published posts (in place, no duplicate). Fail-safe, Wix only.
+    if (publisherPlatform === "wix") {
+      await autoBackfillLinks(row.businessId, row.batchNumber ?? 1);
+    }
 
     // Write success audit log
     await writeAuditLog({
