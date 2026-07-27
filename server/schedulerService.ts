@@ -36,8 +36,8 @@ import {
   decryptCredentials,
   type ArticlePayload,
 } from "./cmsPublisher";
-import { resolvePublishLinks, buildLinkMap } from "./articleEngine";
 import { autoBackfillLinks } from "./autoBackfill";
+import { resolveBodyForPublish } from "./publishLinkResolver";
 import { createHeartbeatJob, deleteHeartbeatJob, updateHeartbeatJob } from "./_core/heartbeat";
 import { notifyOwner } from "./_core/notification";
 
@@ -240,15 +240,10 @@ export async function executeScheduledPublish(
   // posts not yet published (keep anchor text). This is the staggered-publish path.
   let scheduledBodyHtml = row.bodyHtml ?? "";
   {
-    const batchRows = await db
-      .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
-      .from(articles)
-      .where(eq(articles.businessId, row.businessId));
-    const linkMap = buildLinkMap(batchRows);
-    const resolved = resolvePublishLinks(scheduledBodyHtml, linkMap);
+    const resolved = await resolveBodyForPublish(row.businessId, row.batchNumber ?? 1, scheduledBodyHtml);
     scheduledBodyHtml = resolved.bodyHtml;
     if (resolved.warnings.length) {
-      console.log(`[Scheduler] Held back ${resolved.warnings.length} not-yet-live internal link(s) for "${row.title}"`);
+      console.log(`[Scheduler] Dropped ${resolved.dropped} unsafe internal link(s) for "${row.title}"`);
     }
   }
 

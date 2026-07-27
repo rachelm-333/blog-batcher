@@ -49,6 +49,50 @@ describe("buildLinkMap — batch slug → live URL map", () => {
     expect(r.warnings).toHaveLength(0);
   });
 
+  describe("strict mode (opts: ownDomain + pageAllowlist) — no broken links can publish", () => {
+    const map = buildLinkMap([
+      { urlSlug: "brand-positioning", cmsPostUrl: "https://www.skrt.com.au/post/brand-positioning-1", status: "published" },
+    ]);
+    const opts = {
+      ownDomain: "https://www.skrt.com.au",
+      pageAllowlist: ["https://www.skrt.com.au/contact", "https://www.skrt.com.au/the-method"],
+    };
+
+    it("DROPS a hallucinated internal link that is not a post and not a known page", () => {
+      const body = `<p>See <a href="https://www.skrt.com.au/brand-strategy">brand strategy</a>.</p>`;
+      const r = resolvePublishLinks(body, map, opts);
+      expect(r.bodyHtml).not.toContain("<a "); // dropped
+      expect(r.bodyHtml).toContain("brand strategy"); // text kept
+      expect(r.dropped).toBe(1);
+    });
+
+    it("DROPS a bare relative link to an unknown slug", () => {
+      const body = `<p><a href="/made-up-slug">x</a></p>`;
+      expect(resolvePublishLinks(body, map, opts).dropped).toBe(1);
+    });
+
+    it("KEEPS a known business page", () => {
+      const body = `<p><a href="https://www.skrt.com.au/contact">contact</a></p>`;
+      const r = resolvePublishLinks(body, map, opts);
+      expect(r.bodyHtml).toContain('href="https://www.skrt.com.au/contact"');
+      expect(r.dropped).toBe(0);
+    });
+
+    it("KEEPS external authority links", () => {
+      const body = `<p><a href="https://gov.au/fair-work">Fair Work</a></p>`;
+      const r = resolvePublishLinks(body, map, opts);
+      expect(r.bodyHtml).toContain('href="https://gov.au/fair-work"');
+      expect(r.dropped).toBe(0);
+    });
+
+    it("rewrites a real published post link to its live URL", () => {
+      const body = `<p><a href="/brand-positioning">bp</a></p>`;
+      const r = resolvePublishLinks(body, map, opts);
+      expect(r.bodyHtml).toContain('href="https://www.skrt.com.au/post/brand-positioning-1"');
+      expect(r.rewritten).toBe(1);
+    });
+  });
+
   it("end-to-end: a cornerstone published before its cluster drops the down-link, no 404", () => {
     // Cornerstone body links down to a cluster that isn't live yet.
     const body = `<p>See <a href="/handling-lateness">handling lateness</a>.</p>`;

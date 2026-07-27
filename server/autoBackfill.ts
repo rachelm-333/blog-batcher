@@ -12,6 +12,7 @@ import { getDb } from "./db";
 import { articles, integrations } from "../drizzle/schema";
 import { buildLinkMap, resolvePublishLinks } from "./articleEngine";
 import { findBackfillTargets } from "../shared/backfillLinks";
+import { loadBusinessLinkContext } from "./publishLinkResolver";
 import {
   decryptCredentials,
   updateWixPostBody,
@@ -89,12 +90,13 @@ export async function autoBackfillLinks(
     if (targets.length === 0) return { resynced: 0, errors: 0 };
 
     const linkMap = buildLinkMap(batchRows);
+    const linkCtx = await loadBusinessLinkContext(businessId);
     let resynced = 0;
     let errors = 0;
     for (const t of targets) {
       const row = batchRows.find((r) => r.id === t.articleId);
       if (!row || !row.cmsPostId) { errors++; continue; }
-      let body = resolvePublishLinks(row.bodyHtml ?? "", linkMap).bodyHtml;
+      let body = resolvePublishLinks(row.bodyHtml ?? "", linkMap, linkCtx).bodyHtml;
       body = body
         .replace(/<li>/g, '<li style="margin-bottom:0.75em">')
         .replace(/<li /g, '<li style="margin-bottom:0.75em" ');

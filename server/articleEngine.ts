@@ -373,12 +373,19 @@ export function splitDenseParagraphs(html: string, maxSentences = 4): string {
  * Guarantees the no-404 rule: an internal blog link only survives if its target
  * is actually live. Pure + testable.
  */
+function hostOfHref(href: string): string | null {
+  const m = /^https?:\/\/([^/]+)/i.exec((href ?? "").trim());
+  return m ? m[1].toLowerCase().replace(/^www\./, "") : null;
+}
+
 export function resolvePublishLinks(
   bodyHtml: string,
   linkMap: Record<string, string | null>,
-): { bodyHtml: string; warnings: string[]; rewritten: number } {
+  opts?: { ownDomain?: string; pageAllowlist?: string[] },
+): { bodyHtml: string; warnings: string[]; rewritten: number; dropped: number } {
   const warnings: string[] = [];
   let rewritten = 0;
+  let dropped = 0;
   // Index the batch link map by bare slug (last path segment). buildLinkMap
   // provides both "slug" and "/slug"; we key on the bare slug for matching.
   const bySlug = new Map<string, string | null>();
@@ -387,25 +394,60 @@ export function resolvePublishLinks(
     if (s) bySlug.set(s, v);
   }
 
+  // STRICT mode (opts provided): any internal link that isn't a published batch
+  // post AND isn't a known page of the site is DROPPED — so a hallucinated link
+  // can never publish as a 404. Without opts we stay in legacy (batch-only) mode.
+  const strict = !!opts;
+  const ownHost = opts?.ownDomain ? hostOfHref(opts.ownDomain) : null;
+  const norm = (s: string) => (s ?? "").toLowerCase().split(/[?#]/)[0].replace(/\/+$/, "");
+  const pageSet = new Set<string>();
+  for (const p of opts?.pageAllowlist ?? []) {
+    if (!p) continue;
+    pageSet.add(norm(p));
+    const path = p.replace(/^https?:\/\/[^/]+/i, "");
+    if (path) pageSet.add(norm(path));
+  }
+
   const html = bodyHtml.replace(
     /<a\b([^>]*?)href=["']([^"']+)["']([^>]*)>([\s\S]*?)<\/a>/gi,
     (full, pre: string, href: string, post: string, anchor: string) => {
       const slug = slugFromHref(href);
-      // Not an internal batch-article link (external URL, anchor, mailto, CTA,
-      // or a slug we don't own) — leave it untouched.
-      if (!slug || !bySlug.has(slug)) return full;
-      const real = bySlug.get(slug);
-      if (real) {
-        // Rewrite to the real published URL (correct Wix /post/ or WP /blog/ path).
-        rewritten++;
-        return `<a ${pre}href="${real}"${post}>${anchor}</a>`.replace(/\s+href/, " href");
+
+      // 1) A batch article link (matched by slug).
+      if (slug && bySlug.has(slug)) {
+        const real = bySlug.get(slug);
+        if (real) {
+          rewritten++;
+          return `<a ${pre}href="${real}"${post}>${anchor}</a>`.replace(/\s+href/, " href");
+        }
+        dropped++;
+        warnings.push(`Internal link to "${href}" removed — that post is not published yet.`);
+        return anchor;
       }
-      // Target not published yet — drop the link, keep the text, warn.
-      warnings.push(`Internal link to "${href}" was removed — that post is not published yet. Publish it first, then re-publish this article to restore the link.`);
+
+      if (!strict) return full; // legacy: leave non-batch links alone
+
+      // 2) Anchors / mailto / tel → leave alone.
+      const h = (href ?? "").trim();
+      if (!h || h.startsWith("#") || /^(mailto:|tel:)/i.test(h)) return full;
+
+      // 3) External link (different domain) → keep (authority/competitor links).
+      const host = hostOfHref(h);
+      const isInternal = !host || (ownHost !== null && host === ownHost);
+      if (!isInternal) return full;
+
+      // 4) Internal link that's a KNOWN page of the site → keep.
+      const path = h.replace(/^https?:\/\/[^/]+/i, "");
+      if (pageSet.has(norm(h)) || (path && pageSet.has(norm(path)))) return full;
+
+      // 5) Internal link to something that isn't a real post or a known page →
+      //    would 404. Drop it to plain text.
+      dropped++;
+      warnings.push(`Internal link "${href}" removed — not a published post or a known page (would 404).`);
       return anchor;
     },
   );
-  return { bodyHtml: html, warnings, rewritten };
+  return { bodyHtml: html, warnings, rewritten, dropped };
 }
 
 /**

@@ -54,6 +54,7 @@ import {
 import { findBackfillTargets } from "../../shared/backfillLinks";
 import { slugFromHref } from "../../shared/slug";
 import { autoBackfillLinks } from "../autoBackfill";
+import { resolveBodyForPublish, loadBusinessLinkContext } from "../publishLinkResolver";
 import {
   publishToWordPress,
   publishToWix,
@@ -372,9 +373,11 @@ export const articlesRouter = router({
         }
       }
 
-      // Re-resolve the body against the (now-repaired) live batch link map.
+      // Re-resolve the body against the (now-repaired) live batch link map,
+      // dropping any hallucinated internal link (allowlist from the business).
       const linkMap = buildLinkMap(batchRows);
-      const resolvedResult = resolvePublishLinks(target.bodyHtml ?? "", linkMap);
+      const abCtx = await loadBusinessLinkContext(input.businessId);
+      const resolvedResult = resolvePublishLinks(target.bodyHtml ?? "", linkMap, abCtx);
       let body = resolvedResult.bodyHtml;
       body = body
         .replace(/<li>/g, '<li style="margin-bottom:0.75em">')
@@ -743,11 +746,7 @@ export const articlesRouter = router({
       // Resolve internal links exactly as they will publish, so the preview shows
       // reality: links to live posts become real URLs, links to not-yet-published
       // posts show as plain text (no in-app 404s).
-      const batchRows = await db
-        .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
-        .from(articles)
-        .where(and(eq(articles.businessId, row.businessId), eq(articles.batchNumber, row.batchNumber)));
-      const resolved = resolvePublishLinks(row.bodyHtml ?? "", buildLinkMap(batchRows));
+      const resolved = await resolveBodyForPublish(row.businessId, row.batchNumber, row.bodyHtml ?? "");
 
       return {
         ...row,
@@ -1514,18 +1513,13 @@ ${row.bodyHtml ?? ""}
         .replace(/<\/strong>\s*<\/p>\s*<p>\s*A:\s*/g, '</strong></p><p>A: ');
 
       // ── No-404 internal-link resolution ────────────────────────────────────
-      // Rewrite internal links to real published URLs; drop links to posts that
-      // are not live yet (keep the anchor text) so nothing publishes a 404.
+      // Rewrite live links, drop unpublished-post links AND hallucinated internal
+      // links (not a known page) — nothing broken can publish.
       {
-        const batchRows = await db
-          .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
-          .from(articles)
-          .where(and(eq(articles.businessId, row.businessId), eq(articles.batchNumber, row.batchNumber)));
-        const linkMap = buildLinkMap(batchRows);
-        const resolved = resolvePublishLinks(publishBodyHtml, linkMap);
+        const resolved = await resolveBodyForPublish(row.businessId, row.batchNumber, publishBodyHtml);
         publishBodyHtml = resolved.bodyHtml;
         if (resolved.warnings.length) {
-          console.log(`[Publish] Held back ${resolved.warnings.length} not-yet-live internal link(s) for "${row.title}":`, resolved.warnings);
+          console.log(`[Publish] Dropped ${resolved.dropped} unsafe internal link(s) for "${row.title}":`, resolved.warnings);
         }
       }
 
@@ -1701,9 +1695,10 @@ ${row.bodyHtml ?? ""}
         .from(articles)
         .where(eq(articles.businessId, input.businessId));
       const linkMap = buildLinkMap(linkRows);
+      const bulkCtx = await loadBusinessLinkContext(input.businessId);
 
       for (const row of rows) {
-        const resolvedBulk = resolvePublishLinks(row.bodyHtml ?? "", linkMap);
+        const resolvedBulk = resolvePublishLinks(row.bodyHtml ?? "", linkMap, bulkCtx);
         const payload: ArticlePayload = {
           title: row.title ?? "",
           bodyHtml: resolvedBulk.bodyHtml,
@@ -1930,13 +1925,9 @@ ${row.bodyHtml ?? ""}
       }
 
       // ── All other cases: call CMS API now ────────────────────────────────────
-      // Resolve internal links against the live batch map — drop links to
-      // not-yet-published posts (no 404s), rewrite live ones to real URLs.
-      const psBatchRows = await db
-        .select({ urlSlug: articles.urlSlug, cmsPostUrl: articles.cmsPostUrl, status: articles.status })
-        .from(articles)
-        .where(and(eq(articles.businessId, row.businessId), eq(articles.batchNumber, row.batchNumber)));
-      const psResolvedBody = resolvePublishLinks(row.bodyHtml ?? "", buildLinkMap(psBatchRows)).bodyHtml;
+      // Resolve internal links: rewrite live posts, drop unpublished posts AND any
+      // hallucinated internal link (not a known page) so no 404 can publish.
+      const psResolvedBody = (await resolveBodyForPublish(row.businessId, row.batchNumber, row.bodyHtml ?? "")).bodyHtml;
 
       const payload: ArticlePayload = {
         title: row.title ?? "",
