@@ -1633,7 +1633,8 @@ ${row.bodyHtml ?? ""}
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizPA = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchPA = bizPA.activeBatch ?? 1;
 
       // Load integration credentials
       const [integration] = await db
@@ -1802,6 +1803,12 @@ ${row.bodyHtml ?? ""}
       // Advance business to stage 6 if at least one article was published/scheduled
       if (published > 0) {
         await advanceBusinessStage(input.businessId, 6);
+      }
+
+      // Auto-backfill: switch on any down-links now that the whole batch is live
+      // (the bulk loop only fixes links as it goes; this completes the rest). Wix only.
+      if (published > 0 && input.platform === "wix") {
+        await autoBackfillLinks(input.businessId, activeBatchPA);
       }
 
       return { total: rows.length, published, failed, failures };
