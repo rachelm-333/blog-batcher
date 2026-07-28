@@ -170,10 +170,15 @@ export default function ArticleGeneration() {
     ? Math.round(articles!.filter(a => a.internalScore !== null).reduce((s, a) => s + (a.internalScore ?? 0), 0) / scoredCount)
     : null;
 
+  // pendingCount: articles reset/queued and waiting to be (re)generated
+  const pendingCount = articles?.filter(a => a.status === "pending_generation").length ?? 0;
   // allWritten: all articles are in a terminal state (no longer generating/pending)
   const allWritten = hasArticles && writtenCount === totalCount && !generating;
   // showGenerateButton: show when stage is 4+ and generation hasn't completed
   const showGenerateButton = currentStage >= 4 && !allWritten;
+  // canGenerate: allowed when nothing is running AND there's work to do — either
+  // no articles yet, OR some are pending_generation (e.g. after a reset).
+  const canGenerate = !generating && !generateMutation.isPending && (pendingCount > 0 || !hasArticles);
 
   // Count articles under their word count target
   const underTargetCount = articles?.filter(a => {
@@ -226,15 +231,15 @@ export default function ArticleGeneration() {
               {showGenerateButton && (
                 <button
                   className="btn-primary"
-                  onClick={() => { if (!generating && !hasArticles) generateMutation.mutate({ businessId }); }}
-                  disabled={generating || generateMutation.isPending || hasArticles}
-                  style={{ opacity: (generating || hasArticles) ? 0.7 : 1 }}
+                  onClick={() => { if (canGenerate) generateMutation.mutate({ businessId }); }}
+                  disabled={!canGenerate}
+                  style={{ opacity: canGenerate ? 1 : 0.7 }}
                 >
                   {generating
-                    ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Generating articles…</>
+                    ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Generating… {writtenCount}/{totalCount}</>
                     : generateMutation.isPending
                     ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Starting…</>
-                    : <><Zap style={{ width:14, height:14 }} /> Generate {nodeTotal || totalCount || 5} articles</>}
+                    : <><Zap style={{ width:14, height:14 }} /> Generate {pendingCount || nodeTotal || totalCount || 5} articles</>}
                 </button>
               )}
               {hasArticles && underTargetCount > 0 && !generating && (
@@ -269,6 +274,25 @@ export default function ArticleGeneration() {
               </div>
             ))}
           </div>
+
+          {/* Live generating banner */}
+          {generating && (
+            <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 18px", marginBottom:16, background:"#ede9ff", border:"1px solid #c4b5fd", borderRadius:12 }}>
+              <Loader2 style={{ width:20, height:20, color:"#6e5afe", flexShrink:0 }} className="animate-spin" />
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:"#4c1d95" }}>
+                  Writing your articles… {writtenCount}/{totalCount} done
+                </div>
+                <div style={{ fontSize:12, color:"#6b21a8", marginTop:2 }}>
+                  Each article takes ~30–60 seconds, so the full batch runs about 15–20 minutes. This updates automatically — you can leave this page and come back.
+                </div>
+                {/* progress bar */}
+                <div style={{ height:6, background:"#ddd6fe", borderRadius:99, marginTop:8, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:`${totalCount ? Math.round((writtenCount/totalCount)*100) : 0}%`, background:"#6e5afe", transition:"width 400ms" }} />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Batch table */}
           <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden" }}>
