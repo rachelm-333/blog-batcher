@@ -1078,3 +1078,12 @@
 - [ ] BUG 3: Confirm batch filter resolves wrong statuses; ensure new articles insert with status='generated'
 - [ ] BUG 4: Advance businesses.currentStage to 4 after generation completes; sidebar/breadcrumb must read fresh DB value
 - [ ] BUG 5: Fix Review button in ArticleGeneration.tsx to navigate to correct route
+
+## Platform-aware URL prefix for internal links
+
+- [x] Add `slugToPostUrl(slug, cmsType, siteUrl)` helper that prepends the correct path prefix per platform (Wix: /post/, WordPress: configurable, Squarespace: /blog/, Shopify: /blogs/news/, Ghost: /, Webflow: /blog/)
+- [x] Wire helper into ZIP export: rewrite relative internal hrefs to full absolute URLs using the business's connected CMS type and site URL before zipping
+- [ ] Wire helper into internal link context passed to the article engine: when a business has a connected CMS, use full absolute URLs in the internalLinkContext so generated articles link with the correct prefix from the start
+- [ ] Wire helper into buildLinkMap / resolvePublishLinks: pending articles should use the platform-prefixed URL as the placeholder href rather than bare /slug
+- [x] Add unit tests for slugToPostUrl covering all supported platforms
+- [x] Add integration test: ZIP export for a Wix business produces /post/slug hrefs; for a WordPress business produces configurable-prefix hrefs

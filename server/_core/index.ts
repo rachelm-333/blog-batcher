@@ -10,8 +10,9 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { verifySessionToken } from "./session";
 import { getDb } from "../db";
-import { articles, articleNodes } from "../../drizzle/schema";
+import { articles, articleNodes, businesses } from "../../drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { slugToPostUrl, rewriteInternalLinks } from "../../shared/cmsUrlHelper";
 import { parse as parseCookieHeader } from "cookie";
 import { COOKIE_NAME } from "../../shared/const";
 import { scheduledPublishHandler } from "../scheduledPublishHandler";
@@ -112,6 +113,20 @@ async function startServer() {
         res.status(400).json({ error: "No approved articles found." });
         return;
       }
+      // Fetch business CMS platform + website URL for link rewriting
+      const [biz] = await db
+        .select({ cmsPlatform: businesses.cmsPlatform, websiteUrl: businesses.websiteUrl })
+        .from(businesses)
+        .where(eq(businesses.id, businessId))
+        .limit(1);
+      const cmsPlatform = biz?.cmsPlatform ?? null;
+      const siteUrl = biz?.websiteUrl ?? null;
+      // Build slug → full URL map for all articles in this export
+      const slugMap: Record<string, string> = {};
+      for (const r of rows) {
+        const s = (r.urlSlug ?? `article-${r.id}`).replace(/^\/+/, "").replace(/\/+$/, "");
+        slugMap[s] = slugToPostUrl(s, cmsPlatform, siteUrl);
+      }
       // Build ZIP using archiver
       const { default: archiverFn } = await import("archiver");
       const archive = archiverFn("zip", { zlib: { level: 9 } });
@@ -125,7 +140,8 @@ async function startServer() {
       let scheduleCsv = "title,url_slug,level,status_badge,scheduled_publish_at\n";
       for (const row of rows) {
         const slug = row.urlSlug ?? `article-${row.id}`;
-        const htmlContent = `<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<title>${row.metaTitle ?? row.title ?? ""}</title>\n<meta name="description" content="${row.metaDescription ?? ""}">\n${row.schemaMarkup ? `<script type="application/ld+json">${row.schemaMarkup}</script>` : ""}\n</head>\n<body>\n${row.bodyHtml ?? ""}\n</body>\n</html>`;
+        const rewrittenBody = rewriteInternalLinks(row.bodyHtml ?? "", slugMap);
+        const htmlContent = `<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<title>${row.metaTitle ?? row.title ?? ""}</title>\n<meta name="description" content="${row.metaDescription ?? ""}">\n${row.schemaMarkup ? `<script type="application/ld+json">${row.schemaMarkup}</script>` : ""}\n</head>\n<body>\n${rewrittenBody}\n</body>\n</html>`;
         archive.append(htmlContent, { name: `articles/${slug}.html` });
         archive.append(row.bodyMarkdown ?? "", { name: `articles/${slug}.md` });
         const metaTxt = [
@@ -134,6 +150,12 @@ async function startServer() {
           `Meta Description: ${row.metaDescription ?? ""}`,
           `Focus Keyword: ${row.focusKeyword ?? ""}`,
           `URL Slug: ${slug}`,
+          `Full Post URL: ${slugToPostUrl(slug, cmsPlatform, siteUrl)}`,
+          `CMS Platform: ${cmsPlatform ?? "not set — update in Stage 1 to get correct URLs"}`,
+          ``,
+          `NOTE: Internal links in the HTML file have been rewritten to full absolute URLs.`,
+          `If you change platforms, re-download the ZIP after updating your CMS settings.`,
+          ``,
           `Word Count: ${row.wordCount ?? ""}`,
           `Status: ${row.statusBadge ?? ""}`,
           `Level: ${row.level ?? ""}`,
