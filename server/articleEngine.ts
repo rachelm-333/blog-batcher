@@ -632,11 +632,10 @@ export function renderFaqIntoBody(
   const items = faqItems.filter((it) => it && it.question && it.answer);
   if (items.length === 0) return bodyHtml;
 
+  // Clean format: bold question, answer in a paragraph directly under it. No
+  // "Q:"/"A:" labels, no <hr> dividers, no wrapper div (those caused big gaps).
   const faqHtml = items
-    .map(
-      (it) =>
-        `<div class="faq-item"><hr><p><strong>Q: ${it.question}</strong></p><p>A: ${it.answer}</p></div>`,
-    )
+    .map((it) => `<p><strong>${it.question}</strong></p>\n<p>${it.answer}</p>`)
     .join("\n");
 
   // Remove existing faq-item divs (usually empty shells).

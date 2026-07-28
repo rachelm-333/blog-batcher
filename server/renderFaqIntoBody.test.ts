@@ -19,6 +19,16 @@ describe("renderFaqIntoBody", () => {
     expect(/faq-item[^>]*>\s*<hr>\s*<\/div>/i.test(out)).toBe(false);
   });
 
+  it("uses clean format: bold question, plain answer paragraph, no Q:/A:/hr/div", () => {
+    const out = renderFaqIntoBody(`<h2>Frequently Asked Questions</h2>`, items);
+    expect(out).toContain("<p><strong>What is brand positioning?</strong></p>");
+    expect(out).toContain("<p>The space you own in the mind.</p>");
+    expect(out).not.toContain("Q:");
+    expect(out).not.toContain("A:");
+    expect(out).not.toContain("<hr>");
+    expect(out).not.toContain("faq-item");
+  });
+
   it("appends a FAQ section when there's no heading", () => {
     const out = renderFaqIntoBody(`<p>body only</p>`, items);
     expect(out).toContain("<h2>Frequently Asked Questions</h2>");
