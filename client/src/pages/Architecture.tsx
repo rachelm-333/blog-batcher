@@ -167,7 +167,7 @@ function LiveArchMap({
             >
               Pillar {label}
             </span>
-            <span style={{ fontSize: 10, color: "#0369a1", opacity: 0.7 }}>1,500–2,200 w</span>
+            <span style={{ fontSize: 10, color: "#0369a1", opacity: 0.7 }}>1,500–1,800 w</span>
           </div>
           {saved ? (
             <ArticleTypeSelect
@@ -259,7 +259,7 @@ function LiveArchMap({
               </span>
               <span style={{ fontSize: 13, fontWeight: 600, color: "#4c1d95" }}>Cornerstone Guide</span>
             </div>
-            <span style={{ fontSize: 11, color: "#7c3aed", opacity: 0.7 }}>2,800–3,200 words</span>
+            <span style={{ fontSize: 11, color: "#7c3aed", opacity: 0.7 }}>2,500–3,000 words</span>
           </div>
 
           {/* Pillars row */}
@@ -640,7 +640,7 @@ export default function Architecture() {
               {/* Cornerstone */}
               <div style={{ background: "#7c3aed", color: "#fff", borderRadius: 6, padding: "8px 12px", textAlign: "center", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
                 🏛 Cornerstone Article
-                <div style={{ fontSize: 10, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Long-form authority post (2,800–3,200 words)</div>
+                <div style={{ fontSize: 10, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Long-form authority post (2,500–3,000 words)</div>
               </div>
               {/* Arrow down */}
               <div style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", marginBottom: 6 }}>↑ Pillar posts link to this</div>
@@ -649,7 +649,7 @@ export default function Architecture() {
                 {["Pillar Post A", "Pillar Post B"].map((label) => (
                   <div key={label} style={{ background: "#dbeafe", borderRadius: 5, padding: "6px 8px", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#1e40af" }}>
                     📄 {label}
-                    <div style={{ fontSize: 10, fontWeight: 400, color: "#3b82f6", marginTop: 1 }}>1,500–2,200 words</div>
+                    <div style={{ fontSize: 10, fontWeight: 400, color: "#3b82f6", marginTop: 1 }}>1,500–1,800 words</div>
                   </div>
                 ))}
               </div>

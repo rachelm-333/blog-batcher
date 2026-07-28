@@ -89,14 +89,14 @@ describe("Generation order", () => {
     expect(WORD_COUNT_RULES.cluster).toBeDefined();
   });
 
-  it("Cornerstone word count range is 2500–3500", () => {
+  it("Cornerstone word count range is 2500–3000", () => {
     expect(WORD_COUNT_RULES.cornerstone.min).toBe(2500);
-    expect(WORD_COUNT_RULES.cornerstone.max).toBe(3500);
+    expect(WORD_COUNT_RULES.cornerstone.max).toBe(3000);
   });
 
-  it("Pillar word count range is 1500–2500", () => {
+  it("Pillar word count range is 1500–1800", () => {
     expect(WORD_COUNT_RULES.pillar.min).toBe(1500);
-    expect(WORD_COUNT_RULES.pillar.max).toBe(2500);
+    expect(WORD_COUNT_RULES.pillar.max).toBe(1800);
   });
 
   it("Cluster word count range is 800–1200", () => {
@@ -140,7 +140,7 @@ describe("Word count enforcement", () => {
     expect(result.points.p16_word_count).toBe(true);
   });
 
-  it("Pass 1 scorer fails p16 when word count exceeds maximum for cornerstone (3500)", () => {
+  it("Pass 1 scorer fails p16 when word count exceeds maximum for cornerstone (3000)", () => {
     const result = runPass1Scorer(makePass1Params({ wordCount: 3700, level: "cornerstone" }));
     expect(result.points.p16_word_count).toBe(false);
   });
@@ -150,14 +150,14 @@ describe("Word count enforcement", () => {
     expect(result.points.p16_word_count).toBe(true);
   });
 
-  it("Pass 1 scorer passes p16 for pillar within 1500–2200", () => {
-    const result = runPass1Scorer(makePass1Params({ wordCount: 2000, level: "pillar" }));
+  it("Pass 1 scorer passes p16 for pillar within 1500–1800", () => {
+    const result = runPass1Scorer(makePass1Params({ wordCount: 1700, level: "pillar" }));
     expect(result.points.p16_word_count).toBe(true);
   });
 
-  it("Pass 1 scorer passes p16 for pillar at 2206 words (previously failing)", () => {
+  it("Pass 1 scorer fails p16 for pillar over the 1800 maximum", () => {
     const result = runPass1Scorer(makePass1Params({ wordCount: 2206, level: "pillar" }));
-    expect(result.points.p16_word_count).toBe(true);
+    expect(result.points.p16_word_count).toBe(false);
   });
 
   it("Pass 1 scorer fails p16 for pillar below 1500", () => {

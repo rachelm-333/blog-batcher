@@ -12,9 +12,9 @@
  *  8. Auto-regenerate articles below threshold (one retry)
  *
  * CRITICAL RULES (from scope Section 15.1):
- *  - Cornerstone max 3,200 words (hard stop)
+ *  - Cornerstone: 2,500–3,000 words
  *  - Pillar: 1,500–1,800 words
- *  - Cluster: 1,000–1,200 words
+ *  - Cluster: 800–1,200 words
  *  - FAQ schema only on Cornerstones and Pillars — never Clusters
  *  - No fabricated statistics or quotes
  *  - One article at a time per user
@@ -57,8 +57,8 @@ export const TOKEN_LIMITS = {
 // Word count rules (from scope Table 4)
 // ---------------------------------------------------------------------------
 export const WORD_COUNT_RULES = {
-  cornerstone: { min: 2500, max: 3500 },
-  pillar: { min: 1500, max: 2500 },
+  cornerstone: { min: 2500, max: 3000 },
+  pillar: { min: 1500, max: 1800 },
   cluster: { min: 800, max: 1200 },
 } as const;
 
