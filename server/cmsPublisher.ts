@@ -641,6 +641,69 @@ export function htmlToRicos(html: string): Record<string, unknown> {
  * 1. Create a draft post
  * 2. Publish the draft
  */
+/**
+ * Convert a single `<table>…</table>` HTML fragment into a valid Wix Ricos TABLE
+ * node using Wix's own Ricos Documents API. Our hand-rolled converter produces a
+ * TABLE node that Wix silently rejects (it keeps the cell text but drops the grid),
+ * so for tables we delegate to Wix, which guarantees a schema Wix will render.
+ * Returns null on any failure so the caller can fall back to the local builder.
+ */
+async function convertTableNodeViaWix(
+  tableHtml: string,
+  apiKey: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const resp = await fetch(
+      "https://www.wixapis.com/ricos/v1/ricos-document/convert/to-ricos",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: apiKey },
+        body: JSON.stringify({ html: tableHtml, options: { plugins: ["table"] } }),
+      },
+    );
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { document?: { nodes?: Record<string, unknown>[] } };
+    const docNodes = data.document?.nodes;
+    if (!docNodes) return null;
+    const findTable = (ns: Record<string, unknown>[]): Record<string, unknown> | null => {
+      for (const n of ns) {
+        if (n.type === "TABLE") return n;
+        const kids = n.nodes as Record<string, unknown>[] | undefined;
+        if (kids) { const r = findTable(kids); if (r) return r; }
+      }
+      return null;
+    };
+    return findTable(docNodes);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Replace each locally-built TABLE node in `richContent` with a Wix-converted one.
+ * Tables in the source HTML appear top-level and in the same order as the TABLE
+ * nodes htmlToRicos produced, so we match by order. Mutates richContent in place.
+ * Table fragments are tiny, so the 30k-char convert limit is never a concern.
+ */
+async function enhanceTablesViaWix(
+  richContent: Record<string, unknown>,
+  sourceHtml: string,
+  apiKey: string,
+): Promise<void> {
+  const nodes = richContent.nodes as Record<string, unknown>[] | undefined;
+  if (!nodes?.some((n) => n.type === "TABLE")) return;
+  const tableBlocks = sourceHtml.match(/<table[\s\S]*?<\/table>/gi) ?? [];
+  if (tableBlocks.length === 0) return;
+  let tableIdx = 0;
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].type !== "TABLE") continue;
+    const src = tableBlocks[tableIdx++];
+    if (!src) continue;
+    const converted = await convertTableNodeViaWix(src, apiKey);
+    if (converted) nodes[i] = converted; // else keep the local fallback node
+  }
+}
+
 export async function publishToWix(
   credentials: WixCredentials,
   article: ArticlePayload
@@ -762,6 +825,9 @@ export async function publishToWix(
 
     // Convert body HTML to Ricos richContent
     const richContent = htmlToRicos(cleanBodyHtml);
+    // Replace hand-rolled TABLE nodes with Wix-converted ones so tables render as a
+    // real grid (Wix silently drops our local table schema). Falls back to local.
+    await enhanceTablesViaWix(richContent, cleanBodyHtml, apiKey);
 
     // Inject a proper Ricos IMAGE node at the TOP of the content nodes so the image
     // appears inside the post body. The htmlToRicos converter skips <figure>/<img> tags
@@ -1120,6 +1186,7 @@ export async function updateWixPostBody(
   try {
     const cleanBody = stripAiDisclosure(newBodyHtml.replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, ""));
     const richContent = htmlToRicos(cleanBody);
+    await enhanceTablesViaWix(richContent, cleanBody, apiKey);
 
     // Update the draft's rich content only.
     const patchRes = await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${postId}`, {
