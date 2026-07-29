@@ -391,6 +391,48 @@ export function htmlToRicos(html: string): Record<string, unknown> {
     };
   }
 
+  /**
+   * Build a Wix Ricos TABLE node from a <table> inner HTML. Returns null if no
+   * rows/cells can be parsed (caller falls back to text so nothing is lost).
+   */
+  function buildTableNode(tableInner: string): Record<string, unknown> | null {
+    const rowMatches = tableInner.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi) ?? [];
+    if (rowMatches.length === 0) return null;
+
+    const rows: Record<string, unknown>[] = [];
+    let maxCols = 0;
+    for (const rowHtml of rowMatches) {
+      const cellMatches = rowHtml.match(/<(th|td)\b[^>]*>([\s\S]*?)<\/(th|td)>/gi) ?? [];
+      if (cellMatches.length === 0) continue;
+      maxCols = Math.max(maxCols, cellMatches.length);
+      const cells = cellMatches.map((cellHtml) => {
+        const innerMatch = cellHtml.match(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/i);
+        const cellInner = (innerMatch?.[1] ?? "").trim();
+        return {
+          type: "TABLE_CELL",
+          id: nextId(),
+          nodes: [makeParagraph(cellInner || " ")],
+          cellData: { cellStyle: { verticalAlignment: "TOP" } },
+        };
+      });
+      rows.push({ type: "TABLE_ROW", id: nextId(), nodes: cells });
+    }
+    if (rows.length === 0 || maxCols === 0) return null;
+
+    return {
+      type: "TABLE",
+      id: nextId(),
+      nodes: rows,
+      tableData: {
+        dimensions: {
+          colsWidthRatio: Array.from({ length: maxCols }, () => Math.floor(1000 / maxCols)),
+          rowsHeight: Array.from({ length: rows.length }, () => 44),
+          colsMinWidth: Array.from({ length: maxCols }, () => 120),
+        },
+      },
+    };
+  }
+
   // ── Pre-process: flatten wrapper divs/sections so nested block content is never dropped ──
   // Strategy: scan the HTML character-by-character to find matching open/close tag pairs.
   // For each div/section/article/header wrapper, if its content contains block-level children,
@@ -459,7 +501,7 @@ export function htmlToRicos(html: string): Record<string, unknown> {
 
   // Tokenise the HTML into block-level elements
   // We process h1-h6, p, ul, ol, li, blockquote, and fall back to paragraph for anything else
-  const blockPattern = /<(h[1-6]|p|ul|ol|blockquote|div|section|article|header|figure|figcaption)([^>]*?)>([\s\S]*?)<\/\1>/gi;
+  const blockPattern = /<(h[1-6]|p|ul|ol|blockquote|table|div|section|article|header|figure|figcaption)([^>]*?)>([\s\S]*?)<\/\1>/gi;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -527,6 +569,15 @@ export function htmlToRicos(html: string): Record<string, unknown> {
           id: nextId(),
           nodes: listItems,
         });
+      }
+    } else if (tag === "table") {
+      const tableNode = buildTableNode(inner);
+      if (tableNode) {
+        nodes.push(tableNode);
+      } else {
+        // Couldn't parse a table — don't lose the data, flatten to text.
+        const textOnly = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        if (textOnly) nodes.push(makeParagraph(textOnly));
       }
     } else if (tag === "p" || tag === "div" || tag === "section" || tag === "article" || tag === "header") {
       if (inner.trim()) {
