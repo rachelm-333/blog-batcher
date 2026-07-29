@@ -800,7 +800,8 @@ export const articlesRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizRUT = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchRUT = bizRUT.activeBatch ?? 1;
 
       // Word count minimums per article type (must match WORD_COUNT_RULES in articleEngine.ts)
       const WORD_COUNT_MIN: Record<string, number> = {
@@ -820,7 +821,7 @@ export const articlesRouter = router({
         })
         .from(articles)
         .innerJoin(articleNodes, eq(articles.articleNodeId, articleNodes.id))
-        .where(eq(articles.businessId, input.businessId));
+        .where(and(eq(articles.businessId, input.businessId), eq(articles.batchNumber, activeBatchRUT)));
 
       const underTarget = allArticles.filter((a) => {
         if (a.status === "generating" || a.status === "approved") return false;
@@ -1297,7 +1298,8 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const bizEZ = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatchEZ = bizEZ.activeBatch ?? 1;
 
       // Fetch all approved articles with their node info
       const rows = await db
@@ -1324,6 +1326,7 @@ Return ONLY the updated article body as clean HTML, wrapped in these exact delim
         .where(
           and(
             eq(articles.businessId, input.businessId),
+            eq(articles.batchNumber, activeBatchEZ),
             inArray(articles.status, ["approved", "scheduled", "published"])
           )
         )
