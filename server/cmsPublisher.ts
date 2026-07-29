@@ -123,6 +123,13 @@ function seoPluginFields(
 // ---------------------------------------------------------------------------
 
 /**
+/** Append the JSON-LD schema (Article/Breadcrumb/FAQPage/HowTo) as a script tag
+ * to an HTML body, for CMSes that publish a raw-HTML body. No-op if no schema. */
+function appendSchema(html: string, schema: string | null | undefined): string {
+  return schema ? `${html}\n<script type="application/ld+json">${schema}</script>` : html;
+}
+
+/**
  * Publish an article to WordPress via the REST API v2.
  *
  * Steps:
@@ -1359,7 +1366,7 @@ export async function publishToShopify(
   const body: Record<string, unknown> = {
     article: {
       title: article.title,
-      body_html: article.bodyHtml,
+      body_html: appendSchema(article.bodyHtml, article.schemaMarkup),
       published,
       handle: article.urlSlug || undefined,
       metafields: [
@@ -1426,7 +1433,7 @@ export async function publishToWebflow(
   const fieldData: Record<string, unknown> = {
     name: article.title,
     slug: article.urlSlug || undefined,
-    "post-body": article.bodyHtml,
+    "post-body": appendSchema(article.bodyHtml, article.schemaMarkup),
     "post-summary": article.metaDescription || "",
     "seo-title": article.metaTitle || article.title,
     "seo-description": article.metaDescription || "",
@@ -1490,7 +1497,7 @@ export async function publishToSquarespace(
 
   const body: Record<string, unknown> = {
     title: article.title,
-    body: article.bodyHtml,
+    body: appendSchema(article.bodyHtml, article.schemaMarkup),
     urlSlug: article.urlSlug || undefined,
     seoData: {
       seoTitle: article.metaTitle || article.title,
@@ -1572,7 +1579,7 @@ export async function publishToGhost(
 
   const postBody: Record<string, unknown> = {
     title: article.title,
-    html: article.bodyHtml,
+    html: appendSchema(article.bodyHtml, article.schemaMarkup),
     slug: article.urlSlug || undefined,
     status: isDraft ? "draft" : "published",
     meta_title: article.metaTitle || article.title,
