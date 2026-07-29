@@ -392,77 +392,53 @@ export function htmlToRicos(html: string): Record<string, unknown> {
   }
 
   /**
-   * Build a Wix Ricos TABLE node from a <table> inner HTML. Returns null if no
-   * rows/cells can be parsed (caller falls back to text so nothing is lost).
+   * Render an HTML <table> as a clean bold-label bulleted list instead of a Ricos
+   * TABLE node. Wix's blog renderer silently drops our TABLE nodes regardless of
+   * schema, so we render the same information as a list that reliably displays and
+   * stays fully AI-extractable (each row = "<strong>label</strong> — h: v; h: v").
+   * Returns [] if no rows can be parsed (caller then drops the placeholder).
    */
-  function buildTableNode(tableInner: string): Record<string, unknown> | null {
-    const rowMatches = tableInner.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi) ?? [];
-    if (rowMatches.length === 0) return null;
+  function tableToFormattedNodes(tableHtml: string): Record<string, unknown>[] {
+    const rowMatches = tableHtml.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi) ?? [];
+    if (rowMatches.length === 0) return [];
 
-    // A header cell paragraph: bold white text (readable on the blue header row).
-    const headerParagraph = (innerHtml: string): Record<string, unknown> => {
-      const text = innerHtml.replace(/<[^>]+>/g, "").trim() || " ";
-      return {
-        type: "PARAGRAPH",
-        id: nextId(),
-        nodes: [{
-          type: "TEXT",
-          id: nextId(),
-          nodes: [],
-          textData: {
-            text,
-            decorations: [
-              { type: "BOLD", fontWeightValue: 700 },
-              { type: "COLOR", colorData: { foreground: "#FFFFFF" } },
-            ],
-          },
-        }],
-        paragraphData: {},
-      };
-    };
+    const cellText = (cellHtml: string): string =>
+      (cellHtml.match(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/i)?.[1] ?? "")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
 
-    const rows: Record<string, unknown>[] = [];
-    let maxCols = 0;
-    rowMatches.forEach((rowHtml, rowIdx) => {
-      const cellMatches = rowHtml.match(/<(th|td)\b[^>]*>([\s\S]*?)<\/(th|td)>/gi) ?? [];
-      if (cellMatches.length === 0) return;
-      maxCols = Math.max(maxCols, cellMatches.length);
-      // A row is a header row if it's the first row OR it uses <th> cells.
-      const isHeaderRow = rowIdx === 0 || /<th\b/i.test(rowHtml);
-      const cells = cellMatches.map((cellHtml) => {
-        const innerMatch = cellHtml.match(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/i);
-        const cellInner = (innerMatch?.[1] ?? "").trim();
-        return {
-          type: "TABLE_CELL",
-          id: nextId(),
-          nodes: [isHeaderRow ? headerParagraph(cellInner) : makeParagraph(cellInner || " ")],
-          // Wix requires the field name `tableCellData` (not `cellData`) with
-          // `borderColors`; the wrong name makes Wix silently drop the whole table.
-          tableCellData: {
-            cellStyle: {
-              verticalAlignment: "MIDDLE",
-              ...(isHeaderRow ? { backgroundColor: "#116DFF" } : {}),
-            },
-            borderColors: {},
-          },
-        };
-      });
-      rows.push({ type: "TABLE_ROW", id: nextId(), nodes: cells });
+    const rowsCells = rowMatches
+      .map((rowHtml) => (rowHtml.match(/<(th|td)\b[^>]*>([\s\S]*?)<\/(th|td)>/gi) ?? []).map(cellText))
+      .filter((cells) => cells.some((c) => c.length > 0));
+    if (rowsCells.length === 0) return [];
+
+    // Treat the first row as headers when it uses <th>.
+    const firstRowIsHeader = /<th\b/i.test(rowMatches[0] ?? "");
+    const headers = firstRowIsHeader ? rowsCells[0] : [];
+    const dataRows = firstRowIsHeader ? rowsCells.slice(1) : rowsCells;
+    if (dataRows.length === 0) return [];
+
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const listItems = dataRows.map((cells) => {
+      const label = cells[0] ?? "";
+      const rest = cells
+        .slice(1)
+        .map((v, i) => {
+          const h = headers[i + 1];
+          return h ? `${esc(h)}: ${esc(v)}` : esc(v);
+        })
+        .filter((s) => s && !s.endsWith(": "))
+        .join("; ");
+      const innerHtml = rest
+        ? `<strong>${esc(label)}</strong> — ${rest}`
+        : `<strong>${esc(label)}</strong>`;
+      return { type: "LIST_ITEM", id: nextId(), nodes: [makeParagraph(innerHtml)] };
     });
-    if (rows.length === 0 || maxCols === 0) return null;
 
-    return {
-      type: "TABLE",
-      id: nextId(),
-      nodes: rows,
-      tableData: {
-        dimensions: {
-          colsWidthRatio: Array.from({ length: maxCols }, () => Math.floor(1000 / maxCols)),
-          rowsHeight: Array.from({ length: rows.length }, () => 47),
-          colsMinWidth: Array.from({ length: maxCols }, () => 120),
-        },
-      },
-    };
+    return [{ type: "BULLETED_LIST", id: nextId(), nodes: listItems }];
   }
 
   // ── Pre-process: flatten wrapper divs/sections so nested block content is never dropped ──
@@ -529,7 +505,18 @@ export function htmlToRicos(html: string): Record<string, unknown> {
     }
     return result;
   }
-  const flatHtml = flattenWrappers(html);
+  // ── Convert tables to bold-label lists up front ─────────────────────────────
+  // Wix drops Ricos TABLE nodes, so we render each <table> as a bulleted list.
+  // Extracting first also makes it immune to wrapper-flattening (<figure>/<div>):
+  // we leave a placeholder paragraph and swap the list nodes back after the loop.
+  const extractedTables: Record<string, unknown>[][] = [];
+  const htmlWithPlaceholders = html.replace(/<table[\s\S]*?<\/table>/gi, (tableHtml) => {
+    const idx = extractedTables.length;
+    extractedTables.push(tableToFormattedNodes(tableHtml));
+    return `\n<p>@@TABLE_${idx}@@</p>\n`;
+  });
+
+  const flatHtml = flattenWrappers(htmlWithPlaceholders);
 
   // Tokenise the HTML into block-level elements
   // We process h1-h6, p, ul, ol, li, blockquote, and fall back to paragraph for anything else
@@ -603,11 +590,12 @@ export function htmlToRicos(html: string): Record<string, unknown> {
         });
       }
     } else if (tag === "table") {
-      const tableNode = buildTableNode(inner);
-      if (tableNode) {
-        nodes.push(tableNode);
+      // Tables are extracted to bold-label lists before this loop runs, so a raw
+      // <table> should never reach here. If one does, flatten to text as a fallback.
+      const listNodes = tableToFormattedNodes(`<table>${inner}</table>`);
+      if (listNodes.length > 0) {
+        nodes.push(...listNodes);
       } else {
-        // Couldn't parse a table — don't lose the data, flatten to text.
         const textOnly = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
         if (textOnly) nodes.push(makeParagraph(textOnly));
       }
@@ -636,6 +624,24 @@ export function htmlToRicos(html: string): Record<string, unknown> {
     const cleaned = trailing.replace(/<[^>]+>/g, "").trim();
     if (cleaned) nodes.push(makeParagraph(trailing));
   }
+
+  // Swap each table placeholder for the bold-label list nodes we built up front.
+  const nodeText = (n: Record<string, unknown>): string => {
+    const kids = (n.nodes as Record<string, unknown>[] | undefined) ?? [];
+    return kids.map((c) => ((c.textData as { text?: string } | undefined)?.text ?? "")).join("").trim();
+  };
+  const rebuilt: Record<string, unknown>[] = [];
+  for (const n of nodes) {
+    const m = n.type === "PARAGRAPH" ? nodeText(n).match(/^@@TABLE_(\d+)@@$/) : null;
+    if (m) {
+      const block = extractedTables[Number(m[1])] ?? [];
+      rebuilt.push(...block); // may be empty (unparseable table → nothing)
+      continue;
+    }
+    rebuilt.push(n);
+  }
+  nodes.length = 0;
+  nodes.push(...rebuilt);
 
   // Ensure at least one node
   if (nodes.length === 0) {
