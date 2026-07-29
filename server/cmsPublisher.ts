@@ -832,6 +832,16 @@ export async function publishToWix(
               custom: false,
               isDisabled: false,
             }] : []),
+            // Structured data (JSON-LD): Article + Breadcrumb + FAQPage (+ HowTo).
+            // Injected as a script tag so it lands in the Wix post's SEO markup and
+            // is available to search / AI answer engines. Same schema WordPress gets.
+            ...(article.schemaMarkup ? [{
+              type: "script",
+              props: { type: "application/ld+json" },
+              children: article.schemaMarkup,
+              custom: true,
+              isDisabled: false,
+            }] : []),
           ],
         },
       },
