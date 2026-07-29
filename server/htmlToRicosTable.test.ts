@@ -43,6 +43,28 @@ describe("htmlToRicos — table support", () => {
     expect(table.tableData.dimensions.rowsHeight).toHaveLength(3);
   });
 
+  it("uses Wix's required `tableCellData` field (not `cellData`) with borderColors", () => {
+    const ricos = htmlToRicos(html) as any;
+    const table = findNode(ricos, "TABLE");
+    const cell = table.nodes[0].nodes[0];
+    expect(cell.tableCellData).toBeTruthy();
+    expect(cell.cellData).toBeUndefined();
+    expect(cell.tableCellData.borderColors).toBeDefined();
+  });
+
+  it("styles the first row as a header (blue background, bold white text)", () => {
+    const ricos = htmlToRicos(html) as any;
+    const table = findNode(ricos, "TABLE");
+    const headerCell = table.nodes[0].nodes[0];
+    expect(headerCell.tableCellData.cellStyle.backgroundColor).toBe("#116DFF");
+    const decos = headerCell.nodes[0].nodes[0].textData.decorations.map((d: any) => d.type);
+    expect(decos).toContain("BOLD");
+    expect(decos).toContain("COLOR");
+    // Body cells must NOT have the header background.
+    const bodyCell = table.nodes[1].nodes[0];
+    expect(bodyCell.tableCellData.cellStyle.backgroundColor).toBeUndefined();
+  });
+
   it("falls back to text (no crash) when the table has no rows", () => {
     const ricos = htmlToRicos(`<table><caption>empty</caption></table>`) as any;
     expect(findNode(ricos, "TABLE")).toBeNull(); // no rows → no TABLE node
