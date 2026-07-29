@@ -651,6 +651,78 @@ export function renderFaqIntoBody(
 }
 
 /**
+ * Guarantee HowTo schema on how-to articles — mirrors the FAQPage enforcement.
+ * If the article is a `how_to` and its schema has no HowTo block, build one from
+ * the first <ol> in the body (each <li> → a HowToStep) and patch it into @graph
+ * alongside the existing Article/Breadcrumb/FAQPage entries. Never fabricates
+ * steps: if there's no <ol>, or the article isn't a how-to, it's left unchanged.
+ * Pure + testable, no LLM.
+ */
+export function ensureHowToSchema(
+  schemaJson: string,
+  bodyHtml: string,
+  opts: { articleType: string; title: string; description: string; articleUrl: string },
+): { schema: string; outcome: string } {
+  if (opts.articleType !== "how_to") {
+    return { schema: schemaJson, outcome: "skipped — not a how-to article" };
+  }
+
+  let parsed: Record<string, unknown> | null = null;
+  try { parsed = JSON.parse(schemaJson) as Record<string, unknown>; } catch { parsed = null; }
+  if (!parsed) {
+    return { schema: schemaJson, outcome: "skipped — schema not parseable" };
+  }
+
+  const graph = Array.isArray(parsed["@graph"]) ? (parsed["@graph"] as Array<Record<string, unknown>>) : null;
+  const alreadyHasHowTo = graph
+    ? graph.some((n) => n && n["@type"] === "HowTo")
+    : /"@type"\s*:\s*"HowTo"/.test(schemaJson);
+  if (alreadyHasHowTo) {
+    return { schema: schemaJson, outcome: "already present" };
+  }
+
+  // Extract steps from the first ordered list (the canonical how-to steps).
+  const olMatch = bodyHtml.match(/<ol\b[^>]*>([\s\S]*?)<\/ol>/i);
+  if (!olMatch) {
+    return { schema: schemaJson, outcome: "skipped — no <ol> found in body" };
+  }
+  const liTexts = (olMatch[1].match(/<li\b[^>]*>([\s\S]*?)<\/li>/gi) ?? [])
+    .map((li) => li.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (liTexts.length === 0) {
+    return { schema: schemaJson, outcome: "skipped — no steps in <ol>" };
+  }
+
+  const firstSentence = (t: string): string => {
+    const m = t.match(/^(.+?[.!?])(\s|$)/);
+    return m ? m[1].trim() : t;
+  };
+
+  const howTo = {
+    "@type": "HowTo",
+    "@id": `${opts.articleUrl}#howto`,
+    "name": opts.title,
+    "description": opts.description,
+    "step": liTexts.map((t, i) => ({
+      "@type": "HowToStep",
+      "position": i + 1,
+      "name": firstSentence(t),
+      "text": t,
+    })),
+  };
+
+  if (Array.isArray(parsed["@graph"])) {
+    (parsed["@graph"] as unknown[]).push(howTo);
+    return { schema: JSON.stringify(parsed), outcome: `built from ${liTexts.length} <ol> step(s) and patched into @graph` };
+  }
+  // Schema exists but isn't a @graph — wrap it alongside the HowTo.
+  return {
+    schema: JSON.stringify({ "@context": "https://schema.org", "@graph": [parsed, howTo] }),
+    outcome: `built from ${liTexts.length} <ol> step(s) (wrapped into @graph)`,
+  };
+}
+
+/**
  * Ensure the primary keyword appears in at least one H3 heading — but ONLY if
  * H3s already exist (the Pass 1 check passes automatically when there are no
  * H3s, so we never add headings just to satisfy it). Mirrors ensureKeywordInH2.
@@ -2386,6 +2458,24 @@ export async function generateSingleArticle(
       } else {
         console.log(`[ArticleEngine] Step 2.9: schema already has FAQPage/Question for node ${nodeId} — no patch needed`);
       }
+    }
+
+    // =========================================================================
+    // STEP 2.10 — HOWTO SCHEMA GUARANTEE (no LLM) — how_to articles only
+    // Mirrors Step 2.9: if a how-to article's schema lacks a HowTo block, build
+    // one from the first <ol> in the body and patch it into @graph.
+    // =========================================================================
+    if (ctx.articleType === "how_to") {
+      const siteUrl210 = ctx.websiteUrl || ctx.ctaUrl.replace(/\/[^/]+$/, "") || "https://example.com";
+      const articleUrl210 = `${siteUrl210.replace(/\/$/, "")}/${ctx.urlSlug}`;
+      const ht = ensureHowToSchema(schemaMarkupFinal, bodyHtml, {
+        articleType: ctx.articleType,
+        title,
+        description: metaDescription,
+        articleUrl: articleUrl210,
+      });
+      schemaMarkupFinal = ht.schema;
+      console.log(`[ArticleEngine] Step 2.10: HowTo schema ${ht.outcome} for node ${nodeId}`);
     }
 
     // =========================================================================
