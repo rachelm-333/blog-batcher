@@ -83,6 +83,10 @@ Only operational tools remain (spent one-off diagnostics were removed):
 
 ---
 
+## 5b. SEO metadata cross-contamination (fixed)
+
+A frontend race in the Review editor could save one article's SEO fields (slug/keyword/meta) onto another when switching articles quickly — it had duplicated `brand-strategist` slug + focus keyword across 3 posts. Fixed two ways: (1) `handleSaveDraft`/`handleApprove` now only save when `fullArticle.id === selectedItem.id` (commit c7a1187); (2) `scripts/repairSeoMeta.ts` resyncs any article's slug/keyword from its node (source of truth) and rebuilds meta — dry-run by default, `--confirm` to apply. Node keywords and generation were never wrong. Verify with `scripts/dumpSeo.ts`.
+
 ## 6. Workflow rule
 
 Fixes go through code review + tests, then push to GitHub; the runner **pulls** — it must not edit code (two editors on one repo caused hours of divergence). If a dev-tool popup offers "Fix it / Fix All," don't use it on the running instance.
