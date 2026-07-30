@@ -74,7 +74,7 @@ Only operational tools remain (spent one-off diagnostics were removed):
 1. **Verify FAQPage renders on a LIVE Wix post** via Google Rich Results Test (see 1b). Highest priority — decides whether the seoData method is sufficient.
 2. **Rotate the OpenRouter API key** — it was exposed in chat; rotate at openrouter.ai and update the Manus/host secret. `.env` is gitignored.
 3. **Scheduling is Manus-infra-tied** (see 1c) — re-wire when moving hosts.
-4. **Remove debug scaffolding** before public launch: the Stage-6 "Preview backfill" / "Re-sync links" / "Fix links" buttons + diagnostics box in `client/src/pages/PublishSchedule.tsx` (auto-backfill runs automatically; these were dev aids).
+4. ✅ **Done** — debug scaffolding removed from `client/src/pages/PublishSchedule.tsx` (backfill preview, "Apply to this post (test)", diagnostics box, "Fix links" re-sync). Auto-backfill still runs automatically at publish. The `previewBackfill` / `applyBackfillOne` tRPC procedures remain on the server (unused by UI now) — a dev can delete them if desired.
 5. **Existing 19 posts** were generated under the old rule (tables in source, converted to bullets at Wix publish). New posts generate as bullets. Regenerate the 19 only if you want bullets in the source everywhere.
 6. WordPress publish is not live-tested; Shopify/Webflow/Squarespace/Ghost route via Zapier.
 
