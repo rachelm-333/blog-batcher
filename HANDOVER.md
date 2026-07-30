@@ -77,6 +77,7 @@ Only operational tools remain (spent one-off diagnostics were removed):
 4. ✅ **Done** — debug scaffolding removed from `client/src/pages/PublishSchedule.tsx` (backfill preview, "Apply to this post (test)", diagnostics box, "Fix links" re-sync). Auto-backfill still runs automatically at publish. The `previewBackfill` / `applyBackfillOne` tRPC procedures remain on the server (unused by UI now) — a dev can delete them if desired.
 5. **Existing 19 posts** were generated under the old rule (tables in source, converted to bullets at Wix publish). New posts generate as bullets. Regenerate the 19 only if you want bullets in the source everywhere.
 6. WordPress publish is not live-tested; Shopify/Webflow/Squarespace/Ghost route via Zapier.
+7. ✅ **Done** — batch switcher added. `activeBatch` is now the *currently viewed* batch (not just the highest). `business.batchInfo` returns `{activeBatch, maxBatch}`; `business.setActiveBatch` switches it (lands on Stage 6, fully editable). The "Batch N" label in the sidebar is now a dropdown (1..maxBatch). `startNewBatch` bases the new batch on the true max, so it's correct even when viewing an older batch.
 
 ---
 

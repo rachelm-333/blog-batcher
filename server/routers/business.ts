@@ -15,7 +15,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, max } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -794,7 +794,14 @@ Rules:
         });
       }
 
-      const newBatch = (biz.activeBatch ?? 1) + 1;
+      // Base the new batch on the highest batch that exists (not the currently
+      // viewed one) so starting a batch while viewing an older batch still works.
+      const [{ maxBatch } = { maxBatch: null }] = await db
+        .select({ maxBatch: max(articles.batchNumber) })
+        .from(articles)
+        .where(eq(articles.businessId, input.businessId));
+      const ceiling = Math.max(Number(maxBatch ?? 1), biz.activeBatch ?? 1);
+      const newBatch = ceiling + 1;
 
       await db
         .update(businesses)
@@ -805,6 +812,62 @@ Rules:
         .where(eq(businesses.id, input.businessId));
 
       return { success: true, newBatch };
+    }),
+
+  // -------------------------------------------------------------------------
+  // BATCH NAVIGATION — list batches + switch the active (viewed) batch
+  // -------------------------------------------------------------------------
+
+  /** Returns the current active batch and how many batches exist, so the UI can
+   * offer a batch switcher (batches are numbered 1..maxBatch). */
+  batchInfo: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertOwnership(ctx.user.id, input.businessId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [biz] = await db
+        .select({ activeBatch: businesses.activeBatch })
+        .from(businesses)
+        .where(eq(businesses.id, input.businessId))
+        .limit(1);
+      if (!biz) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
+      const [{ maxBatch } = { maxBatch: null }] = await db
+        .select({ maxBatch: max(articles.batchNumber) })
+        .from(articles)
+        .where(eq(articles.businessId, input.businessId));
+      const activeBatch = biz.activeBatch ?? 1;
+      const maxB = Math.max(Number(maxBatch ?? 1), activeBatch);
+      return { activeBatch, maxBatch: maxB };
+    }),
+
+  /** Switch which batch is active/viewed. Existing batches are fully editable, so
+   * we land on Stage 6 (all stages accessible) for the chosen batch. */
+  setActiveBatch: protectedProcedure
+    .input(z.object({ businessId: z.number(), batch: z.number().int().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOwnership(ctx.user.id, input.businessId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [biz] = await db
+        .select({ activeBatch: businesses.activeBatch })
+        .from(businesses)
+        .where(eq(businesses.id, input.businessId))
+        .limit(1);
+      if (!biz) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
+      const [{ maxBatch } = { maxBatch: null }] = await db
+        .select({ maxBatch: max(articles.batchNumber) })
+        .from(articles)
+        .where(eq(articles.businessId, input.businessId));
+      const ceiling = Math.max(Number(maxBatch ?? 1), biz.activeBatch ?? 1);
+      if (input.batch > ceiling) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Batch ${input.batch} does not exist (highest is ${ceiling}).` });
+      }
+      await db
+        .update(businesses)
+        .set({ activeBatch: input.batch, currentStage: 6 })
+        .where(eq(businesses.id, input.businessId));
+      return { success: true, activeBatch: input.batch };
     }),
 
   // -------------------------------------------------------------------------

@@ -73,6 +73,20 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   );
   const credits = summary?.creditBalance ?? 0;
 
+  // Batch switcher — list batches (1..maxBatch) and switch the active one.
+  const utils = trpc.useUtils();
+  const { data: batchInfo } = trpc.business.batchInfo.useQuery(
+    { businessId: activeBiz?.id ?? 0 },
+    { enabled: !!activeBiz?.id, retry: false }
+  );
+  const setActiveBatchMutation = trpc.business.setActiveBatch.useMutation({
+    onSuccess: () => {
+      void refetchBusinesses();
+      void utils.invalidate();
+      setLocation("/review");
+    },
+  });
+
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (bizDropRef.current && !bizDropRef.current.contains(e.target as Node)) {
@@ -211,19 +225,39 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Batch indicator */}
+        {/* Batch indicator + switcher */}
         {activeBiz && (
           <div className="px-3 py-1.5 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
             <div
-              className="flex items-center justify-between px-2 py-1 rounded-md cursor-pointer"
+              className="flex items-center justify-between px-2 py-1 rounded-md gap-2"
               style={{ background: isBatchComplete ? "#dcfce7" : "#f5f3ec" }}
-              onClick={() => isBatchComplete && setLocation("/batch-complete")}
-              title={isBatchComplete ? "View completed batch" : undefined}
             >
-              <span className="text-xs font-semibold" style={{ color: isBatchComplete ? "#16a34a" : "#6b7280" }}>
-                Batch {activeBatch}
-              </span>
-              {isBatchComplete ? (
+              {(batchInfo?.maxBatch ?? 1) > 1 ? (
+                <select
+                  value={activeBatch}
+                  disabled={setActiveBatchMutation.isPending}
+                  onChange={(e) => {
+                    const batch = Number(e.target.value);
+                    if (activeBiz?.id && batch !== activeBatch) {
+                      setActiveBatchMutation.mutate({ businessId: activeBiz.id, batch });
+                    }
+                  }}
+                  className="text-xs font-semibold bg-transparent cursor-pointer outline-none"
+                  style={{ color: isBatchComplete ? "#16a34a" : "#6b7280" }}
+                  title="Switch batch"
+                >
+                  {Array.from({ length: batchInfo?.maxBatch ?? 1 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>Batch {n}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-xs font-semibold" style={{ color: isBatchComplete ? "#16a34a" : "#6b7280" }}>
+                  Batch {activeBatch}
+                </span>
+              )}
+              {setActiveBatchMutation.isPending ? (
+                <span className="text-xs" style={{ color: "#9ca3af" }}>Switching…</span>
+              ) : isBatchComplete ? (
                 <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ background: "#bbf7d0", color: "#15803d" }}>Complete ✓</span>
               ) : (
                 <span className="text-xs" style={{ color: "#9ca3af" }}>In progress</span>
