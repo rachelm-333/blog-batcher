@@ -1005,8 +1005,13 @@ export default function ArticleReview() {
     selectedItem?.status !== "scheduled" &&
     selectedItem?.status !== "published";
 
+  // Guard: the loaded SEO fields must belong to the selected article. Prevents a
+  // race where switching articles quickly saves the previous article's SEO values
+  // onto the newly-selected one (which duplicated slugs/keywords across posts).
+  const seoLoadedForSelected = !!selectedItem?.id && (fullArticle as any)?.id === selectedItem.id;
+
   function handleSaveDraft() {
-    if (!selectedItem?.id) return;
+    if (!selectedItem?.id || !seoLoadedForSelected) return;
     updateSeoFields.mutate({
       articleId: selectedItem.id,
       urlSlug: seoEdits.urlSlug || undefined,
@@ -1019,12 +1024,15 @@ export default function ArticleReview() {
 
   function handleApprove() {
     if (!selectedItem?.id) return;
-    // Save any pending SEO edits first, then approve
+    // Save any pending SEO edits first, then approve — but ONLY if the loaded SEO
+    // fields belong to the selected article (avoids cross-article contamination).
     if (
-      seoEdits.urlSlug !== ((fullArticle as any)?.urlSlug ?? "") ||
-      seoEdits.metaTitle !== ((fullArticle as any)?.metaTitle ?? "") ||
-      seoEdits.metaDescription !== ((fullArticle as any)?.metaDescription ?? "") ||
-      seoEdits.focusKeyword !== ((fullArticle as any)?.focusKeyword ?? "")
+      seoLoadedForSelected && (
+        seoEdits.urlSlug !== ((fullArticle as any)?.urlSlug ?? "") ||
+        seoEdits.metaTitle !== ((fullArticle as any)?.metaTitle ?? "") ||
+        seoEdits.metaDescription !== ((fullArticle as any)?.metaDescription ?? "") ||
+        seoEdits.focusKeyword !== ((fullArticle as any)?.focusKeyword ?? "")
+      )
     ) {
       updateSeoFields.mutate(
         {
