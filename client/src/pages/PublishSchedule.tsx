@@ -166,32 +166,6 @@ export default function PublishSchedule() {
     { enabled: !!business?.id }
   );
 
-  // Dry-run preview of internal-link backfill (Phase 2 — no changes made).
-  const backfillPreview = trpc.articles.previewBackfill.useQuery(
-    { businessId: business?.id ?? 0 },
-    { enabled: false }
-  );
-  // Apply backfill to ONE post (manual smoke test — re-pushes to Wix).
-  const applyBackfill = trpc.articles.applyBackfillOne.useMutation({
-    onSuccess: (r) => {
-      if (r.success) {
-        const live = r.linksNowLive ?? 0;
-        const pending = r.linksPending ?? 0;
-        if (live > 0) {
-          toast.success(`Re-synced to Wix: ${live} link${live !== 1 ? "s" : ""} now live${pending > 0 ? `, ${pending} still pending (target not published yet)` : ""}.`);
-        } else if (pending > 0) {
-          toast.warning(`Re-synced, but 0 links went live — ${pending} still pending. The linked post(s) aren't published yet, or their Wix URL wasn't captured (re-publish them after the latest fix).`, { duration: 12000 });
-        } else {
-          toast.success("Re-synced to Wix (no internal links in this post).");
-        }
-        backfillPreview.refetch();
-      } else {
-        toast.error(r.error ?? "Backfill failed", { description: r.raw ?? undefined, duration: 12000 });
-      }
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
   const { data: scheduleData, isLoading: scheduleLoading, refetch: refetchSchedule } =
     trpc.schedule.get.useQuery(
       { businessId: business?.id ?? 0 },
@@ -478,103 +452,6 @@ export default function PublishSchedule() {
               </div>
             </div>
           </div>
-        )}
-
-        {/* Internal-link backfill preview (dry run) */}
-        <section className="rounded-lg border border-border bg-white p-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h2 className="text-base font-bold text-foreground">Internal-link backfill (preview)</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Shows published posts whose links to later-published posts can now be switched on. This is a dry run — nothing is changed.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs"
-              disabled={backfillPreview.isFetching || !business?.id}
-              onClick={() => backfillPreview.refetch()}
-            >
-              {backfillPreview.isFetching ? "Checking…" : "Preview backfill"}
-            </Button>
-          </div>
-          {backfillPreview.data !== undefined && (
-            <div className="mt-3 text-sm">
-              {(backfillPreview.data.targets ?? []).length === 0 ? (
-                <p className="text-xs text-muted-foreground">No links need switching on right now — every published post's internal links are already live.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {(backfillPreview.data.targets ?? []).map((t) => (
-                    <li key={t.articleId} className="rounded-md border border-border p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="font-medium text-foreground text-sm">{t.title || `Article ${t.articleId}`}</div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs shrink-0"
-                          disabled={applyBackfill.isPending}
-                          onClick={() => business?.id && applyBackfill.mutate({ businessId: business.id, articleId: t.articleId })}
-                        >
-                          {applyBackfill.isPending && applyBackfill.variables?.articleId === t.articleId ? "Applying…" : "Apply to this post (test)"}
-                        </Button>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Would restore {t.restoredLinks.length} link{t.restoredLinks.length !== 1 ? "s" : ""}:
-                        <ul className="list-disc ml-5 mt-1">
-                          {t.restoredLinks.map((l) => (
-                            <li key={l.slug}>→ {l.url}</li>
-                          ))}
-                        </ul>
-                        {!t.hasCmsId && (
-                          <span className="text-amber-600">⚠ No stored Wix post ID — will be looked up by slug at re-push.</span>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {/* Diagnostics — always visible so it's easy to screenshot */}
-              {backfillPreview.data.diag && (
-                <div className="mt-4">
-                  <p className="text-xs font-semibold text-foreground mb-1">Diagnostics (why links match or not)</p>
-                  <div className="text-xs font-mono whitespace-pre-wrap bg-muted/40 border border-border rounded-md p-3 overflow-x-auto">
-                    {"BATCH POSTS (slug · status · has real URL):\n"}
-                    {backfillPreview.data.diag.batch.map((b) => `• ${b.urlSlug} · ${b.status} · ${b.hasUrl ? "URL ✓" : "URL ✗"}${b.cmsPostUrl ? `  ${b.cmsPostUrl}` : ""}`).join("\n")}
-                    {"\n\nLINKS INSIDE PUBLISHED POSTS:\n"}
-                    {backfillPreview.data.diag.publishedLinks.map((p) => `▸ ${p.title}\n${p.hrefs.length ? p.hrefs.map((h) => `   ${h}`).join("\n") : "   (no <a> links found)"}`).join("\n")}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-
-        {/* Fix links in already-published posts (in-place re-sync, no duplicate) */}
-        {articlesData?.some((a) => a.status === "published") && (
-          <section className="rounded-lg border border-border bg-white p-4">
-            <h2 className="text-base font-bold text-foreground">Fix links in already-published posts</h2>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-              Re-pushes a live post to Wix <strong>in place</strong> (no duplicate) — removes links to posts that aren't published yet (fixing 404s) and points links at the real URLs of posts that are live.
-            </p>
-            <ul className="space-y-2">
-              {articlesData!.filter((a) => a.status === "published").map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5">
-                  <span className="text-sm text-foreground">{a.title || `Article ${a.id}`}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs shrink-0"
-                    disabled={applyBackfill.isPending}
-                    onClick={() => business?.id && applyBackfill.mutate({ businessId: business.id, articleId: a.id })}
-                  >
-                    {applyBackfill.isPending && applyBackfill.variables?.articleId === a.id ? "Re-syncing…" : "Re-sync links to Wix"}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </section>
         )}
 
         {/* Publishing Method */}

@@ -1926,16 +1926,20 @@ export default function ArticleReview() {
                   <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
                     <span className="flex items-center gap-1.5">
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                      Article approved.
+                      {selectedItem?.status === "scheduled"
+                        ? "Scheduled."
+                        : "Article approved."}
                     </span>
-                    <button
-                      type="button"
-                      className="text-[10px] text-amber-500 hover:text-amber-400 underline transition-colors"
-                      onClick={() => selectedItem?.id && updateStatus.mutate({ articleId: selectedItem.id, status: "pending_approval" })}
-                      disabled={updateStatus.isPending}
-                    >
-                      {updateStatus.isPending ? "Reverting…" : "Unapprove"}
-                    </button>
+                    {selectedItem?.status === "approved" && (
+                      <button
+                        type="button"
+                        className="text-[10px] text-amber-500 hover:text-amber-400 underline transition-colors"
+                        onClick={() => selectedItem?.id && updateStatus.mutate({ articleId: selectedItem.id, status: "pending_approval" })}
+                        disabled={updateStatus.isPending}
+                      >
+                        {updateStatus.isPending ? "Reverting…" : "Unapprove"}
+                      </button>
+                    )}
                   </div>
 
                   {/* Save Changes button — always visible for approved articles */}
@@ -1954,21 +1958,42 @@ export default function ArticleReview() {
                     Save Changes
                   </Button>
 
-                  {/* Publish action button */}
+                  {/* Publish action button — reflects the article's real state */}
                   {!publishPanelOpen ? (
-                    <Button
-                      size="sm"
-                      className="w-full text-xs"
-                      onClick={() => {
-                        setPublishPlatform(defaultPlatform);
-                        setPublishMode("live");
-                        setScheduleDate("");
-                        setPublishPanelOpen(true);
-                      }}
-                    >
-                      <Send className="h-3 w-3 mr-1.5" />
-                      Publish this article →
-                    </Button>
+                    selectedItem?.status === "scheduled" ? (
+                      <div className="space-y-2">
+                        <div className="w-full rounded-md border border-blue-600/30 bg-blue-600/15 py-2 text-center text-xs font-semibold text-blue-600">
+                          ⏰ Scheduled{(fullArticle as any)?.scheduledPublishAt ? ` — ${new Date((fullArticle as any).scheduledPublishAt).toLocaleString()}` : ""}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full text-xs"
+                          onClick={() => {
+                            setPublishPlatform(defaultPlatform);
+                            setPublishMode("live");
+                            setScheduleDate("");
+                            setPublishPanelOpen(true);
+                          }}
+                        >
+                          Reschedule or publish now
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => {
+                          setPublishPlatform(defaultPlatform);
+                          setPublishMode("live");
+                          setScheduleDate("");
+                          setPublishPanelOpen(true);
+                        }}
+                      >
+                        <Send className="h-3 w-3 mr-1.5" />
+                        Publish this article →
+                      </Button>
+                    )
                   ) : (
                     <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
                       <div className="flex items-center justify-between">
