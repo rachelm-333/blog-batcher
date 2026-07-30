@@ -909,35 +909,39 @@ export async function publishToWix(
         // SEO slug
         ...(article.urlSlug ? { seoSlug: article.urlSlug } : {}),
         seoData: {
+          // Wix SEO tag schema: field is `disabled` (NOT isDisabled), and every tag
+          // carries a `children` string. A JSON-LD script tag adds structured data.
           tags: [
             {
               type: "title",
               children: article.metaTitle || article.title,
               custom: false,
-              isDisabled: false,
+              disabled: false,
             },
             {
               type: "meta",
               props: { name: "description", content: article.metaDescription || "" },
+              children: "",
               custom: false,
-              isDisabled: false,
+              disabled: false,
             },
             // Focus keyword — populates Wix SEO Assistant "Focus keyword" field
             ...(article.focusKeyword ? [{
               type: "meta",
               props: { name: "keywords", content: article.focusKeyword },
+              children: "",
               custom: false,
-              isDisabled: false,
+              disabled: false,
             }] : []),
             // Structured data (JSON-LD): Article + Breadcrumb + FAQPage (+ HowTo).
-            // Injected as a script tag so it lands in the Wix post's SEO markup and
+            // Injected as a custom script tag so it lands in the post's SEO markup and
             // is available to search / AI answer engines. Same schema WordPress gets.
             ...(article.schemaMarkup ? [{
               type: "script",
               props: { type: "application/ld+json" },
               children: article.schemaMarkup,
               custom: true,
-              isDisabled: false,
+              disabled: false,
             }] : []),
           ],
         },
