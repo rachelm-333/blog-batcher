@@ -85,6 +85,23 @@ describe("htmlToRicos — tables render as reliable bold-label lists (Wix drops 
     expect(allText(list.nodes[0])).toContain("One");
   });
 
+  it("converts a 4-column matrix table (Factor/Monolithic/Endorsed/Pluralistic) to labelled bullets", () => {
+    const matrix = `<table>
+      <tr><th>Factor</th><th>Monolithic Fit</th><th>Endorsed Fit</th><th>Pluralistic Fit</th></tr>
+      <tr><td>Product Similarity</td><td>Related offerings, shared values</td><td>Related but serving different segments</td><td>Unrelated products, different categories</td></tr>
+      <tr><td>Customer Overlap</td><td>Same customers buy multiple products</td><td>Partial overlap with distinct needs</td><td>Completely different customer bases</td></tr>
+    </table>`;
+    const ricos = htmlToRicos(matrix) as any;
+    const list = findNode(ricos, "BULLETED_LIST");
+    expect(list).toBeTruthy();
+    expect(list.nodes).toHaveLength(2); // 2 data rows
+    const t = allText(list.nodes[0]);
+    expect(t).toContain("Product Similarity");
+    expect(t).toContain("Monolithic Fit: Related offerings, shared values");
+    expect(t).toContain("Endorsed Fit: Related but serving different segments");
+    expect(t).toContain("Pluralistic Fit: Unrelated products, different categories");
+  });
+
   it("drops an empty table with no data rows (no crash, no stray token)", () => {
     const ricos = htmlToRicos(`<p>Before</p><table><caption>empty</caption></table><p>After</p>`) as any;
     expect(findNode(ricos, "BULLETED_LIST")).toBeNull();
