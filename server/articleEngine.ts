@@ -651,6 +651,32 @@ export function renderFaqIntoBody(
 }
 
 /**
+ * Remove any FAQPage / Question schema from a JSON-LD string. Clusters must never
+ * carry FAQPage markup: they have no visible FAQ section, and FAQPage schema with
+ * no matching on-page Q&A is a Google structured-data violation. Pure + testable.
+ * Returns the schema unchanged if it can't be parsed (never throws).
+ */
+export function stripFaqFromSchema(schemaJson: string): string {
+  if (!schemaJson) return schemaJson;
+  try {
+    const parsed = JSON.parse(schemaJson) as Record<string, unknown>;
+    const graph = parsed["@graph"];
+    if (Array.isArray(graph)) {
+      parsed["@graph"] = graph.filter((n) => {
+        const t = (n as Record<string, unknown> | null)?.["@type"];
+        return t !== "FAQPage" && t !== "Question";
+      });
+      return JSON.stringify(parsed);
+    }
+    // Not a @graph — if the root node itself is a FAQPage, there's nothing else to keep.
+    if (parsed["@type"] === "FAQPage") return "";
+    return schemaJson;
+  } catch {
+    return schemaJson;
+  }
+}
+
+/**
  * Guarantee HowTo schema on how-to articles — mirrors the FAQPage enforcement.
  * If the article is a `how_to` and its schema has no HowTo block, build one from
  * the first <ol> in the body (each <li> → a HowToStep) and patch it into @graph
@@ -2353,7 +2379,16 @@ export async function generateSingleArticle(
     // full FAQ list from faqItems as well.
     // =========================================================================
     let schemaMarkupFinal = schemaMarkup;
-    {
+    const isCornerstoneOrPillar = ctx.level === "cornerstone" || ctx.level === "pillar";
+    if (!isCornerstoneOrPillar) {
+      // Clusters must NOT carry FAQPage schema — no visible FAQ section on the page,
+      // so FAQPage markup would be an invalid/penalisable structured-data mismatch.
+      const before = schemaMarkupFinal;
+      schemaMarkupFinal = stripFaqFromSchema(schemaMarkupFinal);
+      if (before !== schemaMarkupFinal) {
+        console.log(`[ArticleEngine] Step 2.9: stripped FAQPage from cluster schema for node ${nodeId}`);
+      }
+    } else {
       const siteUrl = ctx.websiteUrl || ctx.ctaUrl.replace(/\/[^/]+$/, "") || "https://example.com";
       const articleUrl = `${siteUrl.replace(/\/$/, "")}/${ctx.urlSlug}`;
 
