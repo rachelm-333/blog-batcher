@@ -85,7 +85,7 @@ export const dashboardRouter = router({
         .where(
           and(
             eq(articles.businessId, input.businessId),
-            eq(articleNodes.batchNumber, activeBatch)
+            eq(articles.batchNumber, activeBatch)
           )
         );
 
@@ -195,7 +195,7 @@ export const dashboardRouter = router({
         .where(
           and(
             eq(publishAuditLog.businessId, input.businessId),
-            eq(articleNodes.batchNumber, activeBatch)
+            eq(articles.batchNumber, activeBatch)
           )
         )
         .orderBy(desc(publishAuditLog.createdAt))
@@ -239,10 +239,9 @@ export const dashboardRouter = router({
         .select({
           businessId: articles.businessId,
           status: articles.status,
-          batchNumber: articleNodes.batchNumber,
+          batchNumber: articles.batchNumber,
         })
         .from(articles)
-        .innerJoin(articleNodes, eq(articleNodes.id, articles.articleNodeId))
         .innerJoin(businesses, and(
           eq(businesses.id, articles.businessId),
           eq(businesses.userId, ctx.user.id)
