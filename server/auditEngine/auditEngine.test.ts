@@ -85,6 +85,23 @@ describe("29-point audit engine", () => {
     expect(r.checks.find(c => c.id === "MIC-07")?.passed).toBe(true);
   });
 
+  it("MIC-07 passes on a bold-label list even with NO table (Wix-safe format)", () => {
+    const html = `<h1>Deliverables</h1><p>Intro.</p>
+      <ul>
+        <li><strong>Audience Research</strong> — clarifies who you're talking to</li>
+        <li><strong>Positioning Statement</strong> — defines your place in the market</li>
+        <li><strong>Messaging Framework</strong> — maps what you say and why</li>
+      </ul>`;
+    const r = auditHtml({ html, primaryKeyword: "brand strategy" });
+    expect(r.checks.find(c => c.id === "MIC-07")?.passed).toBe(true);
+  });
+
+  it("MIC-07 fails when there is neither a table nor a bold-label list", () => {
+    const html = `<h1>Plain</h1><p>Just prose.</p><ul><li>one</li><li>two</li></ul>`;
+    const r = auditHtml({ html, primaryKeyword: "x" });
+    expect(r.checks.find(c => c.id === "MIC-07")?.passed).toBe(false);
+  });
+
   it("MIC-08 flags the giant dense paragraph", () => {
     const r = auditHtml({ html: BAD_HTML, primaryKeyword: "pricing" });
     expect(r.checks.find(c => c.id === "MIC-08")?.passed).toBe(false);

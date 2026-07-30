@@ -190,8 +190,16 @@ function evaluate(rule: AuditRule, $: cheerio.CheerioAPI, input: AuditInput): { 
       return { passed: n >= 1, detail: `${n} list elements` };
     }
     case "MIC-07": {
-      const n = $("table").length;
-      return { passed: n >= 1, detail: `${n} tables` };
+      // Structured comparison data. A real <table> passes; so does a bold-label
+      // "at-a-glance" list (<li><strong>Label</strong> …) — we deliver tabular data
+      // as bullets because tables don't render reliably on Wix. Needs >=2 such items.
+      const tables = $("table").length;
+      let labelledItems = 0;
+      $("li").each((_, el) => {
+        if ($(el).children("strong, b").first().length > 0) labelledItems++;
+      });
+      const passed = tables >= 1 || labelledItems >= 2;
+      return { passed, detail: `${tables} tables, ${labelledItems} labelled list items` };
     }
     case "MIC-08": {
       let over = 0;

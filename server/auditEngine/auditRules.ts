@@ -42,7 +42,7 @@ export const AUDIT_RULES: AuditRule[] = [
   { id: "MIC-04", phase: "Micro Architecture", parameter: "H3 Action Framing", pass_condition: "<h3> tags exist beneath <h2> tags to break down sub-steps.", max_points: 3 },
   { id: "MIC-05", phase: "Micro Architecture", parameter: "Answer Proximity", pass_condition: "The first <p> element directly succeeding an <h2> tag contains <= 60 words.", max_points: 5 },
   { id: "MIC-06", phase: "Micro Architecture", parameter: "Structural Formatting (Lists)", pass_condition: "Document contains at least one <ul> or <ol> element.", max_points: 5 },
-  { id: "MIC-07", phase: "Micro Architecture", parameter: "Structural Formatting (Data)", pass_condition: "Document contains at least one <table> element for data comparison.", max_points: 4 },
+  { id: "MIC-07", phase: "Micro Architecture", parameter: "Structural Formatting (Data)", pass_condition: "Document presents comparison data as a <table> OR a bold-label bulleted list (>=2 items starting with <strong>).", max_points: 4 },
   { id: "MIC-08", phase: "Micro Architecture", parameter: "Paragraph Density", pass_condition: "Zero <p> tags in the document exceed 4 sentences (approx 100 words).", max_points: 5 },
   { id: "EAT-01", phase: "E-E-A-T & Voice", parameter: "Non-Commodity Data", pass_condition: "NLP detects unique numerical statistics, percentages, or named case studies.", max_points: 5 },
   { id: "EAT-02", phase: "E-E-A-T & Voice", parameter: "First-Hand Experience", pass_condition: "Regex detects phrases like 'in our experience', 'we tested', 'we found'.", max_points: 4 },
