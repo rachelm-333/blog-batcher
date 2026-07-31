@@ -910,6 +910,8 @@ export interface ArticleContext {
   customerFrustrations?: string;
   customerTransformation?: string;
   contentPlanDirection?: string;
+  /** Approved title the article MUST deliver on (from the AI-architecture review). */
+  plannedTitle?: string;
   linkedinUrl?: string;
   facebookUrl?: string;
   instagramHandle?: string;
@@ -1032,6 +1034,7 @@ export async function buildArticleContext(
     customerFrustrations: biz.customerFrustrations ?? undefined,
     customerTransformation: biz.customerTransformation ?? undefined,
     contentPlanDirection: node.contentPlanDirection ?? undefined,
+    plannedTitle: node.plannedTitle ?? undefined,
     linkedinUrl: biz.linkedinUrl ?? undefined,
     facebookUrl: biz.facebookUrl ?? undefined,
     instagramHandle: biz.instagramHandle ?? undefined,
@@ -1739,6 +1742,12 @@ WRITING RULES BASED ON THIS INTELLIGENCE:
 - Use the frustrations (field 2) when writing any section about common mistakes or what to avoid
 - Use the transformation (field 3) in the conclusion and CTA
 - Pull specific words and phrases from these answers where they fit naturally
+` : ""}${ctx.plannedTitle ? `
+MANDATORY ARTICLE TITLE (APPROVED — DO NOT CHANGE):
+This article's title has been approved and is a PROMISE TO THE READER. You MUST:
+- Use this EXACT title as the H1: "${ctx.plannedTitle}"
+- Write the ENTIRE article to fully deliver on this title — every section must serve the specific promise it makes. Do not drift to a different angle, broaden it, or answer a different question.
+- In the <METADATA> "title" field, return this exact title.
 ` : ""}${ctx.contentPlanDirection ? `
 WRITER DIRECTION FROM PUBLISHER:
 The person publishing this article has added this specific direction:
@@ -2154,7 +2163,8 @@ export async function generateSingleArticle(
     }
 
     const parsed = parsedResult!;
-    let title = parsed.title;
+    // Honor the approved title exactly — it's the promise the article was written to.
+    let title = ctx.plannedTitle ? ctx.plannedTitle : parsed.title;
     let metaTitle = parsed.metaTitle;
     let metaDescription = parsed.metaDescription;
     let bodyHtml = parsed.bodyHtml;
@@ -2179,8 +2189,8 @@ export async function generateSingleArticle(
     metaTitle = enforceMetaTitle(metaTitle, ctx.primaryKeyword);
     metaDescription = enforceMetaDescription(metaDescription, ctx.primaryKeyword, ctx.businessName);
 
-    // Enforce keyword in title (H1)
-    if (!kwPresentInText(ctx.primaryKeyword.toLowerCase(), title.toLowerCase())) {
+    // Enforce keyword in title (H1) — but never rewrite an approved plannedTitle.
+    if (!ctx.plannedTitle && !kwPresentInText(ctx.primaryKeyword.toLowerCase(), title.toLowerCase())) {
       const capitalised = ctx.primaryKeyword.charAt(0).toUpperCase() + ctx.primaryKeyword.slice(1);
       title = `${capitalised}: ${title}`;
       console.log(`[ArticleEngine] P2 enforcement: prepended keyword into title for node ${nodeId}`);

@@ -36,6 +36,8 @@ import {
   type KeywordEntry,
 } from "../../shared/cannibalizationCheck";
 import { allocateKeywords } from "../../shared/keywordAllocation";
+import { generateSlug } from "../articleEngine";
+import { generateCornerstoneArchitecture } from "../campaignArchitect";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -533,6 +535,115 @@ export const keywordsRouter = router({
       await db.insert(keywords).values(insertRows);
 
       return { assigned: insertRows.length };
+    }),
+
+  // -------------------------------------------------------------------------
+  // keywords.assignFromCornerstone
+  // AI-first architecture: the user provides ONLY the cornerstone (head) keyword.
+  // The AI expands it into the full hub-and-spoke hierarchy (cornerstone → pillars
+  // → clusters) with titles, following strict SEO rules and avoiding keywords used
+  // in earlier batches. Keywords are validated against DataForSEO (MSV). The result
+  // is written onto the existing Stage-2 nodes (keyword + plannedTitle + slug), then
+  // the user reviews/edits/approves keywords AND titles before writing begins.
+  // -------------------------------------------------------------------------
+  assignFromCornerstone: protectedProcedure
+    .input(z.object({
+      businessId: z.number(),
+      cornerstoneKeyword: z.string().min(2).max(200),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const biz0 = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz0.activeBatch ?? 1;
+
+      const [biz] = await db.select().from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
+      if (!biz) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
+
+      // Stage-2 nodes must exist (1 cornerstone, N pillars, M clusters/pillar).
+      const nodes = await db.select().from(articleNodes)
+        .where(and(eq(articleNodes.businessId, input.businessId), eq(articleNodes.batchNumber, activeBatch)))
+        .orderBy(asc(articleNodes.sortOrder));
+      if (!nodes.length) throw new TRPCError({ code: "BAD_REQUEST", message: "No article nodes found. Complete Stage 2 first." });
+
+      const cornerstoneNode = nodes.find((n) => n.level === "cornerstone");
+      const pillarNodes = nodes.filter((n) => n.level === "pillar").sort((a, b) => a.sortOrder - b.sortOrder);
+      if (!cornerstoneNode || pillarNodes.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Architecture must have 1 cornerstone and at least 1 pillar." });
+      }
+      // Cluster nodes grouped under each pillar (in order).
+      const clustersByPillar = new Map<number, typeof nodes>();
+      for (const p of pillarNodes) {
+        clustersByPillar.set(p.id, nodes.filter((n) => n.level === "cluster" && n.parentPillarId === p.id)
+          .sort((a, b) => a.sortOrder - b.sortOrder));
+      }
+      const maxClustersPerPillar = Math.max(1, ...pillarNodes.map((p) => clustersByPillar.get(p.id)?.length ?? 0));
+
+      // Cross-batch guard: never reuse keywords from earlier batches of this business.
+      const priorRows = await db.select({ pk: keywords.primaryKeyword, bn: keywords.batchNumber })
+        .from(keywords).where(eq(keywords.businessId, input.businessId));
+      const avoidKeywords = Array.from(new Set(priorRows.filter((r) => r.bn !== activeBatch).map((r) => r.pk).filter(Boolean)));
+
+      // Generate the full hierarchy from the single cornerstone keyword.
+      const audience = [biz.uniqueValueProposition, biz.serviceArea].filter(Boolean).join(" | ") || (biz.industry ?? "general audience");
+      const { architecture, warnings } = await generateCornerstoneArchitecture({
+        cornerstoneKeyword: input.cornerstoneKeyword.trim(),
+        targetAudience: audience,
+        businessName: biz.name,
+        industry: biz.industry ?? undefined,
+        pillarCount: pillarNodes.length,
+        clustersPerPillar: maxClustersPerPillar,
+        avoidKeywords,
+      }, ctx.user.id);
+
+      // Map generated hierarchy → nodes. Collect (nodeId, keyword, title).
+      const assignments: Array<{ nodeId: number; keyword: string; title: string }> = [];
+      assignments.push({ nodeId: cornerstoneNode.id, keyword: architecture.cornerstone.keyword, title: architecture.cornerstone.title });
+      pillarNodes.forEach((pNode, pi) => {
+        const p = architecture.pillars[pi];
+        if (!p) return;
+        assignments.push({ nodeId: pNode.id, keyword: p.keyword, title: p.title });
+        const cNodes = clustersByPillar.get(pNode.id) ?? [];
+        cNodes.forEach((cNode, ci) => {
+          const c = p.clusters[ci];
+          if (c) assignments.push({ nodeId: cNode.id, keyword: c.keyword, title: c.title });
+        });
+      });
+
+      // Validate keywords against DataForSEO (MSV) where available.
+      const msvByKw = new Map<string, { msv: number | null; comp: "high" | "medium" | "low" | null }>();
+      if (process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
+        try {
+          const res = await getKeywordData(assignments.map((a) => a.keyword));
+          for (const r of res) msvByKw.set(r.keyword, { msv: r.monthlySearchVolume, comp: r.competitionLevel });
+        } catch (err) { console.warn("[assignFromCornerstone] MSV enrichment failed:", err); }
+      }
+
+      // Persist: replace this batch's keyword rows, set node slug + plannedTitle.
+      await db.delete(keywords).where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatch)));
+      const insertRows = assignments.map((a) => {
+        const e = msvByKw.get(a.keyword);
+        return {
+          articleNodeId: a.nodeId,
+          businessId: input.businessId,
+          batchNumber: activeBatch,
+          primaryKeyword: a.keyword,
+          monthlySearchVolume: e?.msv ?? null,
+          competitionLevel: e?.comp ?? null,
+          keywordApproved: false,
+          paaApproved: false,
+          cannibalizationWarning: false,
+        };
+      });
+      if (insertRows.length) await db.insert(keywords).values(insertRows);
+
+      for (const a of assignments) {
+        await db.update(articleNodes)
+          .set({ urlSlug: generateSlug(a.keyword), plannedTitle: a.title })
+          .where(eq(articleNodes.id, a.nodeId));
+      }
+
+      return { assigned: assignments.length, warnings, lowVolume: assignments.filter((a) => (msvByKw.get(a.keyword)?.msv ?? 0) === 0).map((a) => a.keyword) };
     }),
 
   // -------------------------------------------------------------------------

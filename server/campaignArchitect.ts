@@ -122,3 +122,137 @@ export async function generateCampaignMatrix(
     : [];
   return { matrix, warnings };
 }
+
+// ===========================================================================
+// FULL CORNERSTONE ARCHITECTURE (hub-and-spoke, one keyword → whole hierarchy)
+// User provides ONLY the cornerstone (head) keyword. The AI expands it into the
+// full 1 cornerstone → N pillars → M clusters/pillar hierarchy with titles,
+// following strict SEO rules (distinct intent at every level, no cannibalization,
+// avoid keywords already used in earlier batches).
+// ===========================================================================
+
+export interface CornerstoneArchInput {
+  cornerstoneKeyword: string;
+  targetAudience: string;
+  businessName: string;
+  industry?: string;
+  pillarCount: number;          // fixed shape = 3
+  clustersPerPillar: number;    // 3–5
+  /** Keywords already used in earlier batches — must NOT be reused. */
+  avoidKeywords?: string[];
+}
+
+export interface ArchPillar {
+  keyword: string;
+  title: string;
+  clusters: Array<{ keyword: string; title: string }>;
+}
+export interface CornerstoneArchitecture {
+  cornerstone: { keyword: string; title: string };
+  pillars: ArchPillar[];
+}
+
+/** Build the strict full-hierarchy prompt. Pure + testable. */
+export function buildCornerstoneArchitecturePrompt(input: CornerstoneArchInput): string {
+  const avoid = (input.avoidKeywords ?? []).filter(Boolean);
+  const avoidText = avoid.length
+    ? `\n\nDO NOT reuse or semantically overlap with any of these keywords already used in earlier content (they would cannibalize existing posts): ${avoid.join(", ")}.`
+    : "";
+  return `You are an expert SEO content architect. Build a complete Hub-and-Spoke topic cluster for the audience "${input.targetAudience}" for ${input.businessName}${input.industry ? ` (${input.industry})` : ""}.
+
+The CORNERSTONE (head) keyword is: "${input.cornerstoneKeyword}".
+
+Produce: 1 cornerstone, exactly ${input.pillarCount} pillars, and exactly ${input.clustersPerPillar} clusters per pillar.
+
+STRICT SEO RULES (each level targets a MORE SPECIFIC, DISTINCT search intent — no two pages may compete for the same query):
+- CORNERSTONE: keeps the head keyword "${input.cornerstoneKeyword}". Its title is a comprehensive, authoritative guide to the whole topic (it internally covers "what is" and "why" — so those must NOT be separate pillars).
+- PILLARS (${input.pillarCount}): each is a BROAD, DISTINCT SEGMENT of the cornerstone (e.g. for "brand architecture": models / strategy / application). Each pillar keyword is 2-4 words, broader than a cluster but narrower than the cornerstone. A pillar must be broad enough to support ${input.clustersPerPillar} distinct clusters beneath it. NEVER a definitional "what is X" or "why X" question. NEVER the cornerstone head term itself.
+- CLUSTERS (${input.clustersPerPillar} per pillar): highly specific, long-tail questions/scenarios that drill into their pillar — real searches the audience makes (3-6 words). Each MUST be completely distinct from every other cluster AND from every pillar (no cannibalization).
+- TITLES: every node gets a compelling, specific, click-worthy article title that a writer can 100% deliver on. The title is a promise — it must be concrete and answerable in one article. Titles may differ from the keyword but must contain/reflect it.${avoidText}
+
+Return ONLY valid JSON in exactly this shape (no markdown fences):
+{
+  "cornerstone": { "keyword": "${input.cornerstoneKeyword}", "title": "..." },
+  "pillars": [
+    { "keyword": "...", "title": "...", "clusters": [ { "keyword": "...", "title": "..." } ] }
+  ]
+}
+Exactly ${input.pillarCount} pillars, each with exactly ${input.clustersPerPillar} clusters.`;
+}
+
+/** Parse + validate the full-hierarchy JSON. Throws on invalid shape. Pure + testable. */
+export function parseCornerstoneArchitecture(
+  raw: string,
+  pillarCount: number,
+  clustersPerPillar: number,
+): CornerstoneArchitecture {
+  const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  const data = JSON.parse(stripped);
+  if (!data?.cornerstone || typeof data.cornerstone.keyword !== "string" || typeof data.cornerstone.title !== "string") {
+    throw new Error("Missing valid cornerstone { keyword, title }");
+  }
+  if (!Array.isArray(data.pillars) || data.pillars.length === 0) throw new Error("Missing pillars array");
+  const pillars: ArchPillar[] = data.pillars.map((p: any, i: number) => {
+    if (typeof p?.keyword !== "string" || typeof p?.title !== "string") throw new Error(`Pillar ${i} missing keyword/title`);
+    if (!Array.isArray(p.clusters)) throw new Error(`Pillar ${i} missing clusters`);
+    const clusters = p.clusters.map((c: any, j: number) => {
+      if (typeof c?.keyword !== "string" || typeof c?.title !== "string") throw new Error(`Cluster ${i}.${j} missing keyword/title`);
+      return { keyword: c.keyword.trim(), title: c.title.trim() };
+    });
+    return { keyword: p.keyword.trim(), title: p.title.trim(), clusters };
+  });
+  return { cornerstone: { keyword: data.cornerstone.keyword.trim(), title: data.cornerstone.title.trim() }, pillars };
+}
+
+/** Flatten all keywords in the hierarchy into cannibalization entries (index = position). */
+export function architectureConflicts(arch: CornerstoneArchitecture): string[] {
+  const entries: Array<{ nodeId: number; keyword: string }> = [];
+  let idx = 0;
+  entries.push({ nodeId: idx++, keyword: arch.cornerstone.keyword });
+  for (const p of arch.pillars) {
+    entries.push({ nodeId: idx++, keyword: p.keyword });
+    for (const c of p.clusters) entries.push({ nodeId: idx++, keyword: c.keyword });
+  }
+  const result = checkCannibalization(entries);
+  const byId = new Map(entries.map((e) => [e.nodeId, e.keyword]));
+  const conflicting = new Set<string>();
+  for (const c of result.conflicts) {
+    if (byId.has(c.nodeIdA)) conflicting.add(byId.get(c.nodeIdA)!);
+    if (byId.has(c.nodeIdB)) conflicting.add(byId.get(c.nodeIdB)!);
+  }
+  return Array.from(conflicting);
+}
+
+/** Generate the full hierarchy via one LLM call, then a cannibalization pass + one repair. */
+export async function generateCornerstoneArchitecture(
+  input: CornerstoneArchInput,
+  userId?: number | null,
+): Promise<{ architecture: CornerstoneArchitecture; warnings: string[] }> {
+  const callLLM = async (prompt: string): Promise<string> => {
+    const res = await invokeClaudeWithCost(
+      { messages: [{ role: "user", content: prompt }], response_format: { type: "json_object" }, max_tokens: 3000 },
+      { userId, feature: "keyword_research" },
+    );
+    const c = res.choices[0]?.message?.content;
+    return typeof c === "string" ? c : JSON.stringify(c);
+  };
+
+  let arch = parseCornerstoneArchitecture(
+    await callLLM(buildCornerstoneArchitecturePrompt(input)),
+    input.pillarCount, input.clustersPerPillar,
+  );
+  let conflicts = architectureConflicts(arch);
+
+  if (conflicts.length > 0) {
+    const fixPrompt = `${buildCornerstoneArchitecturePrompt(input)}\n\nThese keywords overlapped and cannibalize each other — regenerate the WHOLE hierarchy making every keyword completely distinct: ${conflicts.join(", ")}`;
+    try {
+      const retry = parseCornerstoneArchitecture(await callLLM(fixPrompt), input.pillarCount, input.clustersPerPillar);
+      if (architectureConflicts(retry).length < conflicts.length) { arch = retry; conflicts = architectureConflicts(retry); }
+    } catch { /* keep first */ }
+  }
+
+  const warnings = conflicts.length > 0
+    ? [`${conflicts.length} keyword(s) may still overlap: ${conflicts.join(", ")}. Review before generating.`]
+    : [];
+  return { architecture: arch, warnings };
+}

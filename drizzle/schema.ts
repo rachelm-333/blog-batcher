@@ -387,6 +387,12 @@ export const articleNodes = mysqlTable("article_nodes", {
    * so internal links can be inserted as real URLs, not placeholders.
    */
   urlSlug: varchar("urlSlug", { length: 512 }),
+  /**
+   * Approved article title (the "promise to the reader"), set on the AI-architecture
+   * review screen and approved BEFORE writing. Generation must deliver on this exact
+   * title. Null until an architecture with titles is generated/approved.
+   */
+  plannedTitle: varchar("plannedTitle", { length: 512 }),
   /** Display order within its level and parent. */
   sortOrder: int("sortOrder").default(0).notNull(),
   /**
