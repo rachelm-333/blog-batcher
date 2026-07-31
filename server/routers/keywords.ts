@@ -680,6 +680,7 @@ export const keywordsRouter = router({
           nodeSortOrder: articleNodes.sortOrder,
           nodeParentCornerstoneId: articleNodes.parentCornerstoneId,
           nodeParentPillarId: articleNodes.parentPillarId,
+          plannedTitle: articleNodes.plannedTitle,
         })
         .from(keywords)
         .innerJoin(articleNodes, eq(keywords.articleNodeId, articleNodes.id))
@@ -692,6 +693,21 @@ export const keywordsRouter = router({
         console.error("[keywords.getAll] Error:", err);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err instanceof Error ? err.message : "Failed to fetch keywords" });
       }
+    }),
+
+  // -------------------------------------------------------------------------
+  // keywords.updatePlannedTitle — edit the approved article title before writing.
+  // -------------------------------------------------------------------------
+  updatePlannedTitle: protectedProcedure
+    .input(z.object({ businessId: z.number(), articleNodeId: z.number(), title: z.string().min(3).max(512) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+      await db.update(articleNodes)
+        .set({ plannedTitle: input.title.trim() })
+        .where(and(eq(articleNodes.id, input.articleNodeId), eq(articleNodes.businessId, input.businessId)));
+      return { success: true };
     }),
 
   // -------------------------------------------------------------------------

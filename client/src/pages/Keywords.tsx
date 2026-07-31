@@ -407,6 +407,26 @@ export default function Keywords() {
     },
     onError: (err) => toast.error(err.message, { description: "Check your DataForSEO credentials in Settings.", duration: 8000 }),
   });
+
+  // AI-first: build the whole hierarchy from a single cornerstone keyword.
+  const [cornerstoneKw, setCornerstoneKw] = useState("");
+  const assignFromCornerstone = trpc.keywords.assignFromCornerstone.useMutation({
+    onSuccess: async (r) => {
+      toast.success(
+        `AI built your architecture — ${r.assigned} slots filled.` +
+        (r.lowVolume?.length ? ` ${r.lowVolume.length} low-volume keyword(s) flagged to review.` : ""),
+        { duration: 8000 },
+      );
+      if (r.warnings?.length) toast.warning(r.warnings.join(" "), { duration: 10000 });
+      await utils.keywords.getAll.invalidate({ businessId });
+      setSubStage("keyword-review");
+    },
+    onError: (err) => toast.error(err.message, { duration: 8000 }),
+  });
+  const updatePlannedTitle = trpc.keywords.updatePlannedTitle.useMutation({
+    onSuccess: async () => { await refetchKw(); toast.success("Title updated"); },
+    onError: (e) => toast.error(e.message),
+  });
   const approveOne = trpc.keywords.approveOne.useMutation({
     onSuccess: async () => { await refetchKw(); },
     onError: (err) => toast.error(err.message),
@@ -502,6 +522,41 @@ export default function Keywords() {
   /* ── Assign sub-stage ── */
   const renderAssign = () => (
     <div style={{ maxWidth:600 }}>
+      {/* AI-first: build the whole hierarchy from one cornerstone keyword */}
+      <div style={{ background:"#fff", border:"2px solid #6e5afe", borderRadius:12, padding:28, marginBottom:20 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:"#ede9ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <Sparkles style={{ width:18, height:18, color:"#6e5afe" }} />
+          </div>
+          <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Build from a cornerstone keyword (AI)</h2>
+        </div>
+        <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:16 }}>
+          Enter your <strong>primary cornerstone keyword</strong> — the AI builds the full structure: cornerstone,
+          3 pillars (broad segments), and specific clusters, each with a keyword and an article title.
+          Keywords are validated against real search volume, and it avoids anything used in earlier batches.
+          You review and edit every keyword and title before writing begins.
+        </p>
+        <input
+          type="text"
+          value={cornerstoneKw}
+          onChange={(e) => setCornerstoneKw(e.target.value)}
+          placeholder="e.g. brand architecture"
+          style={{ width:"100%", boxSizing:"border-box", fontSize:14, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, marginBottom:12 }}
+          onKeyDown={(e) => { if (e.key === "Enter" && cornerstoneKw.trim().length >= 2) assignFromCornerstone.mutate({ businessId, cornerstoneKeyword: cornerstoneKw.trim() }); }}
+        />
+        <button
+          className="btn-primary"
+          onClick={() => assignFromCornerstone.mutate({ businessId, cornerstoneKeyword: cornerstoneKw.trim() })}
+          disabled={assignFromCornerstone.isPending || cornerstoneKw.trim().length < 2}
+        >
+          {assignFromCornerstone.isPending
+            ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Building architecture…</>
+            : <><Sparkles style={{ width:14, height:14 }} /> Generate architecture with AI</>}
+        </button>
+      </div>
+
+      <div style={{ textAlign:"center", fontSize:12, color:"#9ca3af", margin:"0 0 20px" }}>— or assign from your saved keywords —</div>
+
       <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:28 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:"#ede9ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -722,12 +777,23 @@ export default function Keywords() {
                 return (
                 <tr key={kw.id} style={{ borderBottom:"1px solid #f3f4f6", background: isConflict ? "#fffbeb" : "transparent" }}>
                   <td style={{ padding:"12px 16px" }}><LevelBadge level={kw.nodeLevel} /></td>
-                  <td style={{ padding:"12px 16px" }}>
+                  <td style={{ padding:"12px 16px", minWidth:240 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                       {isConflict && <AlertTriangle style={{ width:13, height:13, color:"#d97706", flexShrink:0 }} />}
-                      <span style={{ fontSize:13, fontWeight:500, color:"#1a1a2e" }}>
-                        {kwData ? deriveNodeLabel(kwData, kw) : "—"}
-                      </span>
+                      <input
+                        type="text"
+                        defaultValue={(kw as { plannedTitle?: string | null }).plannedTitle ?? ""}
+                        placeholder={kwData ? deriveNodeLabel(kwData, kw) : "Article title…"}
+                        title="Approved article title — the writer must deliver on this. Click to edit."
+                        style={{ fontSize:13, fontWeight:500, color:"#1a1a2e", width:"100%", border:"1px solid transparent", borderRadius:6, padding:"4px 6px", background:"transparent" }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#fff"; }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.background = "transparent";
+                          const v = e.currentTarget.value.trim();
+                          const current = ((kw as { plannedTitle?: string | null }).plannedTitle ?? "").trim();
+                          if (v && v !== current) updatePlannedTitle.mutate({ businessId, articleNodeId: kw.articleNodeId, title: v });
+                        }}
+                      />
                     </div>
                   </td>
                   <td style={{ padding:"12px 16px" }}>
