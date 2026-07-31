@@ -94,6 +94,15 @@ A frontend race in the Review editor could save one article's SEO fields (slug/k
 - **Blog posts are stored indefinitely** — no TTL/auto-delete. Removed only by reset (`resetBlogs`), business deletion (requires zero articles), or architecture regeneration (rebuilds a batch). Starting a new batch preserves old batches.
 - ⚠️ **BILLING NOT ENFORCED (launch blocker).** Generation is *gated* on having ≥1 credit (or an unused free trial), but no code path actually **deducts** a credit on generation/regeneration — the only balance mutations are the Stripe webhook (add on purchase), admin add/remove, and the one-time `freeTrialUsed` flag. So a paid account with ≥1 credit can generate unlimited batches/businesses free. Decide the model (per-article vs per-batch vs per-action; confirmed per-account) and implement deduction before charging customers. Prices in `server/stripe/products.ts` are PLACEHOLDERS ("confirm before launch").
 
+## 5d. AI cornerstone-first architecture (new)
+
+User enters ONE cornerstone keyword → AI builds the whole hub-and-spoke hierarchy (cornerstone + 3 pillar *segments* + distinct long-tail clusters) with **titles**, validated against DataForSEO (MSV) and avoiding earlier batches' keywords (cross-batch cannibalization guard). The user then reviews/edits every keyword **and title** before writing.
+- Engine: `server/campaignArchitect.ts` — `buildCornerstoneArchitecturePrompt` / `parseCornerstoneArchitecture` / `architectureConflicts` / `generateCornerstoneArchitecture` (9 tests in `server/cornerstoneArchitecture.test.ts`).
+- Persistence/API: `keywords.assignFromCornerstone` (generate + validate + persist), `keywords.updatePlannedTitle`, `keywords.getAll` returns `plannedTitle`.
+- **Approved title is a contract:** generation reads `articleNodes.plannedTitle`, uses it verbatim as the H1/title, and is instructed to fully deliver on it; it never rewrites an approved title.
+- UI: Keywords stage "Build from a cornerstone keyword (AI)" card + editable Article Title column in the review table.
+- ⚠️ **Requires a DB migration** — adds `article_nodes.plannedTitle`. Run `pnpm db:push` on the host once after deploying (or `ALTER TABLE article_nodes ADD COLUMN plannedTitle VARCHAR(512) NULL;`).
+
 ## 6. Workflow rule
 
 Fixes go through code review + tests, then push to GitHub; the runner **pulls** — it must not edit code (two editors on one repo caused hours of divergence). If a dev-tool popup offers "Fix it / Fix All," don't use it on the running instance.
