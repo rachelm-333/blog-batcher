@@ -77,7 +77,7 @@ Output ONLY valid JSON, no code fences:
           { role: "system", content: "You are an expert SEO copywriter. Output only the requested JSON." },
           { role: "user", content: prompt },
         ], max_tokens: 400 },
-        { userId: r.userId ?? undefined, feature: "meta_regeneration" }
+        { userId: r.userId ?? undefined, feature: "seo_analysis" }
       );
       content = res.choices?.[0]?.message?.content ?? "";
     } catch (e) {
