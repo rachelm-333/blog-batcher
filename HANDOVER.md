@@ -87,6 +87,13 @@ Only operational tools remain (spent one-off diagnostics were removed):
 
 A frontend race in the Review editor could save one article's SEO fields (slug/keyword/meta) onto another when switching articles quickly — it had duplicated `brand-strategist` slug + focus keyword across 3 posts. Fixed two ways: (1) `handleSaveDraft`/`handleApprove` now only save when `fullArticle.id === selectedItem.id` (commit c7a1187); (2) `scripts/repairSeoMeta.ts` resyncs any article's slug/keyword from its node (source of truth) and rebuilds meta — dry-run by default, `--confirm` to apply. Node keywords and generation were never wrong. Verify with `scripts/dumpSeo.ts`.
 
+## 5c. Billing & multi-business (launch decisions)
+
+- **Multiple businesses per account are supported and unlimited** — "Add new business" in the sidebar; each business has its own profile, architecture, keywords, articles, batches, CMS integration and schedule. No cap in code.
+- **Credits are PER ACCOUNT (per user), NOT per business.** The `credits` table is keyed by `userId`, so one balance is shared across ALL of a user's businesses. This is now stated in the UI (sidebar credit box + Billing page). Creating a business is free.
+- **Blog posts are stored indefinitely** — no TTL/auto-delete. Removed only by reset (`resetBlogs`), business deletion (requires zero articles), or architecture regeneration (rebuilds a batch). Starting a new batch preserves old batches.
+- ⚠️ **BILLING NOT ENFORCED (launch blocker).** Generation is *gated* on having ≥1 credit (or an unused free trial), but no code path actually **deducts** a credit on generation/regeneration — the only balance mutations are the Stripe webhook (add on purchase), admin add/remove, and the one-time `freeTrialUsed` flag. So a paid account with ≥1 credit can generate unlimited batches/businesses free. Decide the model (per-article vs per-batch vs per-action; confirmed per-account) and implement deduction before charging customers. Prices in `server/stripe/products.ts` are PLACEHOLDERS ("confirm before launch").
+
 ## 6. Workflow rule
 
 Fixes go through code review + tests, then push to GitHub; the runner **pulls** — it must not edit code (two editors on one repo caused hours of divergence). If a dev-tool popup offers "Fix it / Fix All," don't use it on the running instance.

@@ -173,6 +173,9 @@ export default function Billing() {
           <p className="text-muted-foreground mt-1">
             Purchase article packs or top up your credits. All prices in AUD, GST collected at checkout.
           </p>
+          <p className="text-muted-foreground text-sm mt-1">
+            Credits are held at the account level and are <strong>shared across all your businesses</strong>.
+          </p>
         </div>
 
         {/* Pricing cards */}

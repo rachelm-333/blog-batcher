@@ -400,6 +400,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             <div className="text-sm font-bold mt-0.5" style={{ color: "#1a1a2e" }}>
               {credits} <span className="font-normal text-xs" style={{ color: "#9ca3af" }}>credits</span>
             </div>
+            <div className="text-[10px] mt-0.5" style={{ color: "#9ca3af" }}>
+              Shared across all your businesses
+            </div>
             <button
               onClick={() => setLocation("/billing")}
               className="btn-lime mt-2 w-full text-center text-xs py-1.5 rounded-md font-semibold"
