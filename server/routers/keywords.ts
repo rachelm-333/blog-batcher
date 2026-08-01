@@ -293,6 +293,11 @@ export const keywordsRouter = router({
 
       // Delete any existing keyword rows for this batch (re-assign)
       await db.delete(keywords).where(and(eq(keywords.businessId, input.businessId), eq(keywords.batchNumber, activeBatch)));
+      // Clear any stale planned titles — re-assigning changes each slot's keyword,
+      // so old approved titles no longer match and must be re-proposed on the
+      // Content Plan step to align with the new keywords.
+      await db.update(articleNodes).set({ plannedTitle: null })
+        .where(and(eq(articleNodes.businessId, input.businessId), eq(articleNodes.batchNumber, activeBatch)));
 
       const exclusions = biz.keywordExclusions
         ? biz.keywordExclusions.split(",").map((s) => s.trim()).filter(Boolean)
