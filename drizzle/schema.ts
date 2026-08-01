@@ -148,6 +148,14 @@ export const businesses = mysqlTable("businesses", {
   currentStage: int("currentStage").default(1).notNull(),
   /** The currently active batch number. Increments each time the user starts a new batch. */
   activeBatch: int("activeBatch").default(1).notNull(),
+  /**
+   * The purpose/goal for the CURRENT batch of blog posts (e.g. "educate readers on
+   * what brand architecture is, how to use it in marketing, and why"). Set on the
+   * Content Plan step and used to keep the batch's topics, titles, and writing
+   * aligned to one cohesive, SEO-optimised campaign. Cleared when a new batch starts.
+   * Optional — when empty, generation behaves exactly as before.
+   */
+  batchPurpose: text("batchPurpose"),
   /** True if this business is a test business created by admin (excluded from billing). */
   isTestBusiness: boolean("isTestBusiness").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

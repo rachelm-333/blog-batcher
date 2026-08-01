@@ -14,7 +14,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useActiveBusiness } from "@/contexts/BusinessContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import StageStepper from "@/components/StageStepper";
-import { Loader2, ArrowRight, Zap, BarChart2, AlertTriangle } from "lucide-react";
+import { Loader2, ArrowRight, Zap, BarChart2, AlertTriangle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 /* ─── Level badge ────────────────────────────────────────── */
@@ -319,6 +319,32 @@ export default function ContentPlan() {
     },
   });
 
+  // Batch purpose — the shared goal that keeps this batch's titles + writing aligned.
+  const [purpose, setPurpose] = useState("");
+  const purposeQuery = trpc.business.getBatchPurpose.useQuery(
+    { businessId },
+    { enabled: !!businessId },
+  );
+  useEffect(() => {
+    if (purposeQuery.data?.batchPurpose !== undefined) setPurpose(purposeQuery.data.batchPurpose);
+  }, [purposeQuery.data?.batchPurpose]);
+  const setPurposeMutation = trpc.business.setBatchPurpose.useMutation();
+  const [applyingPurpose, setApplyingPurpose] = useState(false);
+  const handleApplyPurpose = useCallback(async () => {
+    if (!businessId) return;
+    setApplyingPurpose(true);
+    try {
+      await setPurposeMutation.mutateAsync({ businessId, purpose });
+      // Re-propose titles so they reflect the goal.
+      await generatePlanMutation.mutateAsync({ businessId });
+      toast.success("Batch purpose saved — titles refreshed to match your goal.");
+    } catch (err) {
+      toast.error("Could not apply purpose: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setApplyingPurpose(false);
+    }
+  }, [businessId, purpose, setPurposeMutation, generatePlanMutation]);
+
   // Auto-generate plan when businessId is available
   useEffect(() => {
     if (!businessId || planItems !== null || generatePlanMutation.isPending) return;
@@ -420,6 +446,39 @@ export default function ContentPlan() {
                   : <><Zap style={{ width:14, height:14 }} /> Start generating <ArrowRight style={{ width:14, height:14 }} /></>
                 }
               </button>
+            </div>
+          </div>
+
+          {/* Batch purpose — the shared goal that keeps this batch cohesive + SEO-aligned */}
+          <div style={{ background:"#fff", border:"2px solid #6e5afe", borderRadius:12, padding:"18px 20px", marginBottom:24 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+              <Sparkles style={{ width:16, height:16, color:"#6e5afe" }} />
+              <h2 style={{ fontSize:15, fontWeight:700, color:"#1a1a2e", margin:0 }}>Purpose of this blog batch</h2>
+            </div>
+            <p style={{ fontSize:12.5, color:"#6b7280", margin:"0 0 10px", lineHeight:1.5 }}>
+              What should this whole set of posts achieve? This keeps every article on-topic and working together toward
+              one goal — and directs the titles and writing to rank for it. e.g. <em>"Educate our audience on what brand
+              architecture is, how to use it in their marketing, and why it matters."</em>
+            </p>
+            <textarea
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              placeholder="Describe the goal of this batch of blog posts…"
+              rows={3}
+              style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5 }}
+            />
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:10 }}>
+              <button
+                className="btn-primary"
+                onClick={handleApplyPurpose}
+                disabled={applyingPurpose || purpose.trim().length < 5}
+                style={{ display:"flex", alignItems:"center", gap:6 }}
+              >
+                {applyingPurpose
+                  ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Applying & refreshing titles…</>
+                  : <><Sparkles style={{ width:14, height:14 }} /> Save purpose & refresh titles</>}
+              </button>
+              <span style={{ fontSize:11.5, color:"#9ca3af" }}>Refreshes the proposed titles to match your goal. You can still edit each one below.</span>
             </div>
           </div>
 

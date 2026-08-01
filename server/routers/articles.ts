@@ -2189,11 +2189,15 @@ ${row.bodyHtml ?? ""}
           customerSituationBefore: businesses.customerSituationBefore,
           customerFrustrations: businesses.customerFrustrations,
           customerTransformation: businesses.customerTransformation,
+          batchPurpose: businesses.batchPurpose,
         })
         .from(businesses)
         .where(eq(businesses.id, input.businessId))
         .limit(1);
       if (!bizRow) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
+      const purposeBlock = bizRow.batchPurpose && bizRow.batchPurpose.trim()
+        ? `\n\nBATCH GOAL (the shared purpose of this whole set of blog posts — every article must advance it and they must work together as one cohesive, SEO-optimised campaign):\n"${bizRow.batchPurpose.trim()}"\nThe proposed title MUST serve this goal and stay within the business's industry.`
+        : "";
 
       // Fetch approved article nodes with their assigned keywords
       const nodes = await db
@@ -2214,7 +2218,7 @@ ${row.bodyHtml ?? ""}
       const results = await Promise.all(
         nodes.map(async (node) => {
           const kw = node.primaryKeyword ?? "(no keyword assigned)";
-          const prompt = `You are planning a blog post for ${bizRow.name ?? "a business"}, a ${bizRow.industry ?? "business"} business.\n\nCustomer context:\n- Problem before finding this business: ${bizRow.customerSituationBefore ?? "Not specified"}\n- Frustrations: ${bizRow.customerFrustrations ?? "Not specified"}\n- Transformation after: ${bizRow.customerTransformation ?? "Not specified"}\n\nArticle details:\n- Level: ${node.level}\n- Focus keyword: ${kw}\n- Article type: ${node.articleType}\n\nGenerate a content plan for this article. Return JSON with exactly these fields:\n{\n  "proposedTitle": "a specific, compelling article title using the focus keyword",\n  "angle": "one sentence describing the specific problem or question this article addresses for the reader",\n  "keySection": "the one section heading that will be most valuable to the reader"\n}\n\nRules:\n- The proposedTitle must include the focus keyword\n- The angle must connect to the customer problem above - not a generic description\n- Be specific - not 'this article covers X' but 'readers who are struggling with X will learn Y'`;
+          const prompt = `You are planning a blog post for ${bizRow.name ?? "a business"}, a ${bizRow.industry ?? "business"} business.${purposeBlock}\n\nCustomer context:\n- Problem before finding this business: ${bizRow.customerSituationBefore ?? "Not specified"}\n- Frustrations: ${bizRow.customerFrustrations ?? "Not specified"}\n- Transformation after: ${bizRow.customerTransformation ?? "Not specified"}\n\nArticle details:\n- Level: ${node.level}\n- Focus keyword: ${kw}\n- Article type: ${node.articleType}\n\nGenerate a content plan for this article. Return JSON with exactly these fields:\n{\n  "proposedTitle": "a specific, compelling article title using the focus keyword",\n  "angle": "one sentence describing the specific problem or question this article addresses for the reader",\n  "keySection": "the one section heading that will be most valuable to the reader"\n}\n\nRules:\n- The proposedTitle must include the focus keyword\n- The angle must connect to the customer problem above - not a generic description\n- Be specific - not 'this article covers X' but 'readers who are struggling with X will learn Y'`;
           try {
             const resp = await invokeLLMWithCost(
               {
@@ -2305,6 +2309,10 @@ ${row.bodyHtml ?? ""}
       const updatePayload: Record<string, any> = {};
       if (input.direction !== undefined) {
         updatePayload.contentPlanDirection = input.direction.trim() || null;
+      }
+      // Persist the approved title so generation honors it (was previously discarded).
+      if (input.proposedTitle !== undefined) {
+        updatePayload.plannedTitle = input.proposedTitle.trim() || null;
       }
       if (Object.keys(updatePayload).length > 0) {
         await db.update(articleNodes).set(updatePayload).where(eq(articleNodes.id, input.nodeId));

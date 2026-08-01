@@ -912,6 +912,8 @@ export interface ArticleContext {
   contentPlanDirection?: string;
   /** Approved title the article MUST deliver on (from the AI-architecture review). */
   plannedTitle?: string;
+  /** Batch-wide goal — every article serves it so the set works together (optional). */
+  batchPurpose?: string;
   linkedinUrl?: string;
   facebookUrl?: string;
   instagramHandle?: string;
@@ -1035,6 +1037,7 @@ export async function buildArticleContext(
     customerTransformation: biz.customerTransformation ?? undefined,
     contentPlanDirection: node.contentPlanDirection ?? undefined,
     plannedTitle: node.plannedTitle ?? undefined,
+    batchPurpose: biz.batchPurpose ?? undefined,
     linkedinUrl: biz.linkedinUrl ?? undefined,
     facebookUrl: biz.facebookUrl ?? undefined,
     instagramHandle: biz.instagramHandle ?? undefined,
@@ -1742,6 +1745,10 @@ WRITING RULES BASED ON THIS INTELLIGENCE:
 - Use the frustrations (field 2) when writing any section about common mistakes or what to avoid
 - Use the transformation (field 3) in the conclusion and CTA
 - Pull specific words and phrases from these answers where they fit naturally
+` : ""}${ctx.batchPurpose ? `
+BATCH GOAL (this article is one of a connected set — all posts share this purpose and must work together as a single, cohesive, SEO-optimised campaign):
+"${ctx.batchPurpose}"
+Serve this goal directly. Stay within the business's industry. Reinforce and cross-support the other posts in the set (link to them where relevant) rather than drifting to unrelated topics.
 ` : ""}${ctx.plannedTitle ? `
 MANDATORY ARTICLE TITLE (APPROVED — DO NOT CHANGE):
 This article's title has been approved and is a PROMISE TO THE READER. You MUST:

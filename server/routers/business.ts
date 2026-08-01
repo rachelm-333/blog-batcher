@@ -808,6 +808,7 @@ Rules:
         .set({
           activeBatch: newBatch,
           currentStage: 2, // Skip Stage 1 (profile already done), go straight to Architecture
+          batchPurpose: null, // each new batch sets its own goal
         })
         .where(eq(businesses.id, input.businessId));
 
@@ -817,6 +818,30 @@ Rules:
   // -------------------------------------------------------------------------
   // BATCH NAVIGATION — list batches + switch the active (viewed) batch
   // -------------------------------------------------------------------------
+
+  /** Get the current batch's purpose/goal (drives cohesive, on-goal generation). */
+  getBatchPurpose: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertOwnership(ctx.user.id, input.businessId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [row] = await db.select({ batchPurpose: businesses.batchPurpose })
+        .from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
+      return { batchPurpose: row?.batchPurpose ?? "" };
+    }),
+
+  /** Set the current batch's purpose/goal. */
+  setBatchPurpose: protectedProcedure
+    .input(z.object({ businessId: z.number(), purpose: z.string().max(2000) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOwnership(ctx.user.id, input.businessId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await db.update(businesses).set({ batchPurpose: input.purpose.trim() || null })
+        .where(eq(businesses.id, input.businessId));
+      return { success: true };
+    }),
 
   /** Returns the current active batch and how many batches exist, so the UI can
    * offer a batch switcher (batches are numbered 1..maxBatch). */
