@@ -22,7 +22,20 @@ describe("buildCornerstoneArchitecturePrompt", () => {
     expect(p).toContain("exactly 3 pillars");
     expect(p).toContain("3 clusters per pillar");
     expect(p).toMatch(/BROAD, DISTINCT SEGMENT/i);
-    expect(p).toMatch(/NEVER a definitional/i);
+    expect(p).toMatch(/what is X/i);
+  });
+  it("grounds the prompt in industry, services, and batch purpose", () => {
+    const p = buildCornerstoneArchitecturePrompt({
+      ...input,
+      services: ["brand strategy", "logo design"],
+      businessDescription: "we build brands",
+      batchPurpose: "educate on brand architecture",
+    });
+    expect(p).toContain("marketing"); // industry present
+    expect(p).toContain("brand strategy, logo design");
+    expect(p).toContain("educate on brand architecture");
+    expect(p).toMatch(/stay strictly within/i);
+    expect(p).toMatch(/secondary\/LSI keywords/i);
   });
   it("includes the cross-batch avoid list", () => {
     const p = buildCornerstoneArchitecturePrompt(input);

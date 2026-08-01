@@ -136,48 +136,78 @@ export interface CornerstoneArchInput {
   targetAudience: string;
   businessName: string;
   industry?: string;
+  /** The business's real services — hard grounding so topics can't drift off-industry. */
+  services?: string[];
+  /** Short business description / value proposition for extra grounding. */
+  businessDescription?: string;
+  /** The batch goal — every node must serve it (cohesion + on-topic guardrail). */
+  batchPurpose?: string;
   pillarCount: number;          // fixed shape = 3
   clustersPerPillar: number;    // 3–5
+  /** Secondary/LSI keywords to generate per node (default 4). */
+  secondaryPerNode?: number;
   /** Keywords already used in earlier batches — must NOT be reused. */
   avoidKeywords?: string[];
 }
 
-export interface ArchPillar {
+export interface ArchNode {
   keyword: string;
   title: string;
-  clusters: Array<{ keyword: string; title: string }>;
+  /** 3–5 semantically-related secondary/LSI keywords the article weaves in. */
+  secondaryKeywords: string[];
+}
+export interface ArchPillar extends ArchNode {
+  clusters: ArchNode[];
 }
 export interface CornerstoneArchitecture {
-  cornerstone: { keyword: string; title: string };
+  cornerstone: ArchNode;
   pillars: ArchPillar[];
 }
 
-/** Build the strict full-hierarchy prompt. Pure + testable. */
+/** Build the strict, GROUNDED full-hierarchy prompt. Pure + testable. */
 export function buildCornerstoneArchitecturePrompt(input: CornerstoneArchInput): string {
   const avoid = (input.avoidKeywords ?? []).filter(Boolean);
   const avoidText = avoid.length
-    ? `\n\nDO NOT reuse or semantically overlap with any of these keywords already used in earlier content (they would cannibalize existing posts): ${avoid.join(", ")}.`
+    ? `\n- DO NOT reuse or semantically overlap with any of these keywords already used in earlier content (they would cannibalize existing posts): ${avoid.join(", ")}.`
     : "";
-  return `You are an expert SEO content architect. Build a complete Hub-and-Spoke topic cluster for the audience "${input.targetAudience}" for ${input.businessName}${input.industry ? ` (${input.industry})` : ""}.
+  const secondaryN = input.secondaryPerNode ?? 4;
+  const services = (input.services ?? []).filter(Boolean);
+  const grounding = [
+    input.industry ? `Industry: ${input.industry}` : "",
+    services.length ? `Services offered: ${services.join(", ")}` : "",
+    input.businessDescription ? `About the business: ${input.businessDescription}` : "",
+    input.batchPurpose ? `GOAL OF THIS BATCH (every article must serve this): ${input.batchPurpose}` : "",
+  ].filter(Boolean).join("\n");
+
+  return `You are an expert SEO content architect. Build a complete Hub-and-Spoke topic cluster for ${input.businessName}, whose audience is "${input.targetAudience}".
+
+BUSINESS GROUNDING (you MUST stay strictly within this — do NOT drift to unrelated topics like generic "portfolios", "templates", or anything outside this business's world):
+${grounding || "(no extra grounding provided)"}
 
 The CORNERSTONE (head) keyword is: "${input.cornerstoneKeyword}".
 
-Produce: 1 cornerstone, exactly ${input.pillarCount} pillars, and exactly ${input.clustersPerPillar} clusters per pillar.
+Produce: 1 cornerstone, exactly ${input.pillarCount} pillars, and exactly ${input.clustersPerPillar} clusters per pillar. EVERYTHING must be a coherent sub-topic that builds off the cornerstone "${input.cornerstoneKeyword}" — a reader should see the whole set as one connected body of work on that topic.
 
 STRICT SEO RULES (each level targets a MORE SPECIFIC, DISTINCT search intent — no two pages may compete for the same query):
-- CORNERSTONE: keeps the head keyword "${input.cornerstoneKeyword}". Its title is a comprehensive, authoritative guide to the whole topic (it internally covers "what is" and "why" — so those must NOT be separate pillars).
-- PILLARS (${input.pillarCount}): each is a BROAD, DISTINCT SEGMENT of the cornerstone (e.g. for "brand architecture": models / strategy / application). Each pillar keyword is 2-4 words, broader than a cluster but narrower than the cornerstone. A pillar must be broad enough to support ${input.clustersPerPillar} distinct clusters beneath it. NEVER a definitional "what is X" or "why X" question. NEVER the cornerstone head term itself.
-- CLUSTERS (${input.clustersPerPillar} per pillar): highly specific, long-tail questions/scenarios that drill into their pillar — real searches the audience makes (3-6 words). Each MUST be completely distinct from every other cluster AND from every pillar (no cannibalization).
-- TITLES: every node gets a compelling, specific, click-worthy article title that a writer can 100% deliver on. The title is a promise — it must be concrete and answerable in one article. Titles may differ from the keyword but must contain/reflect it.${avoidText}
+- CORNERSTONE: keeps the head keyword "${input.cornerstoneKeyword}". Comprehensive authoritative guide (it internally covers "what is" and "why" — so those must NOT be separate pillars).
+- PILLARS (${input.pillarCount}): each a BROAD, DISTINCT SEGMENT *of the cornerstone* (e.g. for "brand architecture": models / strategy / application). 2-4 words, broad enough to support ${input.clustersPerPillar} clusters. NEVER a "what is X"/"why X" question. NEVER the cornerstone term itself. Must clearly be a part of the cornerstone topic.
+- CLUSTERS (${input.clustersPerPillar} per pillar): highly specific, long-tail questions/scenarios drilling into their pillar (3-6 words, real searches). Each completely distinct from every other cluster and pillar.
+- SECONDARY KEYWORDS: for EVERY node, provide ${secondaryN} secondary/LSI keywords — semantically-related supporting terms the article will weave in for topical depth (NOT duplicates of the node's own keyword or other nodes' primary keywords).
+- TITLES: every node gets a compelling, specific, click-worthy title a writer can 100% deliver on. Concrete, answerable in one article, contains/reflects the keyword.${avoidText}
 
 Return ONLY valid JSON in exactly this shape (no markdown fences):
 {
-  "cornerstone": { "keyword": "${input.cornerstoneKeyword}", "title": "..." },
+  "cornerstone": { "keyword": "${input.cornerstoneKeyword}", "title": "...", "secondaryKeywords": ["...", "..."] },
   "pillars": [
-    { "keyword": "...", "title": "...", "clusters": [ { "keyword": "...", "title": "..." } ] }
+    { "keyword": "...", "title": "...", "secondaryKeywords": ["..."], "clusters": [ { "keyword": "...", "title": "...", "secondaryKeywords": ["..."] } ] }
   ]
 }
-Exactly ${input.pillarCount} pillars, each with exactly ${input.clustersPerPillar} clusters.`;
+Exactly ${input.pillarCount} pillars, each with exactly ${input.clustersPerPillar} clusters, and ${secondaryN} secondaryKeywords on every node.`;
+}
+
+function parseSecondary(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === "string").map((s) => s.trim()).filter(Boolean).slice(0, 8);
 }
 
 /** Parse + validate the full-hierarchy JSON. Throws on invalid shape. Pure + testable. */
@@ -195,13 +225,16 @@ export function parseCornerstoneArchitecture(
   const pillars: ArchPillar[] = data.pillars.map((p: any, i: number) => {
     if (typeof p?.keyword !== "string" || typeof p?.title !== "string") throw new Error(`Pillar ${i} missing keyword/title`);
     if (!Array.isArray(p.clusters)) throw new Error(`Pillar ${i} missing clusters`);
-    const clusters = p.clusters.map((c: any, j: number) => {
+    const clusters: ArchNode[] = p.clusters.map((c: any, j: number) => {
       if (typeof c?.keyword !== "string" || typeof c?.title !== "string") throw new Error(`Cluster ${i}.${j} missing keyword/title`);
-      return { keyword: c.keyword.trim(), title: c.title.trim() };
+      return { keyword: c.keyword.trim(), title: c.title.trim(), secondaryKeywords: parseSecondary(c.secondaryKeywords) };
     });
-    return { keyword: p.keyword.trim(), title: p.title.trim(), clusters };
+    return { keyword: p.keyword.trim(), title: p.title.trim(), secondaryKeywords: parseSecondary(p.secondaryKeywords), clusters };
   });
-  return { cornerstone: { keyword: data.cornerstone.keyword.trim(), title: data.cornerstone.title.trim() }, pillars };
+  return {
+    cornerstone: { keyword: data.cornerstone.keyword.trim(), title: data.cornerstone.title.trim(), secondaryKeywords: parseSecondary(data.cornerstone.secondaryKeywords) },
+    pillars,
+  };
 }
 
 /** Flatten all keywords in the hierarchy into cannibalization entries (index = position). */

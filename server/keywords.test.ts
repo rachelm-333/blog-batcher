@@ -422,7 +422,12 @@ describe("keywords.assignAll", () => {
             { id: 3, level: "cluster", articleType: "specialist_post", sortOrder: 2 },
           ]),
         })
-        // 5th call: business services — .from().where().orderBy() resolves directly
+        // 5th call: prior-batch keywords (cross-batch guard) — .from().where() resolves directly (none)
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockResolvedValue([]),
+        })
+        // 6th call: business services — .from().where().orderBy() resolves directly
         .mockReturnValueOnce({
           from: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),

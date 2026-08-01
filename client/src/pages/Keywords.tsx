@@ -408,6 +408,33 @@ export default function Keywords() {
     onError: (err) => toast.error(err.message, { description: "Check your DataForSEO credentials in Settings.", duration: 8000 }),
   });
 
+  // ── Grounded AI hub: one cornerstone keyword + batch purpose → whole hierarchy ──
+  const [cornerstoneKw, setCornerstoneKw] = useState("");
+  const [batchPurpose, setBatchPurpose] = useState("");
+  const purposeQuery = trpc.business.getBatchPurpose.useQuery({ businessId }, { enabled: !!businessId });
+  useEffect(() => { if (purposeQuery.data?.batchPurpose !== undefined) setBatchPurpose(purposeQuery.data.batchPurpose); }, [purposeQuery.data?.batchPurpose]);
+  const setPurposeMut = trpc.business.setBatchPurpose.useMutation();
+  const assignFromCornerstone = trpc.keywords.assignFromCornerstone.useMutation({
+    onSuccess: async (r) => {
+      toast.success(`Built your hub — ${r.assigned} articles planned around "${cornerstoneKw.trim()}".`, { duration: 8000 });
+      if (r.warnings?.length) toast.warning(r.warnings.join(" "), { duration: 10000 });
+      if (r.lowVolume?.length) toast.warning(`${r.lowVolume.length} keyword(s) have low search volume — review/swap them.`, { duration: 9000 });
+      await utils.keywords.getAll.invalidate({ businessId });
+      setSubStage("keyword-review");
+    },
+    onError: (err) => toast.error(err.message, { duration: 9000 }),
+  });
+  const [buildingHub, setBuildingHub] = useState(false);
+  const handleBuildHub = useCallback(async () => {
+    if (!businessId || cornerstoneKw.trim().length < 2) return;
+    setBuildingHub(true);
+    try {
+      // Save the purpose first so the AI is grounded by it.
+      await setPurposeMut.mutateAsync({ businessId, purpose: batchPurpose });
+      await assignFromCornerstone.mutateAsync({ businessId, cornerstoneKeyword: cornerstoneKw.trim() });
+    } catch { /* handled by onError */ } finally { setBuildingHub(false); }
+  }, [businessId, cornerstoneKw, batchPurpose, setPurposeMut, assignFromCornerstone]);
+
   const updatePlannedTitle = trpc.keywords.updatePlannedTitle.useMutation({
     onSuccess: async () => { await refetchKw(); toast.success("Title updated"); },
     onError: (e) => toast.error(e.message),
@@ -514,6 +541,52 @@ export default function Keywords() {
   /* ── Assign sub-stage ── */
   const renderAssign = () => (
     <div style={{ maxWidth:600 }}>
+      {/* Grounded AI hub — cornerstone keyword + batch purpose → coherent hierarchy */}
+      <div style={{ background:"#fff", border:"2px solid #6e5afe", borderRadius:12, padding:28, marginBottom:20 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:"#ede9ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <Sparkles style={{ width:18, height:18, color:"#6e5afe" }} />
+          </div>
+          <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Build a coherent hub with AI</h2>
+        </div>
+        <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:16 }}>
+          Give one <strong>cornerstone keyword</strong> and the <strong>goal of this batch</strong>. The AI builds the
+          whole set so everything <strong>builds off your cornerstone</strong> — pillars = segments of it, clusters =
+          specific long-tail topics — each with a title and secondary keywords, kept inside <strong>{(business.industry as string | undefined) ?? "your industry"}</strong>,
+          validated for search volume, and distinct from earlier batches.
+        </p>
+
+        <label style={{ display:"block", fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>Cornerstone keyword</label>
+        <input
+          type="text"
+          value={cornerstoneKw}
+          onChange={(e) => setCornerstoneKw(e.target.value)}
+          placeholder="e.g. brand architecture"
+          style={{ width:"100%", boxSizing:"border-box", fontSize:14, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, marginBottom:14 }}
+        />
+
+        <label style={{ display:"block", fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>Purpose of this batch</label>
+        <textarea
+          value={batchPurpose}
+          onChange={(e) => setBatchPurpose(e.target.value)}
+          placeholder="e.g. Educate our audience on what brand architecture is, how to use it in their marketing, and why it matters."
+          rows={3}
+          style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5, marginBottom:14 }}
+        />
+
+        <button
+          className="btn-primary"
+          onClick={handleBuildHub}
+          disabled={buildingHub || cornerstoneKw.trim().length < 2}
+        >
+          {buildingHub
+            ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Building your hub…</>
+            : <><Sparkles style={{ width:14, height:14 }} /> Build hub with AI</>}
+        </button>
+      </div>
+
+      <div style={{ textAlign:"center", fontSize:12, color:"#9ca3af", margin:"0 0 20px" }}>— or assign manually from your saved keywords —</div>
+
       <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:28 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:"#ede9ff", display:"flex", alignItems:"center", justifyContent:"center" }}>

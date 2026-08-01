@@ -605,29 +605,37 @@ export const keywordsRouter = router({
         .from(keywords).where(eq(keywords.businessId, input.businessId));
       const avoidKeywords = Array.from(new Set(priorRows.filter((r) => r.bn !== activeBatch).map((r) => r.pk).filter(Boolean)));
 
-      // Generate the full hierarchy from the single cornerstone keyword.
+      // Real services — hard grounding so the AI can't drift off-industry.
+      const svcRows = await db.select({ name: businessServices.name })
+        .from(businessServices).where(eq(businessServices.businessId, input.businessId));
+      const services = svcRows.map((s) => s.name).filter(Boolean);
+
+      // Generate the full, GROUNDED hierarchy from the single cornerstone keyword.
       const audience = [biz.uniqueValueProposition, biz.serviceArea].filter(Boolean).join(" | ") || (biz.industry ?? "general audience");
       const { architecture, warnings } = await generateCornerstoneArchitecture({
         cornerstoneKeyword: input.cornerstoneKeyword.trim(),
         targetAudience: audience,
         businessName: biz.name,
         industry: biz.industry ?? undefined,
+        services,
+        businessDescription: biz.uniqueValueProposition ?? undefined,
+        batchPurpose: biz.batchPurpose ?? undefined,
         pillarCount: pillarNodes.length,
         clustersPerPillar: maxClustersPerPillar,
         avoidKeywords,
       }, ctx.user.id);
 
-      // Map generated hierarchy → nodes. Collect (nodeId, keyword, title).
-      const assignments: Array<{ nodeId: number; keyword: string; title: string }> = [];
-      assignments.push({ nodeId: cornerstoneNode.id, keyword: architecture.cornerstone.keyword, title: architecture.cornerstone.title });
+      // Map generated hierarchy → nodes. Collect (nodeId, keyword, title, secondary).
+      const assignments: Array<{ nodeId: number; keyword: string; title: string; secondary: string[] }> = [];
+      assignments.push({ nodeId: cornerstoneNode.id, keyword: architecture.cornerstone.keyword, title: architecture.cornerstone.title, secondary: architecture.cornerstone.secondaryKeywords });
       pillarNodes.forEach((pNode, pi) => {
         const p = architecture.pillars[pi];
         if (!p) return;
-        assignments.push({ nodeId: pNode.id, keyword: p.keyword, title: p.title });
+        assignments.push({ nodeId: pNode.id, keyword: p.keyword, title: p.title, secondary: p.secondaryKeywords });
         const cNodes = clustersByPillar.get(pNode.id) ?? [];
         cNodes.forEach((cNode, ci) => {
           const c = p.clusters[ci];
-          if (c) assignments.push({ nodeId: cNode.id, keyword: c.keyword, title: c.title });
+          if (c) assignments.push({ nodeId: cNode.id, keyword: c.keyword, title: c.title, secondary: c.secondaryKeywords });
         });
       });
 
@@ -649,6 +657,7 @@ export const keywordsRouter = router({
           businessId: input.businessId,
           batchNumber: activeBatch,
           primaryKeyword: a.keyword,
+          secondaryKeywords: a.secondary && a.secondary.length ? (a.secondary as unknown) : null,
           monthlySearchVolume: e?.msv ?? null,
           competitionLevel: e?.comp ?? null,
           keywordApproved: false,

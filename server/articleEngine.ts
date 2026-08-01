@@ -1013,7 +1013,12 @@ export async function buildArticleContext(
     ctaUrl: biz.primaryCtaUrl ?? biz.websiteUrl ?? "",
     competitors: competitors.map(c => ({ name: c.name, url: c.websiteUrl })),
     primaryKeyword: kw?.primaryKeyword ?? "",
-    secondaryKeywords: kw?.secondaryKeywords ? JSON.parse(kw.secondaryKeywords as string) : [],
+    secondaryKeywords: (() => {
+      const sk = kw?.secondaryKeywords;
+      if (!sk) return [];
+      if (Array.isArray(sk)) return sk as string[]; // Drizzle json column returns a parsed array
+      try { const p = JSON.parse(sk as string); return Array.isArray(p) ? p : []; } catch { return []; }
+    })(),
     paaQuestion: (() => { const q = kw?.paaQuestions; if (!q) return ""; if (Array.isArray(q)) return (q as string[])[0] ?? ""; try { const arr = JSON.parse(q as string); return Array.isArray(arr) ? arr[0] ?? "" : ""; } catch { return ""; } })(),
     articleType: node.articleType,
     level,
