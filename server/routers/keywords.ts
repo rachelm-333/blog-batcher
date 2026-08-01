@@ -299,6 +299,19 @@ export const keywordsRouter = router({
       await db.update(articleNodes).set({ plannedTitle: null })
         .where(and(eq(articleNodes.businessId, input.businessId), eq(articleNodes.batchNumber, activeBatch)));
 
+      // ── Cross-batch cannibalization guard ──────────────────────────────────
+      // Keywords used in EARLIER batches of this business. New AI-derived cluster
+      // topics must avoid these, and any assigned keyword that duplicates a prior
+      // batch is flagged so the user can swap it (two of your own posts targeting
+      // the same term compete with each other on Google).
+      const priorKwRows = await db
+        .select({ pk: keywords.primaryKeyword })
+        .from(keywords)
+        .where(eq(keywords.businessId, input.businessId)); // current batch already deleted above
+      const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+      const priorKeywords = Array.from(new Set(priorKwRows.map((r) => r.pk).filter(Boolean)));
+      const priorSet = new Set(priorKeywords.map(norm));
+
       const exclusions = biz.keywordExclusions
         ? biz.keywordExclusions.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
@@ -355,10 +368,12 @@ export const keywordsRouter = router({
         for (const a of alloc.assignments) {
           if (a.level === "pillar" && a.keyword) pillarKwByNode.set(a.nodeId, a.keyword);
         }
-        // Keywords already in play — AI-derived clusters must avoid these.
-        const existingKeywords = alloc.assignments
-          .filter((a) => a.keyword)
-          .map((a) => a.keyword!) as string[];
+        // Keywords already in play — AI-derived clusters must avoid these AND every
+        // keyword used in earlier batches (cross-batch cannibalization guard).
+        const existingKeywords = [
+          ...alloc.assignments.filter((a) => a.keyword).map((a) => a.keyword!) as string[],
+          ...priorKeywords,
+        ];
 
         // Derive AI cluster topics per pillar to fill empty slots.
         const aiByPillar = new Map<number, number[]>(); // pillarNodeId → cluster nodeIds
@@ -423,7 +438,8 @@ export const keywordsRouter = router({
             competitionLevel: comp,
             keywordApproved: false,
             paaApproved: false,
-            cannibalizationWarning: false,
+            // Flag if this keyword was already used in an earlier batch (self-competition).
+            cannibalizationWarning: priorSet.has(norm(keyword)),
           };
         });
 
