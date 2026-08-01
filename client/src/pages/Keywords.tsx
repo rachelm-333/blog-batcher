@@ -484,8 +484,15 @@ export default function Keywords() {
     }
     return conflictIds;
   }, []);
-  const liveConflictNodeIds = useMemo(() => computeConflicts(kwData), [kwData, computeConflicts]);
+  const liveConflictNodeIds = useMemo(() => {
+    const ids = computeConflicts(kwData);
+    // Also highlight keywords already used in an EARLIER batch (cross-batch flag
+    // set server-side) — those compete with your own already-published posts.
+    (kwData ?? []).forEach(k => { if (k.cannibalizationWarning) ids.add(k.articleNodeId); });
+    return ids;
+  }, [kwData, computeConflicts]);
   const cannibalizationConflicts = useMemo(() => kwData?.filter(k => liveConflictNodeIds.has(k.articleNodeId)) ?? [], [kwData, liveConflictNodeIds]);
+  const crossBatchConflicts = useMemo(() => kwData?.filter(k => k.cannibalizationWarning) ?? [], [kwData]);
   const allKwApproved = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => k.keywordApproved), [kwData]);
   const allPaaFetched = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => { const q = k.paaQuestions as string[]|null; return q && q.length > 0; }), [kwData]);
   const allPaaApproved = useMemo(() => (kwData?.length ?? 0) > 0 && kwData!.every(k => k.paaApproved), [kwData]);
@@ -701,6 +708,22 @@ export default function Keywords() {
           Aim for a mix of competition levels. A few <strong>high-volume cornerstones</strong> plus easy-win clusters ranks faster than chasing only the big terms.
         </p>
       </div>
+
+      {/* Cross-batch cannibalization banner */}
+      {crossBatchConflicts.length > 0 && (
+        <div style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 18px", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, marginBottom:16 }}>
+          <AlertTriangle style={{ width:16, height:16, color:"#d97706", flexShrink:0, marginTop:2 }} />
+          <div>
+            <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#92400e" }}>
+              {crossBatchConflicts.length} keyword{crossBatchConflicts.length > 1 ? "s are" : " is"} already used in an earlier batch
+            </p>
+            <p style={{ margin:"4px 0 0", fontSize:12, color:"#a16207", lineHeight:1.5 }}>
+              Publishing these would make your new posts compete with your own earlier posts on Google (keyword cannibalization).
+              <strong> Swap the highlighted keywords</strong> for new, distinct terms so this batch targets fresh territory. This batch should cover a different topic/angle than your previous batch.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden" }}>
