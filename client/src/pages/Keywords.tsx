@@ -417,12 +417,12 @@ export default function Keywords() {
   const assignFromCornerstone = trpc.keywords.assignFromCornerstone.useMutation({
     onSuccess: async (r) => {
       toast.success(`Built your hub — ${r.assigned} articles planned around "${cornerstoneKw.trim()}".`, { duration: 8000 });
-      const reps = r.replacements ?? [];
+      const reps = (r.replacements ?? []).filter((x) => x.original !== x.replacement);
       if (reps.length) {
         const lines = reps.slice(0, 4).map((x) => `“${x.original}” → “${x.replacement}”`).join("; ");
         toast.info(
-          `To protect your SEO, ${reps.length} keyword${reps.length > 1 ? "s were" : " was"} already used in earlier posts — we selected the next best option: ${lines}${reps.length > 4 ? "…" : ""}`,
-          { duration: 12000 },
+          `To protect your SEO, we swapped ${reps.length} keyword${reps.length > 1 ? "s" : ""} for stronger options (already used in an earlier post, or no real search volume): ${lines}${reps.length > 4 ? "…" : ""}`,
+          { duration: 13000 },
         );
       }
       if (r.warnings?.length) toast.warning(r.warnings.join(" "), { duration: 10000 });

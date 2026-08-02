@@ -193,7 +193,7 @@ STRICT SEO RULES (each level targets a MORE SPECIFIC, DISTINCT search intent —
 - PILLARS (${input.pillarCount}): each a BROAD, DISTINCT SEGMENT *of the cornerstone* (e.g. for "brand architecture": models / strategy / application). 2-4 words, broad enough to support ${input.clustersPerPillar} clusters. NEVER a "what is X"/"why X" question. NEVER the cornerstone term itself. Must clearly be a part of the cornerstone topic.
 - CLUSTERS (${input.clustersPerPillar} per pillar): highly specific, long-tail questions/scenarios drilling into their pillar (3-6 words, real searches). Each completely distinct from every other cluster and pillar.
 - SECONDARY KEYWORDS: for EVERY node, provide ${secondaryN} secondary/LSI keywords — semantically-related supporting terms the article will weave in for topical depth (NOT duplicates of the node's own keyword or other nodes' primary keywords).
-- TITLES: every node gets a compelling, specific, click-worthy title a writer can 100% deliver on. Concrete, answerable in one article, contains/reflects the keyword.${avoidText}
+- TITLES: benefit/outcome-driven (say what the reader GAINS — NOT "[keyword]: The Complete Guide"), specific & concrete, instantly clear, contains the keyword naturally but never a bare restatement, framed around a real question the article fully answers.${avoidText}
 
 Return ONLY valid JSON in exactly this shape (no markdown fences):
 {
@@ -286,6 +286,93 @@ export async function generateCornerstoneArchitecture(
 
   const warnings = conflicts.length > 0
     ? [`${conflicts.length} keyword(s) may still overlap: ${conflicts.join(", ")}. Review before generating.`]
+    : [];
+  return { architecture: arch, warnings };
+}
+
+// ===========================================================================
+// DATA-FIRST HUB — organise a REAL DataForSEO keyword pool into the hierarchy.
+// Instead of inventing keywords (which mostly return no search volume), the AI
+// SELECTS from a pool of keywords that already have proven demand, and only
+// writes the titles + picks secondary terms. Enforces the title rules (§2.5).
+// ===========================================================================
+
+export interface PoolCandidate {
+  keyword: string;
+  msv: number | null;
+  competition: "high" | "medium" | "low" | null;
+}
+
+const TITLE_RULES = `TITLE RULES (every title must be worth clicking — NOT "[keyword]: The Complete Guide"):
+- Benefit/outcome-driven: say what the reader GAINS (e.g. "How to Roll Out Brand Architecture Without Confusing Customers"), not just the topic.
+- Specific & concrete: real steps/frameworks/numbers where genuine (never fabricate stats).
+- Instantly clear: understandable in one glance.
+- Contains the keyword naturally, but is never a bare "[keyword]" restatement.
+- Framed around a real question/need the article fully answers (for AI-citation).`;
+
+/** Build the data-first prompt: select + organise from a real keyword pool. */
+export function buildHubFromPoolPrompt(input: CornerstoneArchInput, pool: PoolCandidate[]): string {
+  const secondaryN = input.secondaryPerNode ?? 4;
+  const services = (input.services ?? []).filter(Boolean);
+  const grounding = [
+    input.industry ? `Industry: ${input.industry}` : "",
+    services.length ? `Services: ${services.join(", ")}` : "",
+    input.businessDescription ? `About: ${input.businessDescription}` : "",
+    input.batchPurpose ? `GOAL OF THIS BATCH (every article must serve this): ${input.batchPurpose}` : "",
+  ].filter(Boolean).join("\n");
+  const poolText = pool
+    .map((p) => `- "${p.keyword}" (volume: ${p.msv ?? "?"}, competition: ${p.competition ?? "?"})`)
+    .join("\n");
+  const strategy = input.batchPurpose ? "" : "";
+
+  return `You are an expert SEO content architect for ${input.businessName}. Audience: "${input.targetAudience}".
+
+${grounding}
+
+CORNERSTONE (head) keyword: "${input.cornerstoneKeyword}".
+
+Below is a list of REAL keywords with actual search volume (from a keyword tool). You MUST build the hub by SELECTING from THIS LIST — do NOT invent keywords that aren't here (invented keywords have no proven demand):
+
+CANDIDATE KEYWORDS:
+${poolText || "(none — you may fall back to the cornerstone only)"}
+
+Build exactly ${input.pillarCount} pillars and ${input.clustersPerPillar} clusters per pillar, ALL selected from the candidates, all coherently building off "${input.cornerstoneKeyword}":
+- Prefer keywords with a healthy balance of volume and low/medium competition (opportunity), not just the highest volume.
+- PILLARS = the broadest candidates that are distinct segments of the cornerstone.
+- CLUSTERS = more specific/long-tail candidates under the right pillar.
+- Distinct search intent at every level (no two target the same query).
+- SECONDARY KEYWORDS: for each node, choose ${secondaryN} OTHER candidates from the list that are semantically related (do not repeat any node's primary).
+${TITLE_RULES}
+
+Return ONLY valid JSON (no fences):
+{
+  "cornerstone": { "keyword": "${input.cornerstoneKeyword}", "title": "...", "secondaryKeywords": ["..."] },
+  "pillars": [ { "keyword": "...", "title": "...", "secondaryKeywords": ["..."], "clusters": [ { "keyword": "...", "title": "...", "secondaryKeywords": ["..."] } ] } ]
+}
+Exactly ${input.pillarCount} pillars, each with ${input.clustersPerPillar} clusters.${strategy}`;
+}
+
+/** Generate the hub by organising a real keyword pool (data-first). */
+export async function generateHubFromPool(
+  input: CornerstoneArchInput,
+  pool: PoolCandidate[],
+  userId?: number | null,
+): Promise<{ architecture: CornerstoneArchitecture; warnings: string[] }> {
+  const callLLM = async (prompt: string): Promise<string> => {
+    const res = await invokeClaudeWithCost(
+      { messages: [{ role: "user", content: prompt }], response_format: { type: "json_object" }, max_tokens: 3000 },
+      { userId, feature: "keyword_research" },
+    );
+    const c = res.choices[0]?.message?.content;
+    return typeof c === "string" ? c : JSON.stringify(c);
+  };
+  const arch = parseCornerstoneArchitecture(
+    await callLLM(buildHubFromPoolPrompt(input, pool)),
+    input.pillarCount, input.clustersPerPillar,
+  );
+  const conflicts = architectureConflicts(arch);
+  const warnings = conflicts.length > 0
+    ? [`${conflicts.length} keyword(s) may still overlap: ${conflicts.join(", ")}.`]
     : [];
   return { architecture: arch, warnings };
 }

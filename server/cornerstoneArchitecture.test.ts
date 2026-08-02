@@ -3,6 +3,7 @@ import {
   buildCornerstoneArchitecturePrompt,
   parseCornerstoneArchitecture,
   architectureConflicts,
+  buildHubFromPoolPrompt,
 } from "./campaignArchitect";
 
 const input = {
@@ -88,6 +89,27 @@ describe("parseCornerstoneArchitecture", () => {
     const bad = JSON.parse(validJson);
     bad.pillars[0].clusters[0] = { keyword: "x" };
     expect(() => parseCornerstoneArchitecture(JSON.stringify(bad), 3, 3)).toThrow();
+  });
+});
+
+describe("buildHubFromPoolPrompt (data-first)", () => {
+  const pool = [
+    { keyword: "brand architecture models", msv: 320, competition: "low" as const },
+    { keyword: "brand architecture strategy", msv: 210, competition: "medium" as const },
+    { keyword: "monolithic brand", msv: 90, competition: "low" as const },
+  ];
+  it("lists the real candidate pool with volumes and forbids inventing", () => {
+    const p = buildHubFromPoolPrompt(input, pool);
+    expect(p).toContain("brand architecture models");
+    expect(p).toContain("volume: 320");
+    expect(p).toMatch(/SELECTING from THIS LIST/i);
+    expect(p).toMatch(/do NOT invent/i);
+  });
+  it("includes the title rules and grounding", () => {
+    const p = buildHubFromPoolPrompt({ ...input, batchPurpose: "educate on brand architecture", services: ["brand strategy"] }, pool);
+    expect(p).toMatch(/TITLE RULES/i);
+    expect(p).toMatch(/Benefit\/outcome-driven/i);
+    expect(p).toContain("educate on brand architecture");
   });
 });
 

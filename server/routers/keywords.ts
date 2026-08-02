@@ -37,7 +37,7 @@ import {
 } from "../../shared/cannibalizationCheck";
 import { allocateKeywords } from "../../shared/keywordAllocation";
 import { generateSlug } from "../articleEngine";
-import { generateCornerstoneArchitecture } from "../campaignArchitect";
+import { generateCornerstoneArchitecture, generateHubFromPool, type PoolCandidate } from "../campaignArchitect";
 import { loadContentRegister, keywordInRegister, titleInRegister, slugInRegister } from "../contentRegister";
 
 // ---------------------------------------------------------------------------
@@ -612,9 +612,8 @@ export const keywordsRouter = router({
         .from(businessServices).where(eq(businessServices.businessId, input.businessId));
       const services = svcRows.map((s) => s.name).filter(Boolean);
 
-      // Generate the full, GROUNDED hierarchy from the single cornerstone keyword.
       const audience = [biz.uniqueValueProposition, biz.serviceArea].filter(Boolean).join(" | ") || (biz.industry ?? "general audience");
-      const { architecture, warnings } = await generateCornerstoneArchitecture({
+      const genInput = {
         cornerstoneKeyword: input.cornerstoneKeyword.trim(),
         targetAudience: audience,
         businessName: biz.name,
@@ -625,7 +624,36 @@ export const keywordsRouter = router({
         pillarCount: pillarNodes.length,
         clustersPerPillar: maxClustersPerPillar,
         avoidKeywords,
-      }, ctx.user.id);
+      };
+
+      // ── DATA-FIRST: source a REAL keyword pool (with search volume) and let the
+      // AI organise it, so we never target keywords nobody searches. Falls back to
+      // grounded generation only if DataForSEO returns too few real candidates.
+      const MSV_FLOOR = 20;
+      let pool: PoolCandidate[] = [];
+      if (process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
+        try {
+          const suggestions = await getKeywordSuggestions(input.cornerstoneKeyword.trim(), 2036, "en", 120);
+          pool = suggestions
+            .filter((s) => (s.monthlySearchVolume ?? 0) >= MSV_FLOOR)
+            .filter((s) => !register.normKeywordSet.has(s.keyword.toLowerCase().replace(/\s+/g, " ").trim()))
+            .map((s) => ({ keyword: s.keyword, msv: s.monthlySearchVolume, competition: s.competitionLevel }));
+        } catch (err) { console.warn("[assignFromCornerstone] keyword pool fetch failed:", err); }
+      }
+      const needed = 1 + pillarNodes.length + pillarNodes.length * maxClustersPerPillar;
+      const dataFirst = pool.length >= Math.max(6, Math.floor(needed * 0.6));
+      const { architecture, warnings } = dataFirst
+        ? await generateHubFromPool(genInput, pool, ctx.user.id)
+        : await generateCornerstoneArchitecture(genInput, ctx.user.id);
+      if (!dataFirst && (process.env.DATAFORSEO_LOGIN)) {
+        warnings.push("Not enough keywords with real search volume were found for this cornerstone — used AI-generated topics; review volumes and swap any showing no data.");
+      }
+      // Real MSV/competition for pool candidates, for filling slots that come back empty of data.
+      const poolByKw = new Map(pool.map((p) => [p.keyword.toLowerCase().replace(/\s+/g, " ").trim(), p]));
+      const usedPool = new Set<string>();
+      const spareCandidates = () => pool
+        .filter((p) => !usedPool.has(p.keyword.toLowerCase().trim()) && !register.normKeywordSet.has(p.keyword.toLowerCase().replace(/\s+/g, " ").trim()))
+        .sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
 
       // Map generated hierarchy → nodes. Collect (nodeId, keyword, title, secondary).
       const assignments: Array<{ nodeId: number; keyword: string; title: string; secondary: string[] }> = [];
@@ -677,6 +705,31 @@ export const keywordsRouter = router({
           const res = await getKeywordData(assignments.map((a) => a.keyword));
           for (const r of res) msvByKw.set(r.keyword, { msv: r.monthlySearchVolume, comp: r.competitionLevel });
         } catch (err) { console.warn("[assignFromCornerstone] MSV enrichment failed:", err); }
+      }
+
+      // ── Replace any keyword with NO real search volume (the "—" rule) ────────
+      // A keyword nobody searches has no SEO value. Swap it for the best unused
+      // pool candidate (real demand). Only when we actually have a pool to draw from.
+      if (pool.length > 0) {
+        // Mark pool keywords already assigned as used.
+        for (const a of assignments) {
+          const k = a.keyword.toLowerCase().replace(/\s+/g, " ").trim();
+          if (poolByKw.has(k)) usedPool.add(a.keyword.toLowerCase().trim());
+        }
+        for (const a of assignments) {
+          if (a.nodeId === cornerstoneNode.id) continue; // keep the user's chosen cornerstone
+          const msv = msvByKw.get(a.keyword)?.msv ?? poolByKw.get(a.keyword.toLowerCase().replace(/\s+/g, " ").trim())?.msv ?? null;
+          if (msv == null || msv < MSV_FLOOR) {
+            const cand = spareCandidates().find((c) => !usedThisBatch.has(c.keyword.toLowerCase().trim()));
+            if (cand) {
+              replacements.push({ original: a.keyword, replacement: cand.keyword, reason: "no measurable search volume — selected a keyword with real demand" });
+              usedThisBatch.add(cand.keyword.toLowerCase().trim());
+              usedPool.add(cand.keyword.toLowerCase().trim());
+              a.keyword = cand.keyword;
+              msvByKw.set(cand.keyword, { msv: cand.msv, comp: cand.competition });
+            }
+          }
+        }
       }
 
       // Persist: replace this batch's keyword rows, set node slug + plannedTitle.
