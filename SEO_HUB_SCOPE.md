@@ -10,6 +10,7 @@ The architecture is now **flat, 2 tiers only: Pillar Pages (broad topics) → Cl
 - **Shape:** N pillars (default 3, user-selectable) × **3 clusters per pillar**.
 - **Seeding:** Step 1 batch purpose + Step 2 theme keyword → system pulls real DataForSEO terms → builds the pillars + their 3 clusters (no cornerstone article).
 - **Linking (2-tier protocol):** Cluster → links UP to its parent Pillar; Pillar → links DOWN to its 3 Clusters. Flat silos — no cross-pillar links, no cornerstone.
+- **"Make all internal links live" button (Publish stage):** a one-click batch backfill for when posts are published/scheduled MANUALLY in Wix (where auto-backfill doesn't fire). It looks up every post's live URL, rebuilds internal links across all posts to those live URLs, re-pushes each in place (no duplicates), and guarantees no 404s (links to not-yet-live targets stay plain text). Reports live vs pending. (Engine already exists: resolveBodyForPublish strict mode + autoBackfillLinks + updateWixPostBody — this exposes it as a batch button.)
 - **Schema:** FAQPage lives on **Pillars** (was cornerstone). Article + Author(Person) on every post.
 - **Generation order:** Pillars first → their clusters.
 - **Non-destructive:** applies to NEW batches; existing cornerstone batches remain valid.
