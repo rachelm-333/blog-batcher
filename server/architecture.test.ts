@@ -17,70 +17,63 @@ import {
 // ─── Guardrails Engine Tests (pure logic, no mocks needed) ───────────────────
 
 describe("architectureRules.validateArchitecture", () => {
-  // Blog CREATION is a FIXED shape: exactly 1 cornerstone × 3 pillars, with
-  // 3–5 clusters per pillar (default 5). Total ranges 13–19. The only lever the
-  // user has is the clusters-per-pillar count.
+  // Blog CREATION is a FLAT 2-TIER shape: 0 cornerstones, 3–6 pillars, with
+  // 3–5 clusters per pillar (default 3). The user's levers are pillar count
+  // and clusters-per-pillar. A cornerstone is never created.
 
-  it("accepts the full 1×3×5 = 19 config without warnings", () => {
-    const result = validateArchitecture(20, 1, 3, 5);
+  it("accepts the default flat 3×3 = 12 config without warnings", () => {
+    const result = validateArchitecture(20, 0, 3, 3);
     expect(result.valid).toBe(true);
     expect(result.warnings).toHaveLength(0);
-    expect(result.correctedCornerstones).toBe(1);
+    expect(result.correctedCornerstones).toBe(0);
     expect(result.correctedPillarsPerCornerstone).toBe(3);
-    expect(result.correctedClustersPerPillar).toBe(5);
-    expect(calcTotalArticles(1, 3, 5)).toBe(19); // 1 + 3 + 15 = 19
+    expect(result.correctedClustersPerPillar).toBe(3);
+    expect(calcTotalArticles(0, 3, 3)).toBe(12); // 0 + 3 + 9 = 12
   });
 
-  it("accepts the reduced 1×3×3 = 13 config without warnings", () => {
-    const result = validateArchitecture(20, 1, 3, 3);
+  it("accepts the fuller flat 3×5 = 18 config without warnings", () => {
+    const result = validateArchitecture(20, 0, 3, 5);
     expect(result.valid).toBe(true);
     expect(result.warnings).toHaveLength(0);
-    expect(result.correctedClustersPerPillar).toBe(3);
-    expect(calcTotalArticles(1, 3, 3)).toBe(13); // 1 + 3 + 9 = 13
+    expect(result.correctedClustersPerPillar).toBe(5);
+    expect(calcTotalArticles(0, 3, 5)).toBe(18); // 0 + 3 + 15 = 18
   });
 
-  it("clamps cornerstones up to the fixed value of 1", () => {
-    const result = validateArchitecture(20, 0, 3);
-    expect(result.correctedCornerstones).toBe(1);
-    expect(result.warnings.some((w) => w.includes("Minimum 1 cornerstone"))).toBe(true);
+  it("clamps any requested cornerstone down to 0 (flat 2-tier)", () => {
+    const result = validateArchitecture(20, 1, 3);
+    expect(result.correctedCornerstones).toBe(0);
   });
 
-  it("clamps cornerstones down to the fixed value of 1", () => {
-    const result = validateArchitecture(null, 3, 3);
-    expect(result.correctedCornerstones).toBe(1);
-    expect(result.warnings.some((w) => w.includes("Maximum 1 cornerstone"))).toBe(true);
-  });
-
-  it("clamps pillars up to the fixed value of 3", () => {
-    const result = validateArchitecture(20, 1, 1);
+  it("clamps pillars up to the minimum of 3", () => {
+    const result = validateArchitecture(20, 0, 1);
     expect(result.correctedPillarsPerCornerstone).toBe(3);
     expect(result.warnings.some((w) => w.includes("Minimum 3 pillar"))).toBe(true);
   });
 
-  it("clamps pillars down to the fixed value of 3", () => {
-    const result = validateArchitecture(null, 1, 10);
-    expect(result.correctedPillarsPerCornerstone).toBe(3);
-    expect(result.warnings.some((w) => w.includes("Maximum 3 pillar"))).toBe(true);
+  it("clamps pillars down to the maximum of 6", () => {
+    const result = validateArchitecture(null, 0, 10);
+    expect(result.correctedPillarsPerCornerstone).toBe(6);
+    expect(result.warnings.some((w) => w.includes("Maximum 6 pillar"))).toBe(true);
   });
 
   it("clamps clusters per pillar up to the minimum of 3", () => {
-    const result = validateArchitecture(null, 1, 3, 1);
+    const result = validateArchitecture(null, 0, 3, 1);
     expect(result.correctedClustersPerPillar).toBe(3);
   });
 
   it("clamps clusters per pillar down to the maximum of 5", () => {
-    const result = validateArchitecture(null, 1, 3, 20);
+    const result = validateArchitecture(null, 0, 3, 20);
     expect(result.correctedClustersPerPillar).toBe(5);
   });
 
-  it("never produces more than the 19-article maximum", () => {
-    const result = validateArchitecture(20, 1, 3, 5);
+  it("never produces more than the 36-article maximum (6×5)", () => {
+    const result = validateArchitecture(40, 0, 6, 5);
     const total = calcTotalArticles(
       result.correctedCornerstones,
       result.correctedPillarsPerCornerstone,
       result.correctedClustersPerPillar
     );
-    expect(total).toBe(19);
+    expect(total).toBe(36); // 0 + 6 + 30 = 36
   });
 });
 
@@ -410,7 +403,7 @@ describe("architecture.confirm", () => {
     // confirm now calls regenerateNodes which does select().from().where() (no .limit).
     // where() calls that are awaited directly must return a Promise resolving to an array.
     // where() calls followed by .limit() must return an object with a limit mock.
-    const fakeArch = { id: 5, packSize: 20, cornerstoneCount: 1, pillarCount: 3, clustersPerPillar: 5, confirmed: true };
+    const fakeArch = { id: 5, packSize: 20, cornerstoneCount: 0, pillarCount: 3, clustersPerPillar: 5, confirmed: true };
     const db = makeDb({});
     db.where = vi.fn()
       // 1. assertBusinessOwnership → .limit()
