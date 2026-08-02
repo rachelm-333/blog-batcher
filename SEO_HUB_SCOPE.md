@@ -25,11 +25,22 @@ Each batch is **1 cornerstone → 3 pillars → 3–5 clusters/pillar** (13–19
 - Clusters = specific **long-tail** questions/scenarios under each pillar.
 - Distinct search intent at every level — **no two pages target the same query.**
 
-### 2.2 ⚠️ Cross-batch non-competition (CRITICAL)
-**Customers publish every batch on the same blog.** So batches must **never compete with each other** — no keyword, pillar, or cluster in a new batch may target the same (or semantically overlapping) term as ANY earlier batch. This is the #1 requirement. Practically:
-- A new batch's keywords are checked against **all prior batches**, not just within itself.
-- Overlaps are blocked or clearly flagged before writing.
-- Ideally, a new batch is nudged toward **fresh territory / a different angle** of the customer's world.
+### 2.2 ⚠️ Cross-batch non-competition via a CONTENT REGISTER (CRITICAL)
+**Customers publish every batch on the same blog.** So batches must **never compete with each other** — no keyword, pillar, cluster, title, or slug in a new batch may match (or semantically overlap) ANYTHING used in an earlier batch. This is the #1 requirement.
+
+**The mechanism = a per-business Content Register.** A permanent ledger that records, for every article ever built for that business (across all batches):
+- primary keyword,
+- secondary / long-tail keywords,
+- article title,
+- URL slug.
+
+Every new build-out **must consult the register** and is **not allowed to reuse** anything in it:
+- On keyword search/selection: exclude registered keywords (exact + semantic overlap) from candidates.
+- On title/slug generation: exclude registered titles/slugs.
+- New picks are **written back to the register** when the batch is confirmed.
+- A new batch is steered toward **fresh territory / a different angle** of the customer's world.
+
+Today the keywords table already records every batch's keywords (a de-facto partial register); this must be formalised to also cover **titles + slugs** and enforced as a **hard rule**, not a soft flag.
 
 ### 2.3 Data-driven keyword selection (SEO-led, not just SEO-shaped)
 Keywords must be **chosen because the data says they're worth ranking for**, not just because they sound relevant:
@@ -75,7 +86,7 @@ Cornerstone ↔ pillars ↔ clusters are **internally linked** so authority flow
 
 ## 4. Gaps to close (the ask)
 
-1. **Cross-batch non-competition → make it airtight (2.2).** Move from "flag on review" to: hard-block or auto-replace any keyword overlapping ANY prior batch; steer new batches to fresh territory. This is the priority because posts share one blog.
+1. **Build the Content Register + make cross-batch non-competition airtight (2.2).** A per-business register of keywords + secondary/long-tail + titles + slugs across all batches. Move from "flag on review" to hard-block/auto-replace against the register; write new picks back on confirm; steer new batches to fresh territory. Priority #1 — posts share one blog.
 2. **Data-driven selection (2.3).** Add the "AI proposes → DataForSEO scores → pick best-opportunity" loop so keyword choice is led by real volume/competition, not just semantics.
 3. **Secondary keywords on the manual path too (2.4).** Currently populated only on the AI hub path; add to the manual assignment flow for parity.
 4. **Opportunity view for the user.** Surface MSV + competition + an "opportunity" signal on the review screen so the user can make informed swaps.
