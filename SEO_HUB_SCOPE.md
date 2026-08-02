@@ -42,15 +42,20 @@ Every new build-out **must consult the register** and is **not allowed to reuse*
 
 Today the keywords table already records every batch's keywords (a de-facto partial register); this must be formalised to also cover **titles + slugs** and enforced as a **hard rule**, not a soft flag.
 
-### 2.3 Data-driven keyword selection (SEO-led, not just SEO-shaped)
-Keywords must be **chosen because the data says they're worth ranking for**, not just because they sound relevant:
-- AI proposes candidate keywords for each slot (grounded in the business's industry + services + the batch goal).
-- Pull **real monthly search volume (MSV) + competition** for candidates (DataForSEO).
-- **Select the best-opportunity terms** (meaningful volume, achievable competition); swap out zero/low-value ones.
-- Result: "data-chosen, AI-structured" — genuinely SEO-led.
+### 2.3 Data-BACKED keyword architecture (every level, from real data)
+Every keyword at every level must be **backed by real DataForSEO data (volume + competition)** — primary, secondary/LSI, AND long-tail. AI structures; data proves demand. Concretely, using the existing DataForSEO functions:
+- **Candidate pool:** `getKeywordSuggestions(goal + cornerstone)` → real related keywords WITH volume/competition.
+- **Structure:** AI arranges only these **data-backed candidates** into cornerstone / pillars / clusters by relevance + the batch goal (never invents a keyword with no data).
+- **Opportunity selection:** score candidates on volume vs competition and pick the best; drop zero/low-value ones. Result = "data-chosen, AI-structured".
+- **Validate:** `getKeywordData` confirms MSV/competition on the final picks.
 
-### 2.4 Secondary / LSI keywords per post
-Every article targets **one primary keyword + 3–5 secondary/LSI (semantically-related) keywords**, woven in naturally for topical depth (helps rank for variations, reads as thorough to Google).
+### 2.4 Secondary / LSI + long-tail per post — FROM DATA (not invented)
+Every article = **1 primary + 3–5 secondary/LSI keywords + long-tail**, all sourced from real data:
+- **Secondary/LSI:** `getKeywordSuggestions(primary)` → pick top real related terms (by volume + relevance), excluding anything in the Content Register.
+- **Long-tail:** real long-tail suggestions + **`getPAAQuestions`** (People Also Ask) for question-based terms.
+- The writer weaves primary + secondaries + long-tail naturally for topical depth.
+- ⚠️ Current state: secondary keywords are **AI-invented (no volume behind them)** and long-tail is AI-derived — this must move to the DataForSEO sources above.
+- Note: DataForSEO calls cost money/time — batch requests and cache per business/batch.
 
 ### 2.5 Titles are a contract
 Titles are **proposed, reviewed, and approved before writing**. The writer must **100% deliver on the approved title** — no drift. Title, keyword, and content must always agree.
