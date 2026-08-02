@@ -57,8 +57,16 @@ Every article = **1 primary + 3–5 secondary/LSI keywords + long-tail**, all so
 - ⚠️ Current state: secondary keywords are **AI-invented (no volume behind them)** and long-tail is AI-derived — this must move to the DataForSEO sources above.
 - Note: DataForSEO calls cost money/time — batch requests and cache per business/batch.
 
-### 2.5 Titles are a contract
-Titles are **proposed, reviewed, and approved before writing**. The writer must **100% deliver on the approved title** — no drift. Title, keyword, and content must always agree.
+### 2.5 Titles are a contract — and must be compelling (title rules)
+Titles are **proposed, reviewed, and approved before writing**; the writer must **100% deliver on the approved title** — no drift. Title, keyword, and content must always agree. **AND every title must be worth clicking:**
+- **Benefit / outcome-driven** — say what the reader gains, not just the topic. (❌ "Brand Architecture Implementation" → ✅ "How to Roll Out a Brand Architecture Without Confusing Your Customers".)
+- **Specific & concrete** — real numbers, frameworks, or steps where genuine (no fake stats).
+- **Instantly clear** — a reader understands the value in one glance.
+- **Contains the keyword naturally**, but is NEVER just "[keyword]: The Complete Guide" for every post.
+- **Intent + AI-citation** — phrased around a real question/need the article fully answers.
+
+### 2.6 Keyword data rule — NO keyword without proven demand
+Every keyword (primary especially) must have **real DataForSEO search volume**. Reject/replace any term with no or negligible volume (suggested floor: primaries ≥ ~30 MSV; clusters can be lower long-tail but must still register *some* volume or come from PAA). "—" (no data) keywords must not survive into the plan. This is enforced by the data-FIRST flow in §2.3 (source from data, don't invent-then-check).
 
 ### 2.6 Batch purpose grounds everything
 A short **batch goal** (e.g. "educate on brand architecture: what it is, how to use it in marketing, why") is set up front and **steers keyword selection, titles, and writing** so all posts serve one aim and read as one campaign — always kept **inside the business's real industry + services** (no drift to generic/unrelated topics).
