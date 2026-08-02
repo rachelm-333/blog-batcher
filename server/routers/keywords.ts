@@ -629,7 +629,10 @@ export const keywordsRouter = router({
       // ── DATA-FIRST: source a REAL keyword pool (with search volume) and let the
       // AI organise it, so we never target keywords nobody searches. Falls back to
       // grounded generation only if DataForSEO returns too few real candidates.
-      const MSV_FLOOR = 20;
+      // Keep any term with REAL demand. Low-competition long-tail (even ~10/mo) are
+      // exactly what good cluster posts target — only truly zero/no-data terms are
+      // rejected. (A higher floor wrongly discarded real niche keywords.)
+      const MSV_FLOOR = 10;
       let pool: PoolCandidate[] = [];
       if (process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
         try {
