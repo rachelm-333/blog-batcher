@@ -377,12 +377,22 @@ export default function Keywords() {
     setPrimarySelectionId(null);
   }, [businessId]);
 
-  // Default the primary keyword to the user's first saved selection once loaded.
+  // Default the cornerstone dropdown to the ACTUAL assigned cornerstone (from the
+  // assigned keywords), not just the first saved selection — otherwise it shows a
+  // misleading value (e.g. "branding strategies" when the cornerstone is "brand
+  // architecture"). Only falls back to the first selection if nothing is assigned.
   useEffect(() => {
-    if (primarySelectionId == null && savedSelections && savedSelections.length > 0) {
-      setPrimarySelectionId(savedSelections[0].id);
+    if (primarySelectionId != null || !savedSelections?.length) return;
+    const currentCornerstone = kwData?.find((k) => k.nodeLevel === "cornerstone")?.primaryKeyword?.toLowerCase().trim();
+    if (currentCornerstone) {
+      const match = savedSelections.find((s) => s.keyword.toLowerCase().trim() === currentCornerstone);
+      if (match) { setPrimarySelectionId(match.id); return; }
+      // Cornerstone was set outside the saved-selection list (e.g. AI hub) — leave
+      // the dropdown unselected so its placeholder shows the real cornerstone.
+      return;
     }
-  }, [savedSelections, primarySelectionId]);
+    setPrimarySelectionId(savedSelections[0].id);
+  }, [savedSelections, primarySelectionId, kwData]);
 
   // Article count comes directly from the DB article_nodes for this batch.
   // Architecture.confirm is the single source of truth — it always regenerates
