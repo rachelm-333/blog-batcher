@@ -69,7 +69,8 @@ export const ARTICLE_TYPE_LABELS: Record<ArticleType, string> = {
 export const VALID_TYPES_BY_LEVEL: Record<"cornerstone" | "pillar" | "cluster", ArticleType[]> = {
   cornerstone: ["cornerstone_guide"],
   pillar: ["top_10_list", "how_to", "the_why", "comparison", "myth_busting"],
-  cluster: ["how_to", "myth_busting", "specialist_post"],
+  // Flat 2-tier cluster formats (anti-cannibalization: one distinct format each).
+  cluster: ["how_to", "comparison", "top_10_list", "specialist_post", "the_why", "myth_busting"],
 };
 
 /** Word count targets and descriptions for each article level */
