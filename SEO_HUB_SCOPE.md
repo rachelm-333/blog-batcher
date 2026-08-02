@@ -129,6 +129,16 @@ This is the blueprint that prevents cannibalization and makes the whole 1-3-9(+)
 
 ---
 
+## 5e. The DataForSEO sequence (canonical method)
+
+The keyword engine must follow this exact sequence (metrics always from DataForSEO — the LLM never invents numbers):
+1. **Seed query** — from the business description + cornerstone, pull 50–100 real related terms, each with **Search Volume · Search Intent (Informational/Commercial/Transactional) · Keyword Difficulty (KD)**. Raw data only.
+2. **Qualify** — remove KD > threshold (default 60), zero-volume, and competitor/brand-navigational queries; group the survivors semantically by intent (long-tail under their parent).
+3. **Map** — from the *filtered* pool only, assign into the hub: cornerstone = highest-volume broadest parent; pillars = next tier of core categorical terms; clusters = specific lower-KD long-tail supporting their pillar. Output: Level · Slug · Primary · Volume · KD · Intent.
+4. **GEO H2s** — for each cluster (and pillar), generate the conversational H2 question ("How do I…", "What is the best…") aligned to the keyword's intent, to trigger AI-Overview citations; feed these into the writer as required headings.
+
+Single flow only: "Build Hub" (cornerstone in → data-first hub out). The legacy saved-pool Auto-Assign is removed (it reused terms across batches and ignored the goal).
+
 ## 6. Product decisions
 
 1. **Cross-batch overlap → AUTO-REPLACE + notify. [DECIDED]** When a pick matches the Content Register, the system automatically swaps in the next-best data-backed alternative and tells the user, e.g.: *"'brand strategy' was already used in a previous post — to protect your SEO, we've selected the next best option: 'brand strategy framework'."* Never silently, never blocking.

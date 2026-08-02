@@ -336,12 +336,13 @@ Below is a list of REAL keywords with actual search volume (from a keyword tool)
 CANDIDATE KEYWORDS:
 ${poolText || "(none — you may fall back to the cornerstone only)"}
 
-Build exactly ${input.pillarCount} pillars and ${input.clustersPerPillar} clusters per pillar, ALL selected from the candidates, all coherently building off "${input.cornerstoneKeyword}":
-- Prefer keywords with a healthy balance of volume and low/medium competition (opportunity), not just the highest volume.
-- PILLARS = the broadest candidates that are distinct segments of the cornerstone.
-- CLUSTERS = more specific/long-tail candidates under the right pillar.
+Build exactly ${input.pillarCount} pillars and ${input.clustersPerPillar} clusters per pillar, ALL selected from the candidates, all coherently building off "${input.cornerstoneKeyword}". ASSIGN BY TIER:
+- CORNERSTONE = the head term "${input.cornerstoneKeyword}" (broadest, highest volume).
+- PILLARS = the NEXT TIER of higher-volume, broad categorical candidates that are distinct segments of the cornerstone.
+- CLUSTERS = specific, LOWER-competition long-tail candidates (questions/scenarios) under the right pillar — these can have lower volume; that's expected and good (easy-win long-tail).
 - Distinct search intent at every level (no two target the same query).
 - SECONDARY KEYWORDS: for each node, choose ${secondaryN} OTHER candidates from the list that are semantically related (do not repeat any node's primary).
+- NEVER use competitor- or brand-navigational queries (e.g. "Apple brand architecture", "Nike ...") as a primary keyword for any node — those are examples to mention inside articles, not article targets. You MAY use them as secondary keywords.
 ${TITLE_RULES}
 
 Return ONLY valid JSON (no fences):

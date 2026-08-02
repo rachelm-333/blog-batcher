@@ -603,60 +603,6 @@ export default function Keywords() {
         </button>
       </div>
 
-      <div style={{ textAlign:"center", fontSize:12, color:"#9ca3af", margin:"0 0 20px" }}>— or assign manually from your saved keywords —</div>
-
-      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:28 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:"#ede9ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <Sparkles style={{ width:18, height:18, color:"#6e5afe" }} />
-          </div>
-          <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Auto-Assign Keywords</h2>
-        </div>
-        <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:20 }}>
-          Blog Batcher will assign one primary keyword to every article slot using real DataForSEO data from your keyword seeds (Stage 1 → Step 8). If you haven’t set keyword seeds yet, go back and complete that step first for best results. You can swap any keyword after assignment.
-        </p>
-        <div style={{ background:"#faf9f5", border:"1px solid #e5e7eb", borderRadius:8, padding:"14px 16px", marginBottom:20, fontSize:13, color:"#6b7280", display:"flex", flexDirection:"column", gap:4 }}>
-          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Business:</span> {business.name}</div>
-          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Location:</span> {(business.location as string | undefined) ?? "—"}</div>
-          <div><span style={{ fontWeight:600, color:"#1a1a2e" }}>Industry:</span> {(business.industry as string | undefined) ?? "—"}</div>
-        </div>
-
-        {/* Cornerstone primary-keyword picker */}
-        {(savedSelections?.length ?? 0) > 0 && (
-          <div style={{ marginBottom:20 }}>
-            <label style={{ display:"block", fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>
-              Cornerstone keyword (your primary subject)
-            </label>
-            <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 8px", lineHeight:1.5 }}>
-              This becomes the broad subject of your cornerstone article. Your other saved keywords fill the
-              3 pillars (segments) and clusters (specific topics) beneath it.
-            </p>
-            <Select
-              value={primarySelectionId != null ? String(primarySelectionId) : undefined}
-              onValueChange={(v) => setPrimarySelectionId(Number(v))}
-            >
-              <SelectTrigger style={{ fontSize:13 }}>
-                <SelectValue placeholder="Choose your cornerstone keyword…" />
-              </SelectTrigger>
-              <SelectContent>
-                {(savedSelections ?? []).map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.keyword}{s.msv != null ? ` · ${s.msv.toLocaleString()} MSV` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        <button
-          className="btn-primary"
-          onClick={() => assignMutation.mutate({ businessId, primarySelectionId })}
-          disabled={assignMutation.isPending}
-        >
-          {assignMutation.isPending ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Assigning…</> : <><Sparkles style={{ width:14, height:14 }} /> Assign Keywords</>}
-        </button>
-      </div>
     </div>
   );
 
@@ -737,48 +683,6 @@ export default function Keywords() {
   /* ── Keyword Review sub-stage ── */
   const renderKeywordReview = () => (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      {/* Cornerstone primary-keyword picker + re-assign */}
-      {(savedSelections?.length ?? 0) > 0 && (
-        <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:"14px 20px", display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
-          <div style={{ flex:1, minWidth:240 }}>
-            <label style={{ display:"block", fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:4 }}>
-              Cornerstone keyword (your primary subject)
-            </label>
-            <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 8px", lineHeight:1.5 }}>
-              Pick your primary keyword, then re-assign — it anchors the cornerstone, with pillars (segments) and clusters (specific topics) filled beneath it.
-            </p>
-            <Select
-              value={primarySelectionId != null ? String(primarySelectionId) : undefined}
-              onValueChange={(v) => setPrimarySelectionId(Number(v))}
-            >
-              <SelectTrigger style={{ fontSize:13, maxWidth:420 }}>
-                <SelectValue placeholder="Choose your cornerstone keyword…" />
-              </SelectTrigger>
-              <SelectContent>
-                {(savedSelections ?? []).map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.keyword}{s.msv != null ? ` · ${s.msv.toLocaleString()} MSV` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <button
-            className="btn-primary"
-            style={{ flexShrink:0, alignSelf:"flex-end" }}
-            disabled={assignMutation.isPending || primarySelectionId == null}
-            onClick={() => {
-              if (window.confirm("Re-assign all keywords with this cornerstone? This replaces the current keyword assignments.")) {
-                assignMutation.mutate({ businessId, primarySelectionId });
-              }
-            }}
-          >
-            {assignMutation.isPending
-              ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Re-assigning…</>
-              : <><RefreshCw style={{ width:14, height:14 }} /> Set cornerstone & re-assign</>}
-          </button>
-        </div>
-      )}
       {/* Cannibalization warning */}
       {cannibalizationConflicts.length > 0 && (
         <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"12px 16px", display:"flex", gap:10 }}>
@@ -905,21 +809,6 @@ export default function Keywords() {
             title="Go back to the AI hub — one cornerstone keyword builds fresh, data-backed, cross-batch-clean keywords"
           >
             <Sparkles style={{ width:12, height:12 }} /> Rebuild Hub
-          </button>
-          <button
-            className="btn-ghost"
-            style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"#6b7280" }}
-            onClick={() => {
-              if (window.confirm("Re-assign from your SAVED keyword pool? Note: this reuses your existing keywords (which may overlap earlier batches). To get fresh, data-backed keywords, use 'Rebuild Hub' instead.")) {
-                assignMutation.mutate({ businessId, primarySelectionId });
-              }
-            }}
-            disabled={assignMutation.isPending}
-            title="Re-assign from saved keywords (may reuse earlier-batch terms)"
-          >
-            {assignMutation.isPending
-              ? <><Loader2 style={{ width:12, height:12 }} className="animate-spin" /> Re-assigning…</>
-              : <><RefreshCw style={{ width:12, height:12 }} /> Re-assign (saved keywords)</>}
           </button>
         </div>
         {allKwApproved && (
