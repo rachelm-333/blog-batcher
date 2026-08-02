@@ -4,6 +4,23 @@ _Purpose: define everything this part of Blog Batcher must achieve, so it can be
 
 ---
 
+## 0. ARCHITECTURE = 2-TIER (flat, no cornerstone) — CURRENT DIRECTION
+
+The architecture is now **flat, 2 tiers only: Pillar Pages (broad topics) → Cluster Posts (specific sub-topics). NO cornerstone.**
+- **Shape:** N pillars (default 3, user-selectable) × **3 clusters per pillar**.
+- **Seeding:** Step 1 batch purpose + Step 2 theme keyword → system pulls real DataForSEO terms → builds the pillars + their 3 clusters (no cornerstone article).
+- **Linking (2-tier protocol):** Cluster → links UP to its parent Pillar; Pillar → links DOWN to its 3 Clusters. Flat silos — no cross-pillar links, no cornerstone.
+- **Schema:** FAQPage lives on **Pillars** (was cornerstone). Article + Author(Person) on every post.
+- **Generation order:** Pillars first → their clusters.
+- **Non-destructive:** applies to NEW batches; existing cornerstone batches remain valid.
+
+**Writing formula (2-tier, per post) — every draft must:**
+1. Keyword in slug (lowercase-hyphen), H1, first 150 words; secondary/LSI woven into H2/H3.
+2. GEO: question-format H2/H3 headings; a 40–60 word standalone answer immediately under each; extractable tables/lists. Each **secondary keyword → a question H2/H3 + 40–60 word answer** (§2.6b).
+3. 2-tier linking (above); `<a href>` only; descriptive exact/partial-match anchors (never "click here"); links contextual in the upper half.
+4. **≥2 external** authoritative non-competing links; ≥1 image placeholder with descriptive keyword alt; JSON-LD Article + FAQ + Author schema.
+5. E-E-A-T authority, no fluff/robotic transitions; scannable (subheads, bold, short paras, tables); **no nested bullet points**.
+
 ## 1. The vision
 
 Turn a single **cornerstone keyword + a batch goal** into a **coherent, connected set of blog posts** (a topic cluster) that:
