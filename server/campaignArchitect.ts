@@ -377,3 +377,144 @@ export async function generateHubFromPool(
     : [];
   return { architecture: arch, warnings };
 }
+
+// ===========================================================================
+// FLAT 2-TIER HUB — Pillars → Clusters only (NO cornerstone). Each pillar's
+// clusters are forced into DISTINCT formats (A–E) for strict anti-cannibalization.
+// Selects from a real DataForSEO pool (data-first). Pure prompt/parse + generator.
+// ===========================================================================
+
+export const CLUSTER_FORMATS = [
+  { key: "how_to", label: "How-To (step-by-step tutorial)" },
+  { key: "comparison", label: "Comparison (X vs Y / alternatives)" },
+  { key: "top_10_list", label: "Listicle/Examples (roundup, tools, stats)" },
+  { key: "specialist_post", label: "Troubleshooting (fix a specific problem)" },
+  { key: "the_why", label: "Cost/ROI (pricing, value, investment)" },
+] as const;
+
+export interface FlatNode { keyword: string; title: string; secondaryKeywords: string[]; format?: string; }
+export interface FlatPillar extends FlatNode { clusters: FlatNode[]; }
+export interface FlatArchitecture { pillars: FlatPillar[]; }
+
+export interface FlatHubInput {
+  themeKeyword: string;        // seeds the topic; NOT a cornerstone page
+  targetAudience: string;
+  businessName: string;
+  industry?: string;
+  services?: string[];
+  businessDescription?: string;
+  batchPurpose?: string;
+  pillarCount: number;         // default 3
+  clustersPerPillar: number;   // e.g. 3
+  secondaryPerNode?: number;
+  avoidKeywords?: string[];
+}
+
+/** Build the flat 2-tier prompt from a real keyword pool. Pure + testable. */
+export function buildFlatHubPrompt(input: FlatHubInput, pool: PoolCandidate[]): string {
+  const secondaryN = input.secondaryPerNode ?? 4;
+  const services = (input.services ?? []).filter(Boolean);
+  const grounding = [
+    input.industry ? `Industry: ${input.industry}` : "",
+    services.length ? `Services: ${services.join(", ")}` : "",
+    input.businessDescription ? `About: ${input.businessDescription}` : "",
+    input.batchPurpose ? `GOAL OF THIS BATCH (every article must serve this): ${input.batchPurpose}` : "",
+  ].filter(Boolean).join("\n");
+  const poolText = pool.map((p) => `- "${p.keyword}" (volume: ${p.msv ?? "?"}, competition: ${p.competition ?? "?"})`).join("\n");
+  const avoid = (input.avoidKeywords ?? []).filter(Boolean);
+  const avoidText = avoid.length ? `\n- Never reuse or overlap with these (used in earlier batches): ${avoid.join(", ")}.` : "";
+  const formatList = CLUSTER_FORMATS.map((f, i) => `  ${String.fromCharCode(65 + i)} — ${f.label} (article type: ${f.key})`).join("\n");
+
+  return `You are an expert SEO content architect for ${input.businessName}. Audience: "${input.targetAudience}".
+
+${grounding}
+
+Theme keyword: "${input.themeKeyword}". Build a FLAT 2-TIER structure — Pillar Pages (broad topics) and Cluster Posts (specific sub-topics) only. THERE IS NO CORNERSTONE.
+
+Below are REAL keywords with actual search volume. You MUST SELECT from THIS LIST — do NOT invent keywords (invented ones have no proven demand):
+CANDIDATE KEYWORDS:
+${poolText || "(none)"}
+
+Produce exactly ${input.pillarCount} pillars, each with exactly ${input.clustersPerPillar} clusters, all from the candidates and coherent with the theme.
+- PILLARS = the broadest, higher-volume distinct topics.
+- CLUSTERS = specific long-tail candidates under the right pillar.
+STRICT ANTI-CANNIBALIZATION — every cluster under a pillar MUST use a DIFFERENT format (never the same format twice under one pillar), each a distinct search intent (no two share a SERP). Formats:
+${formatList}
+Assign a "format" article-type key to EACH cluster (from the list) and to each pillar (pillars use "how_to" or "the_why" or "top_10_list" as fits).
+- SECONDARY KEYWORDS: ${secondaryN} per node, chosen from OTHER candidates, semantically related, no repeats of any primary.
+${TITLE_RULES}${avoidText}
+
+Return ONLY valid JSON (no fences):
+{
+  "pillars": [
+    { "keyword": "...", "title": "...", "format": "how_to", "secondaryKeywords": ["..."],
+      "clusters": [ { "keyword": "...", "title": "...", "format": "comparison", "secondaryKeywords": ["..."] } ] }
+  ]
+}
+Exactly ${input.pillarCount} pillars, each with ${input.clustersPerPillar} clusters, every cluster a UNIQUE format within its pillar.`;
+}
+
+/** Parse + validate the flat 2-tier JSON. Throws on invalid shape. Pure + testable. */
+export function parseFlatHub(raw: string, pillarCount: number, clustersPerPillar: number): FlatArchitecture {
+  const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  const data = JSON.parse(stripped);
+  if (!Array.isArray(data?.pillars) || data.pillars.length === 0) throw new Error("Missing pillars array");
+  const validFormats = new Set(CLUSTER_FORMATS.map((f) => f.key));
+  const pillars: FlatPillar[] = data.pillars.map((p: any, i: number) => {
+    if (typeof p?.keyword !== "string" || typeof p?.title !== "string") throw new Error(`Pillar ${i} missing keyword/title`);
+    if (!Array.isArray(p.clusters)) throw new Error(`Pillar ${i} missing clusters`);
+    const clusters: FlatNode[] = p.clusters.map((c: any, j: number) => {
+      if (typeof c?.keyword !== "string" || typeof c?.title !== "string") throw new Error(`Cluster ${i}.${j} missing keyword/title`);
+      return {
+        keyword: c.keyword.trim(), title: c.title.trim(),
+        secondaryKeywords: parseSecondary(c.secondaryKeywords),
+        format: validFormats.has(c.format) ? c.format : "specialist_post",
+      };
+    });
+    return {
+      keyword: p.keyword.trim(), title: p.title.trim(),
+      secondaryKeywords: parseSecondary(p.secondaryKeywords),
+      format: validFormats.has(p.format) ? p.format : "how_to",
+      clusters,
+    };
+  });
+  return { pillars };
+}
+
+/** Detect duplicate formats within any pillar (anti-cannibalization check). Pure. */
+export function flatFormatConflicts(arch: FlatArchitecture): string[] {
+  const issues: string[] = [];
+  arch.pillars.forEach((p, i) => {
+    const seen = new Set<string>();
+    for (const c of p.clusters) {
+      const f = c.format ?? "specialist_post";
+      if (seen.has(f)) issues.push(`Pillar ${i + 1} "${p.keyword}" reuses format "${f}"`);
+      seen.add(f);
+    }
+  });
+  return issues;
+}
+
+/** Generate the flat 2-tier hub from a real pool (data-first), one repair on format clashes. */
+export async function generateFlatHub(
+  input: FlatHubInput,
+  pool: PoolCandidate[],
+  userId?: number | null,
+): Promise<{ architecture: FlatArchitecture; warnings: string[] }> {
+  const callLLM = async (prompt: string): Promise<string> => {
+    const res = await invokeClaudeWithCost(
+      { messages: [{ role: "user", content: prompt }], response_format: { type: "json_object" }, max_tokens: 3500 },
+      { userId, feature: "keyword_research" },
+    );
+    const c = res.choices[0]?.message?.content;
+    return typeof c === "string" ? c : JSON.stringify(c);
+  };
+  let arch = parseFlatHub(await callLLM(buildFlatHubPrompt(input, pool)), input.pillarCount, input.clustersPerPillar);
+  let clashes = flatFormatConflicts(arch);
+  if (clashes.length) {
+    const fix = `${buildFlatHubPrompt(input, pool)}\n\nThese pillars reused a cluster format — regenerate so every cluster under a pillar uses a DIFFERENT format: ${clashes.join("; ")}`;
+    try { const retry = parseFlatHub(await callLLM(fix), input.pillarCount, input.clustersPerPillar); if (flatFormatConflicts(retry).length < clashes.length) { arch = retry; clashes = flatFormatConflicts(retry); } } catch { /* keep */ }
+  }
+  const warnings = clashes.length ? [`Some clusters may share a format: ${clashes.join("; ")}`] : [];
+  return { architecture: arch, warnings };
+}
