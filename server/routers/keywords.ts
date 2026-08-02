@@ -38,6 +38,7 @@ import {
 import { allocateKeywords } from "../../shared/keywordAllocation";
 import { generateSlug } from "../articleEngine";
 import { generateCornerstoneArchitecture } from "../campaignArchitect";
+import { loadContentRegister, keywordInRegister, titleInRegister, slugInRegister } from "../contentRegister";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -600,10 +601,11 @@ export const keywordsRouter = router({
       }
       const maxClustersPerPillar = Math.max(1, ...pillarNodes.map((p) => clustersByPillar.get(p.id)?.length ?? 0));
 
-      // Cross-batch guard: never reuse keywords from earlier batches of this business.
-      const priorRows = await db.select({ pk: keywords.primaryKeyword, bn: keywords.batchNumber })
-        .from(keywords).where(eq(keywords.businessId, input.businessId));
-      const avoidKeywords = Array.from(new Set(priorRows.filter((r) => r.bn !== activeBatch).map((r) => r.pk).filter(Boolean)));
+      // Content Register — everything used in earlier batches (keywords + titles +
+      // slugs). The generator avoids these; anything that still slips through is
+      // auto-replaced below so this batch never competes with earlier posts.
+      const register = await loadContentRegister(db, input.businessId, activeBatch);
+      const avoidKeywords = register.keywords;
 
       // Real services — hard grounding so the AI can't drift off-industry.
       const svcRows = await db.select({ name: businessServices.name })
@@ -639,6 +641,35 @@ export const keywordsRouter = router({
         });
       });
 
+      // ── AUTO-REPLACE against the Content Register (decision §6.1) ────────────
+      // Any keyword/title/slug that still matches an earlier batch is swapped for
+      // the node's best data-backed secondary keyword that is NOT in the register,
+      // and the user is told. Protects cross-batch SEO without blocking the flow.
+      const replacements: Array<{ original: string; replacement: string; reason: string }> = [];
+      const usedThisBatch = new Set<string>();
+      for (const a of assignments) {
+        const conflict =
+          keywordInRegister(a.keyword, register) ||
+          titleInRegister(a.title, register) ||
+          slugInRegister(generateSlug(a.keyword), register) ||
+          usedThisBatch.has(a.keyword.toLowerCase().trim());
+        if (conflict) {
+          // Find a clean alternative from this node's secondary keywords.
+          const alt = (a.secondary ?? []).find((s) =>
+            s && !keywordInRegister(s, register) && !usedThisBatch.has(s.toLowerCase().trim()));
+          if (alt) {
+            replacements.push({ original: a.keyword, replacement: alt, reason: "already used in a previous post" });
+            // Promote the secondary to primary; drop it from secondaries.
+            a.secondary = (a.secondary ?? []).filter((s) => s !== alt);
+            a.keyword = alt;
+            a.title = a.title; // title regenerated below to match if needed
+          } else {
+            replacements.push({ original: a.keyword, replacement: a.keyword, reason: "already used in a previous post — no clean alternative found, please swap manually" });
+          }
+        }
+        usedThisBatch.add(a.keyword.toLowerCase().trim());
+      }
+
       // Validate keywords against DataForSEO (MSV) where available.
       const msvByKw = new Map<string, { msv: number | null; comp: "high" | "medium" | "low" | null }>();
       if (process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
@@ -673,7 +704,12 @@ export const keywordsRouter = router({
           .where(eq(articleNodes.id, a.nodeId));
       }
 
-      return { assigned: assignments.length, warnings, lowVolume: assignments.filter((a) => (msvByKw.get(a.keyword)?.msv ?? 0) === 0).map((a) => a.keyword) };
+      return {
+        assigned: assignments.length,
+        warnings,
+        lowVolume: assignments.filter((a) => (msvByKw.get(a.keyword)?.msv ?? 0) === 0).map((a) => a.keyword),
+        replacements, // cross-batch auto-replacements (register conflicts), for user notification
+      };
     }),
 
   // -------------------------------------------------------------------------

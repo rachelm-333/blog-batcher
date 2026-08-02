@@ -417,6 +417,14 @@ export default function Keywords() {
   const assignFromCornerstone = trpc.keywords.assignFromCornerstone.useMutation({
     onSuccess: async (r) => {
       toast.success(`Built your hub — ${r.assigned} articles planned around "${cornerstoneKw.trim()}".`, { duration: 8000 });
+      const reps = r.replacements ?? [];
+      if (reps.length) {
+        const lines = reps.slice(0, 4).map((x) => `“${x.original}” → “${x.replacement}”`).join("; ");
+        toast.info(
+          `To protect your SEO, ${reps.length} keyword${reps.length > 1 ? "s were" : " was"} already used in earlier posts — we selected the next best option: ${lines}${reps.length > 4 ? "…" : ""}`,
+          { duration: 12000 },
+        );
+      }
       if (r.warnings?.length) toast.warning(r.warnings.join(" "), { duration: 10000 });
       if (r.lowVolume?.length) toast.warning(`${r.lowVolume.length} keyword(s) have low search volume — review/swap them.`, { duration: 9000 });
       await utils.keywords.getAll.invalidate({ businessId });
