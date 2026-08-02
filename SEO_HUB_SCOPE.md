@@ -71,6 +71,9 @@ Every keyword (primary especially) must have **real DataForSEO search volume**. 
 ### 2.6 Batch purpose grounds everything
 A short **batch goal** (e.g. "educate on brand architecture: what it is, how to use it in marketing, why") is set up front and **steers keyword selection, titles, and writing** so all posts serve one aim and read as one campaign — always kept **inside the business's real industry + services** (no drift to generic/unrelated topics).
 
+### 2.6b Secondary keywords become question H2/H3s + 40–60 word answers
+Each **secondary/LSI keyword** must be turned into a **conversational question** used as an **H2 or H3 heading**, with a **40–60 word direct answer** immediately beneath (present tense, standalone, snippet-able). So every secondary keyword = one extractable Q&A block. This maps the secondaries onto the heading structure (not just sprinkled) and maximises AI-Overview / AI-engine citation. The writer prompt must enforce this mapping.
+
 ### 2.7 AI-citation + SEO writing (GEO)
 Each article is written to be **extractable and citable**:
 - Answer-first blocks (question asked + answered in the opening / under each H2).
