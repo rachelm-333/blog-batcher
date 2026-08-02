@@ -78,8 +78,20 @@ Each article is written to be **extractable and citable**:
 - Structured data (Article, Breadcrumb; FAQPage on cornerstone/pillars; HowTo on how-tos).
 - Clean, skimmable formatting that survives on the customer's CMS (e.g. tables → bullet lists on Wix).
 
-### 2.8 Internal linking (the "spoke" wiring)
-Cornerstone ↔ pillars ↔ clusters are **internally linked** so authority flows through the cluster — with a **no-broken-links** guarantee (links only go live once their target post is published).
+### 2.8 Internal linking (the "spoke" wiring) — SILO-STRICT
+Cornerstone ↔ pillars ↔ clusters are **internally linked** so authority flows through the cluster — with a **no-broken-links** guarantee (links only go live once their target post is published). **Silo discipline (industry best practice):**
+- Every **cluster links UP to its pillar** (exact/partial-match anchor); every **pillar links DOWN to all its clusters**.
+- **Spoke-to-spoke only within the same pillar** — clusters under Pillar 1 may link to each other, but **NOT** to clusters/pillars in Pillar 2 or 3 (no cross-pollination). Keep each silo tight.
+
+### 2.9 The Keyword Map (the blueprint artifact)
+The keyword architecture is a **data-driven Keyword Map** — the review screen should present it as such, one row per article, columns:
+**Hierarchy Level · Target Slug · Primary Keyword · Search Volume · Keyword Difficulty (KD) · Secondary Keywords · Search Intent · Status · Internal-Links-To.**
+This is the blueprint that prevents cannibalization and makes the whole 1-3-9(+) structure visible before a word is written.
+
+### 2.10 Search Intent + Keyword Difficulty (metrics to add)
+- **Search Intent** classified per keyword (Informational / Commercial / Transactional / Navigational / How-to). Used to (a) match each post's content type and (b) sharpen cannibalization checks (same term + same intent = same page).
+- **Keyword Difficulty (KD)** — a numeric difficulty (DataForSEO has an endpoint) alongside volume, driving the opportunity score (favour good volume + low KD). Today we use DataForSEO *competition* (low/med/high) as a proxy; upgrade to numeric KD.
+- **(Aspirational) SERP-overlap clustering** — the gold standard for cannibalization ("if two keywords return the same SERP, they belong on one page"). Needs ranking data (extra cost); our token-overlap check is the interim proxy.
 
 ---
 
