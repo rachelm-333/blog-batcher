@@ -899,19 +899,27 @@ export default function Keywords() {
         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
           <button className="btn-ghost" onClick={() => setLocation("/architecture")}>← Back to architecture</button>
           <button
+            className="btn-primary"
+            style={{ display:"flex", alignItems:"center", gap:5, fontSize:12 }}
+            onClick={() => setSubStage("assign")}
+            title="Go back to the AI hub — one cornerstone keyword builds fresh, data-backed, cross-batch-clean keywords"
+          >
+            <Sparkles style={{ width:12, height:12 }} /> Rebuild hub with AI
+          </button>
+          <button
             className="btn-ghost"
             style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"#6b7280" }}
             onClick={() => {
-              if (window.confirm("Re-assign all keywords? This will replace the current keywords, anchoring the cornerstone to your chosen primary keyword.")) {
+              if (window.confirm("Re-assign from your SAVED keyword pool? Note: this reuses your existing keywords (which may overlap earlier batches). To get fresh, data-backed keywords, use 'Rebuild hub with AI' instead.")) {
                 assignMutation.mutate({ businessId, primarySelectionId });
               }
             }}
             disabled={assignMutation.isPending}
-            title="Re-run keyword assignment with updated business context"
+            title="Re-assign from saved keywords (may reuse earlier-batch terms)"
           >
             {assignMutation.isPending
               ? <><Loader2 style={{ width:12, height:12 }} className="animate-spin" /> Re-assigning…</>
-              : <><RefreshCw style={{ width:12, height:12 }} /> Re-assign keywords</>}
+              : <><RefreshCw style={{ width:12, height:12 }} /> Re-assign (saved keywords)</>}
           </button>
         </div>
         {allKwApproved && (
