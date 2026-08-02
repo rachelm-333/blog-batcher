@@ -567,29 +567,35 @@ export default function Keywords() {
           </div>
           <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Build your keyword hub</h2>
         </div>
-        <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:16 }}>
-          Give one <strong>cornerstone keyword</strong> and the <strong>goal of this batch</strong>. The system builds the
-          whole set so everything <strong>builds off your cornerstone</strong> — pillars = segments of it, clusters =
-          specific long-tail topics — each with a title and secondary keywords, kept inside <strong>{(business.industry as string | undefined) ?? "your industry"}</strong>,
+        <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:18 }}>
+          Two steps: first say what this batch of posts should achieve, then give the one main keyword that captures it.
+          The system pulls real search data around that keyword and builds the whole set — cornerstone → pillars →
+          long-tail clusters — kept inside <strong>{(business.industry as string | undefined) ?? "your industry"}</strong>,
           validated for search volume, and distinct from earlier batches.
         </p>
 
-        <label style={{ display:"block", fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>Cornerstone keyword</label>
-        <input
-          type="text"
-          value={cornerstoneKw}
-          onChange={(e) => setCornerstoneKw(e.target.value)}
-          placeholder="e.g. brand architecture"
-          style={{ width:"100%", boxSizing:"border-box", fontSize:14, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, marginBottom:14 }}
-        />
-
-        <label style={{ display:"block", fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>Purpose of this batch</label>
+        <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#1a1a2e", marginBottom:2 }}>Step 1 — Purpose of this batch</label>
+        <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 6px", lineHeight:1.5 }}>
+          What should these posts achieve for your audience? Describe the goal, then pull your main keyword from it in Step 2.
+        </p>
         <textarea
           value={batchPurpose}
           onChange={(e) => setBatchPurpose(e.target.value)}
           placeholder="e.g. Educate our audience on what brand architecture is, how to use it in their marketing, and why it matters."
           rows={3}
-          style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5, marginBottom:14 }}
+          style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5, marginBottom:16 }}
+        />
+
+        <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#1a1a2e", marginBottom:2 }}>Step 2 — Cornerstone keyword</label>
+        <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 6px", lineHeight:1.5 }}>
+          The main keyword/topic from your purpose above — it anchors the cornerstone article, and everything else builds off it.
+        </p>
+        <input
+          type="text"
+          value={cornerstoneKw}
+          onChange={(e) => setCornerstoneKw(e.target.value)}
+          placeholder="e.g. brand architecture"
+          style={{ width:"100%", boxSizing:"border-box", fontSize:14, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, marginBottom:16 }}
         />
 
         <button
