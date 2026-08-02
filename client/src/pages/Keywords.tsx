@@ -565,10 +565,10 @@ export default function Keywords() {
           <div style={{ width:36, height:36, borderRadius:10, background:"#ede9ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
             <Sparkles style={{ width:18, height:18, color:"#6e5afe" }} />
           </div>
-          <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Build a coherent hub with AI</h2>
+          <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Build your keyword hub</h2>
         </div>
         <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:16 }}>
-          Give one <strong>cornerstone keyword</strong> and the <strong>goal of this batch</strong>. The AI builds the
+          Give one <strong>cornerstone keyword</strong> and the <strong>goal of this batch</strong>. The system builds the
           whole set so everything <strong>builds off your cornerstone</strong> — pillars = segments of it, clusters =
           specific long-tail topics — each with a title and secondary keywords, kept inside <strong>{(business.industry as string | undefined) ?? "your industry"}</strong>,
           validated for search volume, and distinct from earlier batches.
@@ -599,7 +599,7 @@ export default function Keywords() {
         >
           {buildingHub
             ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Building your hub…</>
-            : <><Sparkles style={{ width:14, height:14 }} /> Build hub with AI</>}
+            : <><Sparkles style={{ width:14, height:14 }} /> Build Hub</>}
         </button>
       </div>
 
@@ -904,13 +904,13 @@ export default function Keywords() {
             onClick={() => setSubStage("assign")}
             title="Go back to the AI hub — one cornerstone keyword builds fresh, data-backed, cross-batch-clean keywords"
           >
-            <Sparkles style={{ width:12, height:12 }} /> Rebuild hub with AI
+            <Sparkles style={{ width:12, height:12 }} /> Rebuild Hub
           </button>
           <button
             className="btn-ghost"
             style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"#6b7280" }}
             onClick={() => {
-              if (window.confirm("Re-assign from your SAVED keyword pool? Note: this reuses your existing keywords (which may overlap earlier batches). To get fresh, data-backed keywords, use 'Rebuild hub with AI' instead.")) {
+              if (window.confirm("Re-assign from your SAVED keyword pool? Note: this reuses your existing keywords (which may overlap earlier batches). To get fresh, data-backed keywords, use 'Rebuild Hub' instead.")) {
                 assignMutation.mutate({ businessId, primarySelectionId });
               }
             }}
