@@ -46,7 +46,7 @@ Today the keywords table already records every batch's keywords (a de-facto part
 Every keyword at every level must be **backed by real DataForSEO data (volume + competition)** — primary, secondary/LSI, AND long-tail. AI structures; data proves demand. Concretely, using the existing DataForSEO functions:
 - **Candidate pool:** `getKeywordSuggestions(goal + cornerstone)` → real related keywords WITH volume/competition.
 - **Structure:** AI arranges only these **data-backed candidates** into cornerstone / pillars / clusters by relevance + the batch goal (never invents a keyword with no data).
-- **Opportunity selection:** score candidates on volume vs competition and pick the best; drop zero/low-value ones. Result = "data-chosen, AI-structured".
+- **Opportunity selection:** score candidates on volume vs competition; the **user chooses the target strategy** (high-volume / low-comp long-tail / medium-volume+low-comp — default medium+low). Show volume + competition on each so the choice is informed. Drop zero-value ones.
 - **Validate:** `getKeywordData` confirms MSV/competition on the final picks.
 
 ### 2.4 Secondary / LSI + long-tail per post — FROM DATA (not invented)
@@ -109,9 +109,13 @@ Cornerstone ↔ pillars ↔ clusters are **internally linked** so authority flow
 
 ---
 
-## 6. Open questions for the product owner
+## 6. Product decisions
 
-1. Cross-batch overlap: **hard block** (can't proceed) or **auto-replace** (system swaps in a distinct alternative)? 
-2. Should starting a new batch **require fresh keyword research** (new seeds) rather than reusing the previous pool?
-3. Opportunity scoring: what's the preferred balance of **volume vs competition** (e.g. favour low-competition long-tail, or chase a few higher-volume heads)?
-4. How many total posts per batch is the target sweet spot (13 vs 19)?
+1. **Cross-batch overlap → AUTO-REPLACE + notify. [DECIDED]** When a pick matches the Content Register, the system automatically swaps in the next-best data-backed alternative and tells the user, e.g.: *"'brand strategy' was already used in a previous post — to protect your SEO, we've selected the next best option: 'brand strategy framework'."* Never silently, never blocking.
+2. **Opportunity scoring → USER CHOOSES THE STRATEGY. [DECIDED]** Present the options and let the user pick what to target per keyword/batch:
+   - High volume (accept higher competition),
+   - Low-competition long-tail (easier wins),
+   - **Medium volume + low competition** (the balanced sweet spot).
+   Show volume + competition on each candidate so the choice is informed; default to medium-volume/low-competition.
+3. **Fresh research per batch → REUSE POOL by default; optional paid "Fresh research". [DECIDED]** A new batch reuses the existing keyword pool by default (no extra cost). A **"Run fresh keyword research"** option triggers a new DataForSEO search (goal + cornerstone → fresh candidates) but **consumes credits** (it's real API spend). Make the credit cost clear before running. This also gives billing a natural paid action.
+4. **Posts per batch (13 vs 19) → OPEN.**
