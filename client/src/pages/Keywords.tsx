@@ -568,9 +568,9 @@ export default function Keywords() {
           <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Build your keyword hub</h2>
         </div>
         <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:18 }}>
-          Two steps: first say what this batch of posts should achieve, then give the one main keyword that captures it.
-          The system pulls real search data around that keyword and builds the whole set — cornerstone → pillars →
-          long-tail clusters — kept inside <strong>{(business.industry as string | undefined) ?? "your industry"}</strong>,
+          Two steps: first say what this batch of posts should achieve, then give the one main topic that captures it.
+          The system pulls real search data around that topic and builds a flat set — <strong>pillar pages</strong> +
+          long-tail <strong>cluster posts</strong> (no cornerstone) — kept inside <strong>{(business.industry as string | undefined) ?? "your industry"}</strong>,
           validated for search volume, and distinct from earlier batches.
         </p>
 
@@ -586,9 +586,9 @@ export default function Keywords() {
           style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5, marginBottom:16 }}
         />
 
-        <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#1a1a2e", marginBottom:2 }}>Step 2 — Cornerstone keyword</label>
+        <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#1a1a2e", marginBottom:2 }}>Step 2 — Main topic keyword</label>
         <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 6px", lineHeight:1.5 }}>
-          The main keyword/topic from your purpose above — it anchors the cornerstone article, and everything else builds off it.
+          The main topic/keyword from your purpose above — the system builds your pillar pages and cluster posts around it.
         </p>
         <input
           type="text"
