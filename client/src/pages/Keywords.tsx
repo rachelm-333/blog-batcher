@@ -422,6 +422,7 @@ export default function Keywords() {
   const [cornerstoneKw, setCornerstoneKw] = useState("");
   const [batchPurpose, setBatchPurpose] = useState("");
   const purposeQuery = trpc.business.getBatchPurpose.useQuery({ businessId }, { enabled: !!businessId });
+  const batchHistory = trpc.keywords.getBatchHistory.useQuery({ businessId }, { enabled: !!businessId });
   useEffect(() => { if (purposeQuery.data?.batchPurpose !== undefined) setBatchPurpose(purposeQuery.data.batchPurpose); }, [purposeQuery.data?.batchPurpose]);
   const setPurposeMut = trpc.business.setBatchPurpose.useMutation();
   const assignFromCornerstone = trpc.keywords.assignFromCornerstone.useMutation({
@@ -590,6 +591,28 @@ export default function Keywords() {
         <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 6px", lineHeight:1.5 }}>
           The main topic/keyword from your purpose above — the system builds your pillar pages and cluster posts around it.
         </p>
+
+        {/* Cross-batch reminder + what's already been built */}
+        {(() => {
+          const activeBatch = (business as { activeBatch?: number } | undefined)?.activeBatch ?? 1;
+          const prior = (batchHistory.data ?? []).filter((b) => b.batchNumber < activeBatch && b.total > 0);
+          if (prior.length === 0) return null;
+          return (
+            <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:8, padding:"10px 12px", margin:"0 0 12px" }}>
+              <p style={{ fontSize:12, color:"#92400e", margin:"0 0 6px", lineHeight:1.5, fontWeight:600 }}>
+                ⚠️ Choose a NEW focus keyword — different from your earlier batches. Targeting the same topic twice makes your posts compete with each other for the same Google ranking (keyword cannibalization).
+              </p>
+              <p style={{ fontSize:11, color:"#92400e", margin:"0 0 4px", opacity:0.85 }}>Already built for this business:</p>
+              {prior.map((b) => (
+                <div key={b.batchNumber} style={{ fontSize:12, color:"#78350f", lineHeight:1.5 }}>
+                  <strong>Batch {b.batchNumber}</strong> ({b.total} posts): {Array.from(new Set(b.themes.length ? b.themes : b.allKeywords)).slice(0, 6).join(", ")}
+                  {Array.from(new Set(b.allKeywords)).length > 6 ? "…" : ""}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         <input
           type="text"
           value={cornerstoneKw}
@@ -706,7 +729,7 @@ export default function Keywords() {
       <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"10px 16px", display:"flex", gap:10, alignItems:"flex-start" }}>
         <span style={{ fontSize:14, flexShrink:0 }}>💡</span>
         <p style={{ fontSize:12, color:"#78350f", margin:0, lineHeight:1.6 }}>
-          Aim for a mix of competition levels. A few <strong>high-volume cornerstones</strong> plus easy-win clusters ranks faster than chasing only the big terms.
+          Aim for a mix of competition levels. A few <strong>higher-volume pillar pages</strong> plus easy-win, low-competition clusters ranks faster than chasing only the big terms.
         </p>
       </div>
 

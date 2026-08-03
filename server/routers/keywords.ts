@@ -844,6 +844,46 @@ export const keywordsRouter = router({
     }),
 
   // -------------------------------------------------------------------------
+  // keywords.getBatchHistory
+  // What the user has ALREADY built, grouped by batch — so they can pick a new
+  // focus keyword for the next batch that doesn't compete with earlier ones.
+  // Returns each batch's pillar (top-level) keywords + total article count.
+  // -------------------------------------------------------------------------
+  getBatchHistory: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      const rows = await db
+        .select({
+          batchNumber: keywords.batchNumber,
+          primaryKeyword: keywords.primaryKeyword,
+          nodeLevel: articleNodes.level,
+          nodeSortOrder: articleNodes.sortOrder,
+        })
+        .from(keywords)
+        .innerJoin(articleNodes, eq(keywords.articleNodeId, articleNodes.id))
+        .where(eq(keywords.businessId, input.businessId))
+        .orderBy(keywords.batchNumber, articleNodes.sortOrder);
+
+      // Group by batch: expose the "headline" keywords (cornerstone/pillar level)
+      // as the batch's themes, and count every article.
+      const byBatch = new Map<number, { batchNumber: number; total: number; themes: string[]; allKeywords: string[] }>();
+      for (const r of rows) {
+        const b = byBatch.get(r.batchNumber) ?? { batchNumber: r.batchNumber, total: 0, themes: [], allKeywords: [] };
+        b.total += 1;
+        if (r.primaryKeyword) {
+          b.allKeywords.push(r.primaryKeyword);
+          if ((r.nodeLevel === "cornerstone" || r.nodeLevel === "pillar")) b.themes.push(r.primaryKeyword);
+        }
+        byBatch.set(r.batchNumber, b);
+      }
+      return Array.from(byBatch.values()).sort((a, b) => a.batchNumber - b.batchNumber);
+    }),
+
+  // -------------------------------------------------------------------------
   // keywords.updatePlannedTitle — edit the approved article title before writing.
   // -------------------------------------------------------------------------
   updatePlannedTitle: protectedProcedure
