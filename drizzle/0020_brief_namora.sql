@@ -1,1 +1,0 @@
-ALTER TABLE `article_nodes` ADD `plannedTitle` varchar(512);

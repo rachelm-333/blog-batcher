@@ -37,7 +37,8 @@ import {
 } from "../../shared/cannibalizationCheck";
 import { allocateKeywords } from "../../shared/keywordAllocation";
 import { generateSlug } from "../articleEngine";
-import { generateCornerstoneArchitecture, generateHubFromPool, type PoolCandidate } from "../campaignArchitect";
+import { generateCornerstoneArchitecture, generateHubFromPool, generateFlatHub, CLUSTER_FORMATS, type PoolCandidate, type FlatHubInput } from "../campaignArchitect";
+import type { ArticleType } from "../../shared/architectureRules";
 import { loadContentRegister, keywordInRegister, titleInRegister, slugInRegister } from "../contentRegister";
 
 // ---------------------------------------------------------------------------
@@ -582,16 +583,15 @@ export const keywordsRouter = router({
       const [biz] = await db.select().from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
       if (!biz) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
 
-      // Stage-2 nodes must exist (1 cornerstone, N pillars, M clusters/pillar).
+      // Stage-2 nodes must exist. FLAT 2-TIER: N pillars, M clusters/pillar, NO cornerstone.
       const nodes = await db.select().from(articleNodes)
         .where(and(eq(articleNodes.businessId, input.businessId), eq(articleNodes.batchNumber, activeBatch)))
         .orderBy(asc(articleNodes.sortOrder));
       if (!nodes.length) throw new TRPCError({ code: "BAD_REQUEST", message: "No article nodes found. Complete Stage 2 first." });
 
-      const cornerstoneNode = nodes.find((n) => n.level === "cornerstone");
       const pillarNodes = nodes.filter((n) => n.level === "pillar").sort((a, b) => a.sortOrder - b.sortOrder);
-      if (!cornerstoneNode || pillarNodes.length === 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Architecture must have 1 cornerstone and at least 1 pillar." });
+      if (pillarNodes.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Architecture must have at least 1 pillar." });
       }
       // Cluster nodes grouped under each pillar (in order).
       const clustersByPillar = new Map<number, typeof nodes>();
@@ -613,8 +613,8 @@ export const keywordsRouter = router({
       const services = svcRows.map((s) => s.name).filter(Boolean);
 
       const audience = [biz.uniqueValueProposition, biz.serviceArea].filter(Boolean).join(" | ") || (biz.industry ?? "general audience");
-      const genInput = {
-        cornerstoneKeyword: input.cornerstoneKeyword.trim(),
+      const flatInput: FlatHubInput = {
+        themeKeyword: input.cornerstoneKeyword.trim(),
         targetAudience: audience,
         businessName: biz.name,
         industry: biz.industry ?? undefined,
@@ -627,11 +627,10 @@ export const keywordsRouter = router({
       };
 
       // ── DATA-FIRST: source a REAL keyword pool (with search volume) and let the
-      // AI organise it, so we never target keywords nobody searches. Falls back to
-      // grounded generation only if DataForSEO returns too few real candidates.
-      // Keep any term with REAL demand. Low-competition long-tail (even ~10/mo) are
-      // exactly what good cluster posts target — only truly zero/no-data terms are
-      // rejected. (A higher floor wrongly discarded real niche keywords.)
+      // AI organise it into a FLAT 2-TIER hub (pillars + clusters, NO cornerstone),
+      // so we never target keywords nobody searches. Keep any term with REAL demand.
+      // Low-competition long-tail (even ~10/mo) are exactly what good cluster posts
+      // target — only truly zero/no-data terms are rejected.
       const MSV_FLOOR = 10;
       let pool: PoolCandidate[] = [];
       if (process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
@@ -641,16 +640,45 @@ export const keywordsRouter = router({
             .filter((s) => (s.monthlySearchVolume ?? 0) >= MSV_FLOOR)
             .filter((s) => !register.normKeywordSet.has(s.keyword.toLowerCase().replace(/\s+/g, " ").trim()))
             .map((s) => ({ keyword: s.keyword, msv: s.monthlySearchVolume, competition: s.competitionLevel }));
-        } catch (err) { console.warn("[assignFromCornerstone] keyword pool fetch failed:", err); }
+        } catch (err) { console.warn("[buildHub] keyword pool fetch failed:", err); }
       }
-      const needed = 1 + pillarNodes.length + pillarNodes.length * maxClustersPerPillar;
+      const needed = pillarNodes.length + pillarNodes.length * maxClustersPerPillar;
       const dataFirst = pool.length >= Math.max(6, Math.floor(needed * 0.6));
-      const { architecture, warnings } = dataFirst
-        ? await generateHubFromPool(genInput, pool, ctx.user.id)
-        : await generateCornerstoneArchitecture(genInput, ctx.user.id);
-      if (!dataFirst && (process.env.DATAFORSEO_LOGIN)) {
-        warnings.push("Not enough keywords with real search volume were found for this cornerstone — used AI-generated topics; review volumes and swap any showing no data.");
+
+      // Format keys → article types (formats already ARE article types; clamp per level).
+      const pillarType = (f?: string) =>
+        (["top_10_list", "how_to", "the_why", "comparison", "myth_busting"].includes(f ?? "") ? f! : "how_to");
+      const clusterType = (f?: string) =>
+        (CLUSTER_FORMATS.some((cf) => cf.key === f) ? f! : "specialist_post");
+
+      // Generate the flat hub. On LLM failure, deterministic pool fill so we never hard-fail.
+      let warnings: string[] = [];
+      let flatArch;
+      try {
+        const r = await generateFlatHub(flatInput, pool, ctx.user.id);
+        flatArch = r.architecture;
+        warnings = r.warnings;
+      } catch (err) {
+        console.warn("[buildHub] generateFlatHub failed, using deterministic fallback:", err);
+        const sorted = [...pool].sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
+        const titleCase = (s: string) => s.replace(/\b\w/g, (m) => m.toUpperCase());
+        let idx = 0;
+        flatArch = {
+          pillars: pillarNodes.map((_p) => {
+            const pk = sorted[idx++]?.keyword ?? input.cornerstoneKeyword.trim();
+            const clusters = Array.from({ length: maxClustersPerPillar }, (_c, ci) => {
+              const ck = sorted[idx++]?.keyword ?? `${pk} ${ci + 1}`;
+              return { keyword: ck, title: titleCase(ck), secondaryKeywords: [] as string[], format: CLUSTER_FORMATS[ci % CLUSTER_FORMATS.length].key };
+            });
+            return { keyword: pk, title: titleCase(pk), secondaryKeywords: [] as string[], format: "how_to", clusters };
+          }),
+        };
+        warnings.push("AI hub generation was unavailable — used keyword-based titles; please review and edit titles before approving.");
       }
+      if (!dataFirst && process.env.DATAFORSEO_LOGIN) {
+        warnings.push("Not enough keywords with real search volume were found for this theme — some topics may be AI-generated; review volumes and swap any showing no data.");
+      }
+
       // Real MSV/competition for pool candidates, for filling slots that come back empty of data.
       const poolByKw = new Map(pool.map((p) => [p.keyword.toLowerCase().replace(/\s+/g, " ").trim(), p]));
       const usedPool = new Set<string>();
@@ -658,17 +686,16 @@ export const keywordsRouter = router({
         .filter((p) => !usedPool.has(p.keyword.toLowerCase().trim()) && !register.normKeywordSet.has(p.keyword.toLowerCase().replace(/\s+/g, " ").trim()))
         .sort((a, b) => (b.msv ?? 0) - (a.msv ?? 0));
 
-      // Map generated hierarchy → nodes. Collect (nodeId, keyword, title, secondary).
-      const assignments: Array<{ nodeId: number; keyword: string; title: string; secondary: string[] }> = [];
-      assignments.push({ nodeId: cornerstoneNode.id, keyword: architecture.cornerstone.keyword, title: architecture.cornerstone.title, secondary: architecture.cornerstone.secondaryKeywords });
+      // Map generated hierarchy → nodes. Collect (nodeId, keyword, title, secondary, articleType).
+      const assignments: Array<{ nodeId: number; keyword: string; title: string; secondary: string[]; articleType: string }> = [];
       pillarNodes.forEach((pNode, pi) => {
-        const p = architecture.pillars[pi];
+        const p = flatArch.pillars[pi];
         if (!p) return;
-        assignments.push({ nodeId: pNode.id, keyword: p.keyword, title: p.title, secondary: p.secondaryKeywords });
+        assignments.push({ nodeId: pNode.id, keyword: p.keyword, title: p.title, secondary: p.secondaryKeywords, articleType: pillarType(p.format) });
         const cNodes = clustersByPillar.get(pNode.id) ?? [];
         cNodes.forEach((cNode, ci) => {
           const c = p.clusters[ci];
-          if (c) assignments.push({ nodeId: cNode.id, keyword: c.keyword, title: c.title, secondary: c.secondaryKeywords });
+          if (c) assignments.push({ nodeId: cNode.id, keyword: c.keyword, title: c.title, secondary: c.secondaryKeywords, articleType: clusterType(c.format) });
         });
       });
 
@@ -720,7 +747,6 @@ export const keywordsRouter = router({
           if (poolByKw.has(k)) usedPool.add(a.keyword.toLowerCase().trim());
         }
         for (const a of assignments) {
-          if (a.nodeId === cornerstoneNode.id) continue; // keep the user's chosen cornerstone
           const msv = msvByKw.get(a.keyword)?.msv ?? poolByKw.get(a.keyword.toLowerCase().replace(/\s+/g, " ").trim())?.msv ?? null;
           if (msv == null || msv < MSV_FLOOR) {
             const cand = spareCandidates().find((c) => !usedThisBatch.has(c.keyword.toLowerCase().trim()));
@@ -756,7 +782,7 @@ export const keywordsRouter = router({
 
       for (const a of assignments) {
         await db.update(articleNodes)
-          .set({ urlSlug: generateSlug(a.keyword), plannedTitle: a.title })
+          .set({ urlSlug: generateSlug(a.keyword), plannedTitle: a.title, articleType: a.articleType as ArticleType })
           .where(eq(articleNodes.id, a.nodeId));
       }
 

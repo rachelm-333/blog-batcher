@@ -25,23 +25,23 @@ export const CLUSTERS_PER_PILLAR = 5;
 export const DEFAULT_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
 export const MIN_CLUSTERS_PER_PILLAR = 3;
 export const MAX_CLUSTERS_PER_PILLAR = 5;
-/** Max total articles for a creation campaign (1 + 3 + 15). */
-export const MAX_TOTAL_ARTICLES = 19;
-/** Min total articles for a creation campaign (1 + 3 + 9). */
-export const MIN_TOTAL_ARTICLES = 13;
+/** Max total articles (flat 2-tier: 6 pillars × 5 clusters + 6 = 36). */
+export const MAX_TOTAL_ARTICLES = 36;
+/** Min total articles (flat 2-tier: 3 pillars × 3 clusters + 3 = 12). */
+export const MIN_TOTAL_ARTICLES = 12;
 
 /**
  * Module 10 (Campaign Architect) defaults its Cluster_Count to the hard-set
  * minimum so a generated campaign always meets the 19-article authority floor.
  */
 export const RECOMMENDED_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
-// Cornerstones and pillars are FIXED — exactly 1 and exactly 3.
+// FLAT 2-TIER architecture: NO cornerstone. Pillars (top) + clusters only.
 export const MIN_PILLARS_PER_CORNERSTONE = 3;
-export const MAX_PILLARS_PER_CORNERSTONE = 3;
-export const MIN_CORNERSTONES = 1;
-export const MAX_CORNERSTONES = 1;
-/** The fixed, non-negotiable parts of the creation architecture. */
-export const FIXED_CORNERSTONES = 1;
+export const MAX_PILLARS_PER_CORNERSTONE = 6;
+export const MIN_CORNERSTONES = 0;   // 2-tier = 0 cornerstones
+export const MAX_CORNERSTONES = 0;
+/** The fixed, non-negotiable parts of the creation architecture (flat 2-tier). */
+export const FIXED_CORNERSTONES = 0;
 export const FIXED_PILLARS_PER_CORNERSTONE = 3;
 
 export const ARTICLE_TYPES = [
@@ -69,7 +69,8 @@ export const ARTICLE_TYPE_LABELS: Record<ArticleType, string> = {
 export const VALID_TYPES_BY_LEVEL: Record<"cornerstone" | "pillar" | "cluster", ArticleType[]> = {
   cornerstone: ["cornerstone_guide"],
   pillar: ["top_10_list", "how_to", "the_why", "comparison", "myth_busting"],
-  cluster: ["how_to", "myth_busting", "specialist_post"],
+  // Flat 2-tier cluster formats (anti-cannibalization: one distinct format each).
+  cluster: ["how_to", "comparison", "top_10_list", "specialist_post", "the_why", "myth_busting"],
 };
 
 /** Word count targets and descriptions for each article level */
@@ -103,11 +104,11 @@ export const WORD_COUNT_TARGETS: Record<"cornerstone" | "pillar" | "cluster", { 
 
 // ─── Default architectures ────────────────────────────────────────────────────
 
-// Default = the hard-set minimum creation campaign: 1×3×5 = 19 articles.
+// Default = flat 2-tier: 0 cornerstones × 3 pillars × 3 clusters = 12 articles.
 export const DEFAULT_ARCHITECTURE = {
-  cornerstones: 1,
+  cornerstones: 0,
   pillarsPerCornerstone: 3,
-  clustersPerPillar: CLUSTERS_PER_PILLAR,
+  clustersPerPillar: MIN_CLUSTERS_PER_PILLAR, // 3 clusters per pillar
 };
 
 // ─── Calculation helpers ──────────────────────────────────────────────────────

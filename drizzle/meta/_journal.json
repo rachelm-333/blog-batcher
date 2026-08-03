@@ -141,13 +141,6 @@
       "when": 1781515355924,
       "tag": "0019_blushing_doomsday",
       "breakpoints": true
-    },
-    {
-      "idx": 20,
-      "version": "5",
-      "when": 1785482541328,
-      "tag": "0020_brief_namora",
-      "breakpoints": true
     }
   ]
 }
