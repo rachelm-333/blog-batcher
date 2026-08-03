@@ -899,6 +899,8 @@ export interface ArticleContext {
   parentCornerstoneUrl?: string;
   parentPillarUrl?: string;
   siblingUrls?: string[];
+  /** For a PILLAR: the slugs of its own cluster posts, for mandatory down-links. */
+  childClusterUrls?: string[];
   allBatchSlugs: string[];
   bookingsPageUrl?: string;
   contactPageUrl?: string;
@@ -995,6 +997,14 @@ export async function buildArticleContext(
       .map(n => `/${n.urlSlug}`);
   }
 
+  // Child cluster URLs — a PILLAR links DOWN to each of its cluster posts (2-tier hub).
+  let childClusterUrls: string[] = [];
+  if (level === "pillar") {
+    childClusterUrls = allOrderedNodes
+      .filter(n => n.level === "cluster" && n.parentPillarId === nodeId)
+      .map(n => `/${n.urlSlug}`);
+  }
+
   const socialProofParts: string[] = [];
   if (biz.yearsInBusiness) socialProofParts.push(`${biz.yearsInBusiness} years in business`);
   if (biz.clientsServed) socialProofParts.push(`${biz.clientsServed} clients served`);
@@ -1028,6 +1038,7 @@ export async function buildArticleContext(
     parentCornerstoneUrl,
     parentPillarUrl,
     siblingUrls,
+    childClusterUrls,
     allBatchSlugs: allOrderedNodes.map(n => `/${n.urlSlug}`),
     bookingsPageUrl: biz.bookingsPageUrl ?? undefined,
     contactPageUrl: biz.contactPageUrl ?? undefined,
@@ -1699,6 +1710,7 @@ Article Type: ${typeLabel}
 URL Slug: /${ctx.urlSlug}
 Primary Keyword: ${ctx.primaryKeyword}
 Secondary Keywords: ${ctx.secondaryKeywords.join(", ") || "None"}
+${ctx.secondaryKeywords.length ? `SECONDARY-KEYWORD PLACEMENT (MANDATORY for SEO/GEO): Turn EACH secondary keyword above into its own question-style <h2> or <h3> heading (phrased as the exact question a user would search, ending in "?"), and answer it in the FIRST paragraph beneath that heading in 40–60 words, answer-first. Cover every secondary keyword this way — one question heading each. Do not just sprinkle the secondary keywords into prose; they must anchor their own Q&A sections.` : ""}
 PAA Question to Answer: ${ctx.paaQuestion || "Not specified — answer the most likely search intent question"}
 Word Count: ${ctx.wordCountMin}–${ctx.wordCountMax} words (MINIMUM: ${ctx.wordCountMin} words — you MUST write at least ${ctx.wordCountMin} words; HARD MAXIMUM: ${ctx.wordCountMax} words — do not exceed).
 ⚠️ WORD BUDGET IS A HARD CONSTRAINT — PLAN FOR IT:
@@ -1730,9 +1742,11 @@ Note: External authority links (government, industry body, nationally recognised
 7. META TITLE: Must include primary keyword verbatim. Maximum 60 characters. Written for click-through rate.
 8. META DESCRIPTION: Must include the EXACT primary keyword phrase "${ctx.primaryKeyword}" verbatim. Exactly 140–160 characters. Written for CTR.
 9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
-10. EXTERNAL AUTHORITY LINK: You MUST include at least one hyperlink to a real, well-known, popular, authoritative source that is DIRECTLY relevant to the article topic and the business's target market. This can be a famous person's official website, a recognised brand's homepage, a major publication, a government website, or an industry body. CRITICAL RULES: (a) Link ONLY to the ROOT DOMAIN / homepage of the source (e.g. https://www.gordonramsay.com, https://www.taylormade.com, https://www.vogue.com.au) — never invent a deep sub-page path. (b) The source must be genuinely well-known and popular — not obscure. (c) If you cannot name a genuinely well-known relevant source, do NOT add an external link at all. (d) This link will be live-checked before publishing — a 404 or dead URL will be automatically stripped. Use descriptive anchor text.
+10. EXTERNAL AUTHORITY LINKS: You MUST include at least TWO hyperlinks to real, well-known, popular, authoritative sources that are DIRECTLY relevant to the article topic and the business's target market — each to a DIFFERENT source. These can be a famous person's official website, a recognised brand's homepage, a major publication, a government website, or an industry body. CRITICAL RULES: (a) Link ONLY to the ROOT DOMAIN / homepage of each source (e.g. https://www.gordonramsay.com, https://www.taylormade.com, https://www.vogue.com.au) — never invent a deep sub-page path. (b) Each source must be genuinely well-known and popular — not obscure. (c) If you cannot name at least two genuinely well-known relevant sources, include as many as you can genuinely name rather than inventing one. (d) These links will be live-checked before publishing — a 404 or dead URL will be automatically stripped. Use descriptive anchor text.
 11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
-12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs from the LINK ALLOWLIST above — do NOT invent, guess, or construct any URL. If fewer than 2 batch slugs are available, link to as many as exist.
+12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs from the LINK ALLOWLIST above — do NOT invent, guess, or construct any URL. If fewer than 2 batch slugs are available, link to as many as exist.${ctx.level === "pillar" && ctx.childClusterUrls && ctx.childClusterUrls.length ? `
+12b. PILLAR DOWN-LINKS (MANDATORY): This is a pillar page — it is the hub for its cluster posts. You MUST link DOWN to EVERY one of these cluster posts, each with descriptive anchor text, woven naturally into the relevant section: ${ctx.childClusterUrls.join(", ")}. Every one of these must appear as a link.` : ""}${ctx.level === "cluster" && ctx.parentPillarUrl ? `
+12c. CLUSTER UP-LINK (MANDATORY): Link UP to your parent pillar page at ${ctx.parentPillarUrl} using descriptive, keyword-relevant anchor text.` : ""}
 13. SCHEMA MARKUP: Always include Article schema + Breadcrumb schema. ${isCornerstoneOrPillar ? "Include FAQ schema (this is a Cornerstone/Pillar). Include How-To schema if applicable." : "DO NOT include FAQ schema on Cluster articles."}
 14. E-E-A-T SIGNALS: Weave in Experience, Expertise, Authoritativeness, and Trustworthiness. Include social proof signals: ${ctx.socialProof || "mention industry experience"}.
 ${ctx.problemsSolved ? `
