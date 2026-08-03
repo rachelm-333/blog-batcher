@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildFlatHubPrompt, parseFlatHub, flatFormatConflicts, CLUSTER_FORMATS, type FlatHubInput } from "./campaignArchitect";
+import { buildFlatHubPrompt, parseFlatHub, flatFormatConflicts, flatKeywordCollisions, CLUSTER_FORMATS, type FlatHubInput } from "./campaignArchitect";
 
 const input: FlatHubInput = {
   themeKeyword: "marketing strategy",
@@ -28,6 +28,33 @@ describe("buildFlatHubPrompt", () => {
     expect(p).toMatch(/DIFFERENT format/i);
     for (const f of CLUSTER_FORMATS) expect(p).toContain(f.key);
     expect(p).toContain("educate on marketing strategy");
+  });
+  it("forbids duplicate keywords and reusing the bare theme keyword", () => {
+    const p = buildFlatHubPrompt(input, pool);
+    expect(p).toMatch(/UNIQUE/);
+    expect(p).toMatch(/NEVER use the bare theme keyword/i);
+    expect(p).toContain(input.themeKeyword); // the theme is named in the ban
+  });
+  it("tells the model to generate keywords when the pool is empty", () => {
+    const p = buildFlatHubPrompt(input, []);
+    expect(p).toMatch(/empty/i);
+    expect(p).toMatch(/GENERATE specific, distinct long-tail/i);
+  });
+});
+
+describe("flatKeywordCollisions", () => {
+  const mk = (kws: string[]): any => ({
+    pillars: [{ keyword: kws[0], title: "t", secondaryKeywords: [], format: "how_to",
+      clusters: kws.slice(1).map((k) => ({ keyword: k, title: "t", secondaryKeywords: [], format: "how_to" })) }],
+  });
+  it("passes when every keyword is distinct and none equals the theme", () => {
+    expect(flatKeywordCollisions(mk(["content plan", "content tools", "content vs ads"]), "content marketing")).toHaveLength(0);
+  });
+  it("flags a duplicate keyword", () => {
+    expect(flatKeywordCollisions(mk(["content plan", "content plan", "content tools"])).length).toBeGreaterThan(0);
+  });
+  it("flags a keyword equal to the bare theme keyword", () => {
+    expect(flatKeywordCollisions(mk(["content marketing", "content tools", "content plan"]), "content marketing").length).toBeGreaterThan(0);
   });
 });
 

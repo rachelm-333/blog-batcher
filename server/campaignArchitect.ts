@@ -431,17 +431,21 @@ ${grounding}
 
 Theme keyword: "${input.themeKeyword}". Build a FLAT 2-TIER structure — Pillar Pages (broad topics) and Cluster Posts (specific sub-topics) only. THERE IS NO CORNERSTONE.
 
-Below are REAL keywords with actual search volume. You MUST SELECT from THIS LIST — do NOT invent keywords (invented ones have no proven demand):
+Below are REAL keywords with actual search volume. PREFER these — selecting a candidate means proven demand:
 CANDIDATE KEYWORDS:
-${poolText || "(none)"}
+${poolText || "(none available — the candidate list is empty)"}
 
-Produce exactly ${input.pillarCount} pillars, each with exactly ${input.clustersPerPillar} clusters, all from the candidates and coherent with the theme.
-- PILLARS = the broadest, higher-volume distinct topics.
-- CLUSTERS = specific long-tail candidates under the right pillar.
+Produce exactly ${input.pillarCount} pillars, each with exactly ${input.clustersPerPillar} clusters, coherent with the theme.
+- PILLARS = the broadest distinct topics. CLUSTERS = specific long-tail sub-topics under the right pillar.
+- When the candidate list has enough coverage, choose keywords from it. When it does NOT (few or none listed above), GENERATE specific, distinct long-tail keywords a real person would search — grounded in the industry/services above — rather than reusing the theme.
+CRITICAL UNIQUENESS RULES (a violation makes the whole set cannibalise itself — never do this):
+- EVERY keyword must be UNIQUE. No two articles (pillar or cluster) may share the same keyword.
+- NEVER use the bare theme keyword "${input.themeKeyword}" as any article's keyword. Each keyword must be a more specific variation or sub-topic, distinct from the theme and from every other article.
+- Each of the ${input.pillarCount + input.pillarCount * input.clustersPerPillar} articles targets its OWN distinct search query.
 STRICT ANTI-CANNIBALIZATION — every cluster under a pillar MUST use a DIFFERENT format (never the same format twice under one pillar), each a distinct search intent (no two share a SERP). Formats:
 ${formatList}
 Assign a "format" article-type key to EACH cluster (from the list) and to each pillar (pillars use "how_to" or "the_why" or "top_10_list" as fits).
-- SECONDARY KEYWORDS: ${secondaryN} per node, chosen from OTHER candidates, semantically related, no repeats of any primary.
+- SECONDARY KEYWORDS: ${secondaryN} per node — related question/long-tail terms (from other candidates where available, otherwise generated), no repeats of any primary keyword.
 ${TITLE_RULES}${avoidText}
 
 Return ONLY valid JSON (no fences):
@@ -481,6 +485,28 @@ export function parseFlatHub(raw: string, pillarCount: number, clustersPerPillar
   return { pillars };
 }
 
+/** Detect duplicate (or theme-equal) primary keywords across ALL nodes. Pure. */
+export function flatKeywordCollisions(arch: FlatArchitecture, themeKeyword?: string): string[] {
+  const issues: string[] = [];
+  const seen = new Map<string, number>();
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  const theme = themeKeyword ? norm(themeKeyword) : null;
+  const all: string[] = [];
+  for (const p of arch.pillars) {
+    all.push(p.keyword);
+    for (const c of p.clusters) all.push(c.keyword);
+  }
+  for (const kw of all) {
+    const n = norm(kw);
+    seen.set(n, (seen.get(n) ?? 0) + 1);
+    if (theme && n === theme) issues.push(`"${kw}" is the bare theme keyword`);
+  }
+  for (const [kw, count] of Array.from(seen.entries())) {
+    if (count > 1) issues.push(`"${kw}" is used by ${count} articles`);
+  }
+  return issues;
+}
+
 /** Detect duplicate formats within any pillar (anti-cannibalization check). Pure. */
 export function flatFormatConflicts(arch: FlatArchitecture): string[] {
   const issues: string[] = [];
@@ -511,10 +537,26 @@ export async function generateFlatHub(
   };
   let arch = parseFlatHub(await callLLM(buildFlatHubPrompt(input, pool)), input.pillarCount, input.clustersPerPillar);
   let clashes = flatFormatConflicts(arch);
-  if (clashes.length) {
-    const fix = `${buildFlatHubPrompt(input, pool)}\n\nThese pillars reused a cluster format — regenerate so every cluster under a pillar uses a DIFFERENT format: ${clashes.join("; ")}`;
-    try { const retry = parseFlatHub(await callLLM(fix), input.pillarCount, input.clustersPerPillar); if (flatFormatConflicts(retry).length < clashes.length) { arch = retry; clashes = flatFormatConflicts(retry); } } catch { /* keep */ }
+  let collisions = flatKeywordCollisions(arch, input.themeKeyword);
+  // One repair pass covering BOTH duplicate keywords and duplicate formats — a
+  // thin/empty pool is the usual cause of the LLM repeating the theme keyword.
+  if (clashes.length || collisions.length) {
+    const problems = [
+      collisions.length ? `Duplicate or theme-equal keywords (every article MUST have a unique keyword, never the bare theme): ${collisions.join("; ")}` : "",
+      clashes.length ? `Clusters reused a format under one pillar (each must differ): ${clashes.join("; ")}` : "",
+    ].filter(Boolean).join("\n");
+    const fix = `${buildFlatHubPrompt(input, pool)}\n\nYour previous answer had these problems — regenerate the WHOLE set fixing them:\n${problems}`;
+    try {
+      const retry = parseFlatHub(await callLLM(fix), input.pillarCount, input.clustersPerPillar);
+      const retryClash = flatFormatConflicts(retry);
+      const retryColl = flatKeywordCollisions(retry, input.themeKeyword);
+      if (retryClash.length + retryColl.length < clashes.length + collisions.length) {
+        arch = retry; clashes = retryClash; collisions = retryColl;
+      }
+    } catch { /* keep original */ }
   }
-  const warnings = clashes.length ? [`Some clusters may share a format: ${clashes.join("; ")}`] : [];
+  const warnings: string[] = [];
+  if (collisions.length) warnings.push(`Some articles may share a keyword — the pool had too few real keywords for this theme (often because an earlier batch already used them). Review and swap: ${collisions.join("; ")}`);
+  if (clashes.length) warnings.push(`Some clusters may share a format: ${clashes.join("; ")}`);
   return { architecture: arch, warnings };
 }
