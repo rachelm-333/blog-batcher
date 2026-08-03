@@ -414,6 +414,116 @@ export const articlesRouter = router({
     }),
 
   /**
+   * MAKE ALL INTERNAL LINKS LIVE (batch-only) — the "no 404s" button.
+   * For every PUBLISHED post in the active batch, re-resolve its internal links
+   * against the now-live Wix URLs of its batch siblings and re-push it to Wix.
+   * After all posts are published, this switches on every internal link so no
+   * cluster→pillar / pillar→cluster / sibling link points at a dead placeholder.
+   * Fail-safe per post: an error on one post leaves it untouched and continues.
+   */
+  applyBackfillAll: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const biz = await assertBusinessOwnership(ctx.user.id, input.businessId);
+      const activeBatch = biz.activeBatch ?? 1;
+
+      const batchRows = await db
+        .select({
+          id: articles.id,
+          title: articles.title,
+          urlSlug: articles.urlSlug,
+          cmsPostId: articles.cmsPostId,
+          cmsPostUrl: articles.cmsPostUrl,
+          status: articles.status,
+          bodyHtml: articles.bodyHtml,
+        })
+        .from(articles)
+        .where(and(eq(articles.businessId, input.businessId), eq(articles.batchNumber, activeBatch)));
+
+      const publishedRows = batchRows.filter((r) => r.status === "published");
+      if (publishedRows.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No published posts in this batch yet. Publish the posts first, then make their links live." });
+      }
+
+      const [integration] = await db
+        .select({ credentialsEncrypted: integrations.credentialsEncrypted })
+        .from(integrations)
+        .where(and(eq(integrations.businessId, input.businessId), eq(integrations.platform, "wix")))
+        .limit(1);
+      if (!integration?.credentialsEncrypted) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No Wix credentials found." });
+      }
+      const creds = decryptCredentials(integration.credentialsEncrypted);
+      if (!creds) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt Wix credentials" });
+      const wixCreds = { apiKey: creds.apiKey ?? "", siteId: creds.siteId ?? "", memberId: creds.memberId ?? "" };
+
+      // Self-heal missing live URLs across the whole batch FIRST, so the link map is complete.
+      let repaired = 0;
+      for (const r of batchRows) {
+        if (r.status === "published" && !r.cmsPostUrl) {
+          const resolved = await resolveWixPublishedUrl(wixCreds, { postId: r.cmsPostId, slug: r.urlSlug, title: r.title });
+          if (resolved.url) {
+            r.cmsPostUrl = resolved.url;
+            const upd: Record<string, string> = { cmsPostUrl: resolved.url };
+            if (resolved.id && resolved.id !== r.cmsPostId) { upd.cmsPostId = resolved.id; r.cmsPostId = resolved.id; }
+            await db.update(articles).set(upd).where(eq(articles.id, r.id));
+            repaired++;
+          }
+        }
+      }
+
+      const linkMap = buildLinkMap(batchRows);
+      const abCtx = await loadBusinessLinkContext(input.businessId);
+
+      let updated = 0, failed = 0, totalLinksNowLive = 0, totalLinksPending = 0;
+      const failures: Array<{ title: string; error: string }> = [];
+      for (const target of publishedRows) {
+        try {
+          const resolvedResult = resolvePublishLinks(target.bodyHtml ?? "", linkMap, abCtx);
+          let body = resolvedResult.bodyHtml
+            .replace(/<li>/g, '<li style="margin-bottom:0.75em">')
+            .replace(/<li /g, '<li style="margin-bottom:0.75em" ');
+
+          let postId = target.cmsPostId;
+          if (!postId && target.urlSlug) {
+            postId = await findWixPostIdBySlug(wixCreds, target.urlSlug);
+            if (postId) await db.update(articles).set({ cmsPostId: postId }).where(eq(articles.id, target.id));
+          }
+          if (!postId) { failed++; failures.push({ title: target.title ?? "(untitled)", error: "Could not resolve Wix post ID" }); continue; }
+
+          const result = await updateWixPostBody(wixCreds, postId, body);
+          if (result.success) {
+            updated++;
+            totalLinksNowLive += resolvedResult.rewritten;
+            totalLinksPending += resolvedResult.warnings.length;
+            const upd: Record<string, string> = {};
+            if (result.cmsPostUrl) upd.cmsPostUrl = result.cmsPostUrl;
+            if (result.cmsPostId) upd.cmsPostId = result.cmsPostId;
+            if (Object.keys(upd).length) await db.update(articles).set(upd).where(eq(articles.id, target.id));
+          } else {
+            failed++;
+            failures.push({ title: target.title ?? "(untitled)", error: result.error ?? "Wix update failed" });
+          }
+        } catch (err) {
+          failed++;
+          failures.push({ title: target.title ?? "(untitled)", error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+
+      return {
+        publishedCount: publishedRows.length,
+        updated,
+        failed,
+        repaired,
+        linksNowLive: totalLinksNowLive,
+        linksPending: totalLinksPending,
+        failures,
+      };
+    }),
+
+  /**
    * Start batch generation for a business.
    * Runs articles one at a time in Cornerstone → Pillar → Cluster order.
    * This is a fire-and-forget mutation — the client polls getGenerationStatus.

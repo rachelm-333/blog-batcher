@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   CheckCircle2, AlertTriangle, RefreshCw, XCircle, Clock,
   RotateCcw, ArrowRight, Plus, FileText, BarChart2, Calendar,
-  Zap, Building2, Lock, RotateCw
+  Zap, Building2, Lock, RotateCw, Link2
 } from "lucide-react";
 
 /* ── Stage definitions ── */
@@ -104,6 +104,26 @@ export default function Dashboard() {
     if (!selectedBusinessId) return;
     if (!confirm(`Start Batch ${activeBatch + 1} for ${bizName}? Your existing articles will be preserved and you'll go back to Stage 2 (Architecture) for the new batch.`)) return;
     startNewBatchMutation.mutate({ businessId: selectedBusinessId });
+  }
+
+  // "Make all internal links live" — after publishing, re-push every published
+  // post in this batch to Wix with its internal links pointing at the now-live URLs.
+  const makeLinksLiveMutation = trpc.articles.applyBackfillAll.useMutation({
+    onSuccess: (r) => {
+      if (r.failed > 0) {
+        toast.warning(`Updated ${r.updated}/${r.publishedCount} posts — ${r.linksNowLive} links now live. ${r.failed} couldn't be updated${r.failures[0] ? `: ${r.failures[0].error}` : ""}.`, { duration: 9000 });
+      } else {
+        toast.success(`All internal links are live — ${r.updated} post${r.updated !== 1 ? "s" : ""} re-pushed, ${r.linksNowLive} link${r.linksNowLive !== 1 ? "s" : ""} switched on. No 404s.`, { duration: 8000 });
+      }
+      utils.dashboard.getSummary.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  function handleMakeLinksLive() {
+    if (!selectedBusinessId) return;
+    if (!confirm("Re-push every published post in this batch to Wix with its internal links pointing at the now-live URLs? This updates your live Wix posts so there are no broken internal links.")) return;
+    makeLinksLiveMutation.mutate({ businessId: selectedBusinessId });
   }
   const statusCounts = summary?.statusCounts;
   const bizName = summary?.business?.name ?? "Your business";
@@ -243,6 +263,23 @@ export default function Dashboard() {
               >
                 <RotateCw style={{ width: 13, height: 13 }} />
                 {startNewBatchMutation.isPending ? "Starting…" : `Start Batch ${activeBatch + 1}`}
+              </button>
+            )}
+            {publishedCount > 0 && (
+              <button
+                onClick={handleMakeLinksLive}
+                disabled={makeLinksLiveMutation.isPending}
+                title="Re-push every published post so its internal links point at the now-live URLs — guarantees no 404s."
+                style={{
+                  fontSize: 12, fontWeight: 600, color: "#166534",
+                  border: "1px solid #86efac", borderRadius: 8,
+                  padding: "6px 14px", background: "#f0fdf4",
+                  cursor: makeLinksLiveMutation.isPending ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", gap: 6, opacity: makeLinksLiveMutation.isPending ? 0.6 : 1,
+                }}
+              >
+                <Link2 style={{ width: 13, height: 13 }} />
+                {makeLinksLiveMutation.isPending ? "Linking…" : "Make internal links live"}
               </button>
             )}
           </div>
