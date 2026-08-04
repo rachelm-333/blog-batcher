@@ -29,11 +29,15 @@ import {
   articles,
   blogArchitectures,
   businesses,
+  businessServices,
   credits,
   schedules,
   keywords,
   users,
 } from "../../drizzle/schema";
+import { buildLlmsTxt } from "../llmsTxt";
+import { runLiveChecks } from "../liveChecks";
+import { auditHtml } from "../auditEngine/auditEngine";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { storagePut } from "../storage";
@@ -521,6 +525,87 @@ export const articlesRouter = router({
         linksPending: totalLinksPending,
         failures,
       };
+    }),
+
+  /**
+   * MAC-13 — generate the site's /llms.txt from the business profile + published
+   * posts. Returns the file content for the user to host at https://<domain>/llms.txt.
+   */
+  generateLlmsTxt: protectedProcedure
+    .input(z.object({ businessId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      const [biz] = await db.select().from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
+      if (!biz) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
+
+      const svc = await db.select({ name: businessServices.name, pageUrl: businessServices.pageUrl })
+        .from(businessServices).where(eq(businessServices.businessId, input.businessId));
+
+      const published = await db.select({ title: articles.title, cmsPostUrl: articles.cmsPostUrl })
+        .from(articles)
+        .where(and(eq(articles.businessId, input.businessId), eq(articles.status, "published")));
+
+      const keyPages: Array<{ label: string; url: string }> = [];
+      if (biz.contactPageUrl) keyPages.push({ label: "Contact", url: biz.contactPageUrl });
+      if (biz.bookingsPageUrl) keyPages.push({ label: "Bookings", url: biz.bookingsPageUrl });
+      if (biz.shopUrl) keyPages.push({ label: "Shop", url: biz.shopUrl });
+      if (biz.testimonialsPageUrl) keyPages.push({ label: "Testimonials", url: biz.testimonialsPageUrl });
+      for (const s of svc) if (s.pageUrl && s.name) keyPages.push({ label: s.name, url: s.pageUrl });
+
+      const posts = published
+        .filter((p) => p.cmsPostUrl && p.title)
+        .map((p) => ({ title: p.title as string, url: p.cmsPostUrl as string }));
+
+      const content = buildLlmsTxt({
+        businessName: biz.name,
+        description: biz.uniqueValueProposition ?? undefined,
+        websiteUrl: biz.websiteUrl ?? undefined,
+        keyPages,
+        posts,
+      });
+      return { content, postCount: posts.length, hostAt: biz.websiteUrl ? `${biz.websiteUrl.replace(/\/+$/, "")}/llms.txt` : "/llms.txt" };
+    }),
+
+  /**
+   * Audit a PUBLISHED post against all 29 checks INCLUDING the live-URL ones
+   * (MAC-12 Core Web Vitals, MAC-13 llms.txt) — fetches the live page and runs
+   * the real PageSpeed + llms.txt checks so nothing is left "not applicable".
+   */
+  auditLive: protectedProcedure
+    .input(z.object({ businessId: z.number(), articleId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      await assertBusinessOwnership(ctx.user.id, input.businessId);
+
+      const [art] = await db.select({ status: articles.status, cmsPostUrl: articles.cmsPostUrl, focusKeyword: articles.focusKeyword, title: articles.title })
+        .from(articles)
+        .where(and(eq(articles.id, input.articleId), eq(articles.businessId, input.businessId)))
+        .limit(1);
+      if (!art) throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      if (art.status !== "published" || !art.cmsPostUrl) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Article is not published yet — the live checks (Core Web Vitals, llms.txt) need a live URL." });
+      }
+
+      let liveHtml = "";
+      try {
+        const res = await fetch(art.cmsPostUrl, { redirect: "follow", signal: AbortSignal.timeout(15000) });
+        liveHtml = await res.text();
+      } catch (err) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Could not fetch the live page: ${err instanceof Error ? err.message : String(err)}` });
+      }
+
+      const liveChecks = await runLiveChecks(art.cmsPostUrl);
+      const audit = auditHtml({
+        html: liveHtml,
+        primaryKeyword: art.focusKeyword ?? "",
+        url: art.cmsPostUrl,
+        liveChecks,
+      });
+      return { url: art.cmsPostUrl, ...audit };
     }),
 
   /**
