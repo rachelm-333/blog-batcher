@@ -174,8 +174,12 @@ export default function ArticleGeneration() {
   const pendingCount = articles?.filter(a => a.status === "pending_generation").length ?? 0;
   // allWritten: all articles are in a terminal state (no longer generating/pending)
   const allWritten = hasArticles && writtenCount === totalCount && !generating;
-  // showGenerateButton: show when stage is 4+ and generation hasn't completed
-  const showGenerateButton = currentStage >= 4 && !allWritten;
+  // showGenerateButton: show once generation isn't complete AND the user has
+  // approved keywords. We DON'T depend solely on currentStage>=4 because the
+  // stage-advance (which fires only when every PAA is approved) can fail to stick
+  // and strand the user on this page with no button (approved keywords but no
+  // way to generate). hasApprovedKeyword is the real precondition for generating.
+  const showGenerateButton = !allWritten && (currentStage >= 4 || hasApprovedKeyword);
   // canGenerate: allowed when nothing is running AND there's work to do — either
   // no articles yet, OR some are pending_generation (e.g. after a reset).
   const canGenerate = !generating && !generateMutation.isPending && (pendingCount > 0 || !hasArticles);
