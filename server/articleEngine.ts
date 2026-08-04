@@ -774,6 +774,126 @@ export function ensureKeywordInH3(
 }
 
 // ---------------------------------------------------------------------------
+// 29-point enforcement helpers (MIC-03, MIC-05, MIC-06, MIC-07, EAT-05)
+// ---------------------------------------------------------------------------
+
+const H2_QUESTION_START = /^(what|how|why|is|are|can|should|does|do|who|where|when)\b/i;
+
+/** True if a heading reads as a question (ends "?" or starts with a question word). */
+export function isQuestionHeading(text: string): boolean {
+  const t = text.replace(/<[^>]+>/g, "").trim();
+  return /\?\s*$/.test(t) || H2_QUESTION_START.test(t);
+}
+
+/**
+ * MIC-03 — guarantee at least 50% of H2s are questions. Converts the first
+ * non-question H2s (prepending "How do you " / "What is ") until >=50% qualify.
+ * Pure, no LLM.
+ */
+export function ensureQuestionH2s(bodyHtml: string): { bodyHtml: string; changed: boolean } {
+  const matches = Array.from(bodyHtml.matchAll(/<h2((?:\s[^>]*)?)>([\s\S]*?)<\/h2>/gi));
+  if (matches.length === 0) return { bodyHtml, changed: false };
+  let questionCount = matches.filter(m => isQuestionHeading(m[2] ?? "")).length;
+  const needed = Math.ceil(matches.length * 0.5);
+  if (questionCount >= needed) return { bodyHtml, changed: false };
+  let out = bodyHtml; let changed = false;
+  for (const m of matches) {
+    if (questionCount >= needed) break;
+    const inner = (m[2] ?? "").trim();
+    if (isQuestionHeading(inner)) continue;
+    const plain = inner.replace(/<[^>]+>/g, "").trim().replace(/[?.:]+$/, "");
+    // Action-style heading → "How do you …?"; noun-phrase heading → "What is …?"
+    const actionLed = /^(build|create|choose|use|implement|set up|fix|improve|start|write|make|avoid|measure|plan|manage|find|get|run|design)\b/i.test(plain);
+    const newInner = actionLed
+      ? `How do you ${plain.charAt(0).toLowerCase() + plain.slice(1)}?`
+      : `What is ${plain}?`;
+    out = out.replace(m[0], `<h2${m[1] ?? ""}>${newInner}</h2>`);
+    questionCount++; changed = true;
+  }
+  return { bodyHtml: out, changed };
+}
+
+/**
+ * MIC-05 — the first <p> after each <h2> must be a <=60-word direct answer.
+ * Trims any longer answer to the nearest sentence boundary at or under 60 words;
+ * never truncates mid-sentence (keeps a first sentence whole even if it is long).
+ * Pure, no LLM.
+ */
+export function trimAnswersAfterH2(bodyHtml: string, maxWords = 60): { bodyHtml: string; changed: boolean } {
+  let changed = false;
+  const out = bodyHtml.replace(
+    /(<h2(?:\s[^>]*)?>[\s\S]*?<\/h2>\s*)(<p(?:\s[^>]*)?>)([\s\S]*?)(<\/p>)/gi,
+    (full, h2: string, pOpen: string, inner: string, pClose: string) => {
+      const text = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      if (text.split(/\s+/).filter(Boolean).length <= maxWords) return full;
+      const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+      let acc = ""; let count = 0;
+      for (const s of sentences) {
+        const w = s.split(/\s+/).filter(Boolean).length;
+        if (count + w > maxWords) break;
+        acc += (acc ? " " : "") + s; count += w;
+      }
+      if (!acc) acc = sentences[0] ?? text; // first sentence already >max: keep it whole
+      changed = true;
+      return `${h2}${pOpen}${acc}${pClose}`;
+    },
+  );
+  return { bodyHtml: out, changed };
+}
+
+/** MIC-06 — does the body contain at least one list? */
+export function hasList(bodyHtml: string): boolean {
+  return /<(ul|ol)\b/i.test(bodyHtml);
+}
+
+/** MIC-07 — is comparison data present (a table OR a bold-label list item)? */
+export function hasComparisonData(bodyHtml: string): boolean {
+  return /<table\b/i.test(bodyHtml) || /<li\b[^>]*>\s*<strong\b/i.test(bodyHtml);
+}
+
+/** EAT-05 — is there an outbound link to a .gov / .edu / .gov.au / .edu.au domain? */
+export function hasGovEduLink(bodyHtml: string): boolean {
+  const re = /<a\b[^>]*href=["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(bodyHtml)) !== null) {
+    const href = m[1] ?? "";
+    if (/^https?:\/\/[^/]*\.(gov|edu)(\.[a-z]{2})?(?=[/:?#]|$)/i.test(href)) return true;
+  }
+  return false;
+}
+
+/**
+ * Make ONE surgical LLM edit to the body HTML and return the complete edited HTML.
+ * Used for the checks that need rewriting (MIC-06, MIC-07, EAT-05). On any error
+ * or an implausibly short response, returns the original untouched.
+ */
+export async function surgicalHtmlRepair(
+  bodyHtml: string,
+  instruction: string,
+  meta: { userId?: number | null; nodeId: number; feature?: "article_generation" | "keyword_research" | "business_scrape" | "seo_analysis" | "other" },
+): Promise<string> {
+  try {
+    const res = await invokeLLMWithCost(
+      {
+        messages: [
+          { role: "system" as const, content: "You make ONE surgical edit to the HTML you are given and return the COMPLETE edited HTML only — no preamble, no explanation, no markdown fences. Change nothing except what the instruction asks." },
+          { role: "user" as const, content: `${instruction}\n\nHTML:\n${bodyHtml}` },
+        ],
+        max_tokens: TOKEN_LIMITS.section,
+      },
+      { userId: meta.userId ?? null, feature: meta.feature ?? "article_generation" },
+    );
+    const raw = res.choices[0]?.message?.content ?? "";
+    let outHtml = (typeof raw === "string" ? raw : JSON.stringify(raw))
+      .replace(/^```(?:html)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+    return outHtml.length > 50 ? outHtml : bodyHtml;
+  } catch (err) {
+    console.warn(`[ArticleEngine] surgical repair failed for node ${meta.nodeId}:`, err);
+    return bodyHtml;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Slug generation
 // ---------------------------------------------------------------------------
 
@@ -1742,7 +1862,7 @@ Note: External authority links (government, industry body, nationally recognised
 7. META TITLE: Must include primary keyword verbatim. Maximum 60 characters. Written for click-through rate.
 8. META DESCRIPTION: Must include the EXACT primary keyword phrase "${ctx.primaryKeyword}" verbatim. Exactly 140–160 characters. Written for CTR.
 9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
-10. EXTERNAL AUTHORITY LINKS: You MUST include at least TWO hyperlinks to real, well-known, popular, authoritative sources that are DIRECTLY relevant to the article topic and the business's target market — each to a DIFFERENT source. These can be a famous person's official website, a recognised brand's homepage, a major publication, a government website, or an industry body. CRITICAL RULES: (a) Link ONLY to the ROOT DOMAIN / homepage of each source (e.g. https://www.gordonramsay.com, https://www.taylormade.com, https://www.vogue.com.au) — never invent a deep sub-page path. (b) Each source must be genuinely well-known and popular — not obscure. (c) If you cannot name at least two genuinely well-known relevant sources, include as many as you can genuinely name rather than inventing one. (d) These links will be live-checked before publishing — a 404 or dead URL will be automatically stripped. Use descriptive anchor text.
+10. EXTERNAL AUTHORITY LINKS: You MUST include at least TWO hyperlinks to real, well-known, popular, authoritative sources that are DIRECTLY relevant to the article topic and the business's target market — each to a DIFFERENT source. At least ONE of these two links MUST point to a .gov, .gov.au, .edu, or .edu.au domain (e.g. https://business.gov.au, https://www.ato.gov.au, https://www.accc.gov.au, https://www.fairwork.gov.au) — this is mandatory; do not substitute a commercial or news site for it. The other link can be a recognised brand, major publication, or industry body relevant to the niche. CRITICAL RULES: (a) Link ONLY to the ROOT DOMAIN / homepage of each source (e.g. https://www.gordonramsay.com, https://business.gov.au) — never invent a deep sub-page path. (b) Each source must be genuinely well-known and popular — not obscure. (c) If you cannot name a second non-government source, still include the mandatory government link. (d) These links will be live-checked before publishing — a 404 or dead URL will be automatically stripped. Use descriptive anchor text.
 11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
 12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs from the LINK ALLOWLIST above — do NOT invent, guess, or construct any URL. If fewer than 2 batch slugs are available, link to as many as exist.${ctx.level === "pillar" && ctx.childClusterUrls && ctx.childClusterUrls.length ? `
 12b. PILLAR DOWN-LINKS (MANDATORY): This is a pillar page — it is the hub for its cluster posts. You MUST link DOWN to EVERY one of these cluster posts, each with descriptive anchor text, woven naturally into the relevant section: ${ctx.childClusterUrls.join(", ")}. Every one of these must appear as a link.` : ""}${ctx.level === "cluster" && ctx.parentPillarUrl ? `
@@ -2262,6 +2382,55 @@ export async function generateSingleArticle(
 
     // STEP 2.6c — GEO paragraph density: split any <p> over 4 sentences (MIC-08)
     bodyHtml = splitDenseParagraphs(bodyHtml, 4);
+
+    // STEP 2.6c2 — MIC-03: ensure >=50% of H2s are questions (deterministic)
+    const q2 = ensureQuestionH2s(bodyHtml);
+    if (q2.changed) {
+      console.log(`[ArticleEngine] Converted H2(s) to questions for MIC-03 on node ${nodeId}`);
+      bodyHtml = q2.bodyHtml;
+    }
+
+    // STEP 2.6c3 — MIC-05: trim each post-H2 answer paragraph to <=60 words (deterministic)
+    const a60 = trimAnswersAfterH2(bodyHtml, 60);
+    if (a60.changed) {
+      console.log(`[ArticleEngine] Trimmed post-H2 answer paragraph(s) to <=60 words (MIC-05) on node ${nodeId}`);
+      bodyHtml = a60.bodyHtml;
+      wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    }
+
+    // STEP 2.6c4 — MIC-06: guarantee at least one list (surgical LLM repair if missing)
+    if (!hasList(bodyHtml)) {
+      console.log(`[ArticleEngine] No list found — running MIC-06 surgical repair on node ${nodeId}`);
+      bodyHtml = await surgicalHtmlRepair(
+        bodyHtml,
+        "This article has no <ul> or <ol> list. Find the single most list-like paragraph (one that enumerates 3+ items separated by commas or semicolons) and rewrite ONLY that paragraph as a <ul> with one <li> per item. Change nothing else.",
+        { userId, nodeId },
+      );
+      wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    }
+
+    // STEP 2.6c5 — MIC-07: guarantee comparison data as a bold-label list (surgical LLM repair)
+    if (!hasComparisonData(bodyHtml)) {
+      console.log(`[ArticleEngine] No comparison data found — running MIC-07 surgical repair on node ${nodeId}`);
+      bodyHtml = await surgicalHtmlRepair(
+        bodyHtml,
+        "This article has no comparison data formatted as a table or a bold-label list. Find the single most comparison-heavy paragraph and rewrite ONLY it as a bold-label bullet list: <ul><li><strong>Label:</strong> description</li>...</ul> with at least 2 items. Do NOT use an HTML <table>. Change nothing else.",
+        { userId, nodeId },
+      );
+      wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    }
+
+    // STEP 2.6c6 — EAT-05: guarantee a .gov/.edu outbound link (surgical LLM repair)
+    // Runs AFTER the link stripper (STEP 2.6) so we validate the surviving links.
+    if (!hasGovEduLink(bodyHtml)) {
+      console.log(`[ArticleEngine] No .gov/.edu link found — running EAT-05 surgical repair on node ${nodeId}`);
+      bodyHtml = await surgicalHtmlRepair(
+        bodyHtml,
+        `This article has no outbound link to a .gov / .gov.au / .edu / .edu.au domain. Insert exactly ONE such link into the most contextually appropriate existing paragraph, using descriptive anchor text and a REAL, live Australian government or educational resource relevant to the topic (e.g. https://business.gov.au, https://www.ato.gov.au, https://www.accc.gov.au, https://www.fairwork.gov.au). Link only to the root domain. Change nothing else.`,
+        { userId, nodeId },
+      );
+      wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+    }
 
     // STEP 2.6d — Ensure the user-provided expert quote appears (EAT-04)
     const quoteResult = ensureExpertQuote(bodyHtml, ctx.expertQuote);
