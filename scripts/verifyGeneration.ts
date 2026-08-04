@@ -13,6 +13,12 @@ import {
   validateAndStripLinks,
   removeOrphanFaqItems,
   splitDenseParagraphs,
+  ensureQuestionH2s,
+  trimAnswersAfterH2,
+  hasList,
+  hasComparisonData,
+  hasGovEduLink,
+  surgicalHtmlRepair,
   trimHtmlToWordCount,
   ensureKeywordInH2,
   ensureKeywordInH3,
@@ -127,6 +133,18 @@ async function main() {
   bodyHtml = linkRes.html;
   bodyHtml = removeOrphanFaqItems(bodyHtml).bodyHtml;
   bodyHtml = splitDenseParagraphs(bodyHtml, 4);
+  // 29-point enforcement (same order as the real pipeline)
+  bodyHtml = ensureQuestionH2s(bodyHtml).bodyHtml;                    // MIC-03
+  bodyHtml = trimAnswersAfterH2(bodyHtml, 60).bodyHtml;              // MIC-05
+  if (!hasList(bodyHtml)) {                                          // MIC-06
+    bodyHtml = await surgicalHtmlRepair(bodyHtml, "This article has no <ul> or <ol> list. Find the single most list-like paragraph (3+ items separated by commas or semicolons) and rewrite ONLY that paragraph as a <ul> with one <li> per item. Change nothing else.", { nodeId: 0 });
+  }
+  if (!hasComparisonData(bodyHtml)) {                               // MIC-07
+    bodyHtml = await surgicalHtmlRepair(bodyHtml, "This article has no comparison data as a table or bold-label list. Rewrite the single most comparison-heavy paragraph as <ul><li><strong>Label:</strong> description</li>...</ul> with at least 2 items. Do NOT use an HTML <table>. Change nothing else.", { nodeId: 0 });
+  }
+  if (!hasGovEduLink(bodyHtml)) {                                   // EAT-05
+    bodyHtml = await surgicalHtmlRepair(bodyHtml, "This article has no .gov/.gov.au/.edu/.edu.au outbound link. Insert exactly ONE such link into the most appropriate existing paragraph, descriptive anchor text, real live Australian government resource root domain (e.g. https://business.gov.au, https://www.ato.gov.au, https://www.accc.gov.au). Change nothing else.", { nodeId: 0 });
+  }
   bodyHtml = ensureKeywordInH2(bodyHtml, ctx.primaryKeyword).bodyHtml;
   bodyHtml = ensureKeywordInH3(bodyHtml, ctx.primaryKeyword).bodyHtml;
   bodyHtml = trimHtmlToWordCount(bodyHtml, max, ctx.primaryKeyword).bodyHtml;
