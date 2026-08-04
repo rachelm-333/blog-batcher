@@ -27,8 +27,8 @@ export const MIN_CLUSTERS_PER_PILLAR = 3;
 export const MAX_CLUSTERS_PER_PILLAR = 5;
 /** Max total articles (flat 2-tier: 6 pillars × 5 clusters + 6 = 36). */
 export const MAX_TOTAL_ARTICLES = 36;
-/** Min total articles (flat 2-tier: 3 pillars × 3 clusters + 3 = 12). */
-export const MIN_TOTAL_ARTICLES = 12;
+/** Min total articles (flat 2-tier: 1 pillar × 3 clusters + 1 = 4). */
+export const MIN_TOTAL_ARTICLES = 4;
 
 /**
  * Module 10 (Campaign Architect) defaults its Cluster_Count to the hard-set
@@ -36,7 +36,8 @@ export const MIN_TOTAL_ARTICLES = 12;
  */
 export const RECOMMENDED_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
 // FLAT 2-TIER architecture: NO cornerstone. Pillars (top) + clusters only.
-export const MIN_PILLARS_PER_CORNERSTONE = 3;
+// Minimum 1 pillar — a single pillar over 3–5 clusters is a valid focused mini-hub.
+export const MIN_PILLARS_PER_CORNERSTONE = 1;
 export const MAX_PILLARS_PER_CORNERSTONE = 6;
 export const MIN_CORNERSTONES = 0;   // 2-tier = 0 cornerstones
 export const MAX_CORNERSTONES = 0;

@@ -283,7 +283,7 @@ export default function Architecture() {
   const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
 
-  // Flat 2-tier shape: NO cornerstone. The user picks the pillar count (3–6) and
+  // Flat 2-tier shape: NO cornerstone. The user picks the pillar count (1–6) and
   // the clusters-per-pillar count (3–5).
   const localCornerstones = FIXED_CORNERSTONES; // 0
   const [localPillars, setLocalPillars] = useState<number>(FIXED_PILLARS_PER_CORNERSTONE);
@@ -475,10 +475,10 @@ export default function Architecture() {
               so they never compete with each other.
             </div>
 
-            {/* Pillar count (3–6) */}
+            {/* Pillar count (1–6) */}
             <SliderRow
               label="Pillar Pages"
-              subtitle="Broad topic pages — 1,500–1,800 words. Each anchors a group of cluster posts. Choose 3–6."
+              subtitle="Broad topic pages — 1,500–1,800 words. Each anchors a group of cluster posts. Choose 1–6 (even a single pillar over 3–5 clusters is a strong focused hub)."
               value={localPillars}
               min={MIN_PILLARS_PER_CORNERSTONE}
               max={MAX_PILLARS_PER_CORNERSTONE}
@@ -661,7 +661,7 @@ export default function Architecture() {
                 kept shallow so every post can rank on its own.
               </p>
               <p style={{ fontSize: 12, color: "#5A5A52", lineHeight: 1.65, margin: 0, fontStyle: "italic" }}>
-                Choose 3–6 pillars and 3–5 clusters each. More = deeper topical coverage.
+                Choose 1–6 pillars and 3–5 clusters each. More = deeper topical coverage.
               </p>
             </div>
 

@@ -44,10 +44,16 @@ describe("architectureRules.validateArchitecture", () => {
     expect(result.correctedCornerstones).toBe(0);
   });
 
-  it("clamps pillars up to the minimum of 3", () => {
-    const result = validateArchitecture(20, 0, 1);
-    expect(result.correctedPillarsPerCornerstone).toBe(3);
-    expect(result.warnings.some((w) => w.includes("Minimum 3 pillar"))).toBe(true);
+  it("accepts a single pillar (1-pillar focused mini-hub is valid)", () => {
+    const result = validateArchitecture(20, 0, 1, 3);
+    expect(result.correctedPillarsPerCornerstone).toBe(1);
+    expect(result.warnings.some((w) => w.includes("Minimum"))).toBe(false);
+    expect(calcTotalArticles(0, 1, 3)).toBe(4); // 1 pillar + 3 clusters
+  });
+
+  it("clamps pillars up to the minimum of 1", () => {
+    const result = validateArchitecture(20, 0, 0);
+    expect(result.correctedPillarsPerCornerstone).toBe(1);
   });
 
   it("clamps pillars down to the maximum of 6", () => {
