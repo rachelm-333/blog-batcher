@@ -222,7 +222,7 @@ function LiveArchMap({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, overflowX: "auto" }}>
-      {/* Flat 2-tier: pillar pages side by side, each over its cluster posts. No cornerstone. */}
+      {/* Flat 2-tier: pillar pages side by side, each over its cluster posts. */}
       {pillars > 0 && (
         <div style={{ display: "flex", gap: 12, minWidth: "max-content" }}>
           {Array.from({ length: pillars }, (_, pIdx) => renderPillarColumn(pIdx))}
@@ -392,7 +392,7 @@ export default function Architecture() {
             Stage 2 — Blog Architecture
           </h1>
           <p style={{ fontSize: 13, color: "#5A5A52", marginTop: 4, marginBottom: 0 }}>
-            Your content batch is a flat 2-tier hub — <strong>pillar pages</strong> with <strong>cluster posts</strong> under each (no cornerstone). Choose how many pillars, and how many clusters sit under each pillar.
+            Your content batch is a flat 2-tier hub — <strong>pillar pages</strong> with <strong>cluster posts</strong> under each. Choose how many pillars, and how many clusters sit under each pillar.
           </p>
         </div>
       </div>
@@ -411,7 +411,7 @@ export default function Architecture() {
                   <HelpLink slug="cornerstone-pillar-cluster" label="What are Pillar and Cluster articles?" />
                 </div>
                 <CardDescription style={{ marginTop: 4 }}>
-                  Flat 2-tier hub — no cornerstone. Set how many pillar pages, and how many cluster posts
+                  Flat 2-tier hub. Set how many pillar pages, and how many cluster posts
                   sit under each pillar — the total updates live.
                 </CardDescription>
               </div>
@@ -470,7 +470,7 @@ export default function Architecture() {
             <div className="rounded-lg bg-secondary border border-border px-4 py-3 text-sm text-muted-foreground">
               A flat 2-tier hub:{" "}
               <strong className="text-foreground">pillar pages</strong>{" → "}
-              clusters under each pillar. <strong>No cornerstone.</strong> Each pillar's clusters
+              clusters under each pillar. Each pillar's clusters
               are forced into different formats (how-to, comparison, listicle, troubleshooting, cost/ROI)
               so they never compete with each other.
             </div>
@@ -657,7 +657,7 @@ export default function Architecture() {
                 </span>
               </div>
               <p style={{ fontSize: 12, color: "#4c1d95", lineHeight: 1.65, margin: "0 0 8px" }}>
-                Every batch is a flat <strong>pillar pages → clusters</strong> structure (no cornerstone) —
+                Every batch is a flat <strong>pillar pages → clusters</strong> structure —
                 kept shallow so every post can rank on its own.
               </p>
               <p style={{ fontSize: 12, color: "#5A5A52", lineHeight: 1.65, margin: 0, fontStyle: "italic" }}>
