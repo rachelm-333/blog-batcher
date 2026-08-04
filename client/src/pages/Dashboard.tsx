@@ -46,14 +46,14 @@ const ACTION_ICONS: Record<string, React.ElementType> = {
   schedule_rescheduled:        RotateCcw,
 };
 const ACTION_COLORS: Record<string, string> = {
-  scheduled_publish_attempted: "#6e5afe",
-  scheduled_publish_succeeded: "#22c55e",
-  scheduled_publish_failed:    "#f59e0b",
-  retry_attempted:             "#6e5afe",
-  retry_succeeded:             "#22c55e",
-  retry_failed:                "#ef4444",
-  schedule_cancelled:          "#9ca3af",
-  schedule_rescheduled:        "#8b5cf6",
+  scheduled_publish_attempted: "#0E0E0C",
+  scheduled_publish_succeeded: "#D9F542",
+  scheduled_publish_failed:    "#C98A2B",
+  retry_attempted:             "#0E0E0C",
+  retry_succeeded:             "#D9F542",
+  retry_failed:                "#D24A2A",
+  schedule_cancelled:          "#8E8E84",
+  schedule_rescheduled:        "#0E0E0C",
 };
 
 function fmtTime(ts: Date | number | string) {
@@ -159,8 +159,8 @@ export default function Dashboard() {
   function stageIconStyle(id: number) {
     const s = stageStatus(id);
     if (s === "complete") return { background: "#D9F542" };
-    if (s === "active")   return { background: "#6e5afe" };
-    return { background: "#f3f4f6" };
+    if (s === "active")   return { background: "#0E0E0C" };
+    return { background: "#EFEBDF" };
   }
 
   /* ── Stage card icon ── */
@@ -183,13 +183,13 @@ export default function Dashboard() {
       <DashboardLayout>
         <div style={{ padding: "40px 32px" }}>
           <div style={{ maxWidth: 480, margin: "80px auto", textAlign: "center" }}>
-            <div style={{ width: 56, height: 56, borderRadius: 14, background: "#ede9ff", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-              <Building2 style={{ width: 28, height: 28, color: "#6e5afe" }} />
+            <div style={{ width: 56, height: 56, borderRadius: 14, background: "#EFEBDF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+              <Building2 style={{ width: 28, height: 28, color: "#0E0E0C" }} />
             </div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1a1a2e", marginBottom: 8 }}>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: "#0E0E0C", marginBottom: 8 }}>
               No businesses yet
             </h2>
-            <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 24 }}>
+            <p style={{ fontSize: 14, color: "#5A5A52", marginBottom: 24 }}>
               Create your first business to start building your blog batch.
             </p>
             <button className="btn-primary" onClick={() => setLocation("/onboarding")}>
@@ -209,14 +209,14 @@ export default function Dashboard() {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af" }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8E8E84" }}>
                 AUTHORITY PACK · {bizName.toUpperCase()}
               </div>
               {businesses && businesses.length > 1 && (
                 <select
                   value={selectedBusinessId ?? ""}
                   onChange={e => setSelectedBizId(Number(e.target.value))}
-                  style={{ fontSize: 11, color: "#6e5afe", border: "1px solid #c4b5fd", borderRadius: 6, padding: "2px 6px", background: "#ede9ff", cursor: "pointer", fontWeight: 600 }}
+                  style={{ fontSize: 11, color: "#0E0E0C", border: "1px solid rgba(14,14,12,0.16)", borderRadius: 6, padding: "2px 6px", background: "#EFEBDF", cursor: "pointer", fontWeight: 600 }}
                 >
                   {businesses.map(b => (
                     <option key={b.id} value={b.id}>{b.name}</option>
@@ -225,17 +225,17 @@ export default function Dashboard() {
               )}
               <button
                 onClick={() => setLocation("/onboarding?new=1")}
-                style={{ fontSize: 11, color: "#6e5afe", border: "1px solid #c4b5fd", borderRadius: 6, padding: "2px 8px", background: "#ede9ff", cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}
+                style={{ fontSize: 11, color: "#0E0E0C", border: "1px solid rgba(14,14,12,0.16)", borderRadius: 6, padding: "2px 8px", background: "#EFEBDF", cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}
               >
                 <Plus style={{ width: 10, height: 10 }} /> Add business
               </button>
             </div>
-            <h1 style={{ fontSize: 36, fontWeight: 800, color: "#1a1a2e", lineHeight: 1.15, margin: 0 }}>
+            <h1 style={{ fontSize: 36, fontWeight: 800, color: "#0E0E0C", lineHeight: 1.15, margin: 0 }}>
               Your whole blog, in{" "}
-              <em style={{ fontFamily: "'Lora', serif", fontStyle: "italic", fontWeight: 600 }}>one</em>
+              <em style={{ fontFamily: "'Instrument Serif', serif", fontStyle: "italic", fontWeight: 600 }}>one</em>
               {" "}batch.
             </h1>
-            <p style={{ fontSize: 14, color: "#6b7280", marginTop: 8 }}>
+            <p style={{ fontSize: 14, color: "#5A5A52", marginTop: 8 }}>
               {summaryLoading
                 ? "Loading your progress…"
                 : `You're on stage ${currentStage} of 6. ${currentStage < 6 ? "Keep going — almost there." : "All stages complete!"}`
@@ -255,9 +255,9 @@ export default function Dashboard() {
                 onClick={handleStartNewBatch}
                 disabled={startNewBatchMutation.isPending}
                 style={{
-                  fontSize: 12, fontWeight: 600, color: "#6e5afe",
-                  border: "1px solid #c4b5fd", borderRadius: 8,
-                  padding: "6px 14px", background: "#ede9ff",
+                  fontSize: 12, fontWeight: 600, color: "#0E0E0C",
+                  border: "1px solid rgba(14,14,12,0.16)", borderRadius: 8,
+                  padding: "6px 14px", background: "#EFEBDF",
                   cursor: startNewBatchMutation.isPending ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", gap: 6, opacity: startNewBatchMutation.isPending ? 0.6 : 1,
                 }}
@@ -272,9 +272,9 @@ export default function Dashboard() {
                 disabled={makeLinksLiveMutation.isPending}
                 title="Re-push every published post so its internal links point at the now-live URLs — guarantees no 404s."
                 style={{
-                  fontSize: 12, fontWeight: 600, color: "#166534",
-                  border: "1px solid #86efac", borderRadius: 8,
-                  padding: "6px 14px", background: "#f0fdf4",
+                  fontSize: 12, fontWeight: 600, color: "#5A5A52",
+                  border: "1px solid rgba(14,14,12,0.16)", borderRadius: 8,
+                  padding: "6px 14px", background: "#EFEBDF",
                   cursor: makeLinksLiveMutation.isPending ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", gap: 6, opacity: makeLinksLiveMutation.isPending ? 0.6 : 1,
                 }}
@@ -319,7 +319,7 @@ export default function Dashboard() {
               <div className="kpi-value">
                 {card.value}
                 {card.denom !== null && (
-                  <span style={{ fontSize: 16, fontWeight: 500, color: "#9ca3af" }}>/{card.denom}</span>
+                  <span style={{ fontSize: 16, fontWeight: 500, color: "#8E8E84" }}>/{card.denom}</span>
                 )}
               </div>
               <div className="kpi-sub">{card.sub}</div>
@@ -333,8 +333,8 @@ export default function Dashboard() {
           {/* ── The batch ── */}
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e" }}>The batch</h2>
-              <span style={{ fontSize: 11, color: "#9ca3af", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0E0E0C" }}>The batch</h2>
+              <span style={{ fontSize: 11, color: "#8E8E84", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                 6 stages · click to open
               </span>
             </div>
@@ -354,7 +354,7 @@ export default function Dashboard() {
                       <div className={`stage-icon ${status}`} style={stageIconStyle(stage.id)}>
                         <Icon style={{
                           width: 18, height: 18,
-                          color: status === "complete" ? "#1a1a2e" : status === "active" ? "#fff" : "#9ca3af"
+                          color: status === "complete" ? "#0E0E0C" : status === "active" ? "#FBFAF4" : "#8E8E84"
                         }} />
                       </div>
                       {status === "complete" && (
@@ -370,18 +370,18 @@ export default function Dashboard() {
                       )}
                     </div>
                     {/* Stage label */}
-                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 4 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8E8E84", marginBottom: 4 }}>
                       Stage {stage.id}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: status === "locked" ? "#9ca3af" : "#1a1a2e", marginBottom: 4 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: status === "locked" ? "#8E8E84" : "#0E0E0C", marginBottom: 4 }}>
                       {stage.label}
                     </div>
-                    <div style={{ fontSize: 12, color: "#9ca3af" }}>{stage.desc}</div>
+                    <div style={{ fontSize: 12, color: "#8E8E84" }}>{stage.desc}</div>
                     {/* Progress bar for active stage */}
                     {status === "active" && (
-                      <div style={{ marginTop: 10, height: 3, background: "#e5e7eb", borderRadius: 99 }}>
+                      <div style={{ marginTop: 10, height: 3, background: "rgba(14,14,12,0.08)", borderRadius: 99 }}>
                         <div style={{
-                          height: 3, borderRadius: 99, background: "#6e5afe",
+                          height: 3, borderRadius: 99, background: "#0E0E0C",
                           width: `${Math.min(100, ((currentStage - 1) / 6) * 100 + 10)}%`
                         }} />
                       </div>
@@ -395,33 +395,33 @@ export default function Dashboard() {
           {/* ── Right column: Activity + Tips ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {/* Activity feed */}
-            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "18px 20px" }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>What clicked</h3>
+            <div style={{ background: "#FBFAF4", border: "1px solid rgba(14,14,12,0.08)", borderRadius: 12, padding: "18px 20px" }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0E0E0C", marginBottom: 14 }}>What clicked</h3>
               {activityLoading ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 10 }} />)}
                 </div>
               ) : grouped.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", textAlign: "center", padding: "16px 0" }}>
+                <p style={{ fontSize: 13, color: "#8E8E84", textAlign: "center", padding: "16px 0" }}>
                   No activity yet — start your first stage!
                 </p>
               ) : (
                 grouped.map(group => (
                   <div key={group.day}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, marginTop: 4 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#8E8E84", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, marginTop: 4 }}>
                       {group.day}
                     </div>
                     {group.items?.map(item => {
                       const Icon = ACTION_ICONS[item.action] ?? Clock;
-                      const color = ACTION_COLORS[item.action] ?? "#9ca3af";
+                      const color = ACTION_COLORS[item.action] ?? "#8E8E84";
                       return (
                         <div key={item.id} className="activity-item">
                           <span className="activity-time">{fmtTime(item.createdAt)}</span>
                           <Icon style={{ width: 14, height: 14, color, flexShrink: 0, marginTop: 1 }} />
-                          <span style={{ fontSize: 13, color: "#374151" }}>
+                          <span style={{ fontSize: 13, color: "#2C2C28" }}>
                             {ACTION_LABELS[item.action] ?? item.action}
                             {item.articleTitle && (
-                              <em style={{ color: "#6b7280" }}> — {item.articleTitle}</em>
+                              <em style={{ color: "#5A5A52" }}> — {item.articleTitle}</em>
                             )}
                           </span>
                         </div>
@@ -433,12 +433,12 @@ export default function Dashboard() {
             </div>
 
             {/* Before you publish tips */}
-            <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "16px 18px" }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 10 }}>Before you publish</h3>
-              <p style={{ fontSize: 12, color: "#78350f", lineHeight: 1.6, margin: "0 0 8px" }}>
+            <div style={{ background: "#EFEBDF", border: "1px solid rgba(14,14,12,0.16)", borderRadius: 12, padding: "16px 18px" }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#0E0E0C", marginBottom: 10 }}>Before you publish</h3>
+              <p style={{ fontSize: 12, color: "#2C2C28", lineHeight: 1.6, margin: "0 0 8px" }}>
                 <strong>Cornerstone first.</strong> Your cornerstone article must go live before its pillars and clusters — we'll order the queue for you.
               </p>
-              <p style={{ fontSize: 12, color: "#78350f", lineHeight: 1.6, margin: 0 }}>
+              <p style={{ fontSize: 12, color: "#2C2C28", lineHeight: 1.6, margin: 0 }}>
                 Over-editing keyword placement can lower ranking potential. We recommend publishing strong drafts as-is.
               </p>
             </div>

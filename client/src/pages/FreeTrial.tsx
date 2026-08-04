@@ -102,8 +102,8 @@ export default function FreeTrial() {
       <DashboardLayout>
         <div className="max-w-2xl mx-auto py-12 text-center space-y-6">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-14 w-14 rounded-full bg-amber-100 flex items-center justify-center">
-              <Star className="h-7 w-7 text-amber-500" />
+            <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center">
+              <Star className="h-7 w-7 text-[#C98A2B]" />
             </div>
             <h1 className="text-2xl font-bold">You've used your free trial</h1>
             <p className="text-muted-foreground max-w-md">
@@ -184,7 +184,7 @@ export default function FreeTrial() {
               <ul className="space-y-2.5">
                 {TRIAL_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                    <CheckCircle className="h-4 w-4 text-foreground shrink-0 mt-0.5" />
                     {f}
                   </li>
                 ))}

@@ -426,7 +426,7 @@ function StatusBadgeChip({
 }) {
   if (status === "published") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-foreground">
         <CheckCircle2 className="h-3 w-3" />
         Published
       </span>
@@ -449,7 +449,7 @@ function StatusBadgeChip({
   }
   if (status === "approved") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-foreground">
         <CheckCircle2 className="h-3 w-3" />
         Approved
       </span>
@@ -464,7 +464,7 @@ function StatusBadgeChip({
   }
   if (badge === "authority_ready") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-foreground">
         <Trophy className="h-3 w-3" />
         Authority Ready
       </span>
@@ -479,7 +479,7 @@ function StatusBadgeChip({
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-[#C98A2B]">
       <AlertTriangle className="h-3 w-3" />
       Needs Review
     </span>
@@ -489,7 +489,7 @@ function StatusBadgeChip({
 function LevelLabel({ level }: { level: "cornerstone" | "pillar" | "cluster" }) {
   if (level === "cornerstone") {
     return (
-      <span className="text-xs font-bold uppercase tracking-wide text-violet-400">
+      <span className="text-xs font-bold uppercase tracking-wide text-foreground">
         Cornerstone
       </span>
     );
@@ -527,12 +527,12 @@ function ScoreBadgePanel({ liveChecks }: { badge?: StatusBadge; liveChecks?: Pas
     const label = score === 16 ? "Perfect Score" : score === 15 ? "Authority Ready" : "Ready to Publish";
     const emoji = score === 16 ? "✨" : "✅";
     return (
-      <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3">
+      <div className="rounded-lg bg-secondary border border-border p-3">
         <div className="flex items-center gap-3">
           <div className="text-xl">{emoji}</div>
           <div>
-            <div className="text-sm font-bold text-emerald-400">{label} — {score}/16</div>
-            <div className="text-xs text-emerald-600">
+            <div className="text-sm font-bold text-foreground">{label} — {score}/16</div>
+            <div className="text-xs text-foreground">
               {score === 16
                 ? "All 16 SEO checks passed. Publish with confidence."
                 : "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards."
@@ -542,11 +542,11 @@ function ScoreBadgePanel({ liveChecks }: { badge?: StatusBadge; liveChecks?: Pas
         </div>
         {/* Show the 1–2 failing checks even at 15/16 so the user knows exactly what was missed */}
         {score < 16 && failingChecks.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-emerald-500/20">
-            <div className="text-[10px] font-semibold text-emerald-600 mb-1">Missed point{failingChecks.length > 1 ? 's' : ''} (optional to fix):</div>
+          <div className="mt-2 pt-2 border-t border-border">
+            <div className="text-[10px] font-semibold text-foreground mb-1">Missed point{failingChecks.length > 1 ? 's' : ''} (optional to fix):</div>
             <div className="flex flex-col gap-1">
               {failingChecks.map(k => (
-                <div key={k} className="flex items-start gap-1.5 text-xs text-emerald-700">
+                <div key={k} className="flex items-start gap-1.5 text-xs text-foreground">
                   <span className="mt-0.5 shrink-0">◦</span>
                   <span>{PASS1_CHECK_LABELS[k]}</span>
                 </div>
@@ -585,19 +585,19 @@ function ScoreBadgePanel({ liveChecks }: { badge?: StatusBadge; liveChecks?: Pas
 
   // Below 12 = Needs attention (orange — only here)
   return (
-    <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
+    <div className="rounded-lg bg-secondary border border-border p-3">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-base">⚠️</span>
         <div>
-          <div className="text-sm font-bold text-amber-400">Needs Attention — {score}/16</div>
-          <div className="text-xs text-amber-500">Below the 12-point minimum. Review the items below.</div>
+          <div className="text-sm font-bold text-[#C98A2B]">Needs Attention — {score}/16</div>
+          <div className="text-xs text-[#C98A2B]">Below the 12-point minimum. Review the items below.</div>
         </div>
       </div>
       {failingChecks.length > 0 && (
         <div className="mt-2 flex flex-col gap-1">
-          <div className="text-xs font-semibold text-amber-400 mb-1">To improve:</div>
+          <div className="text-xs font-semibold text-[#C98A2B] mb-1">To improve:</div>
           {failingChecks.map(k => (
-            <div key={k} className="flex items-start gap-1.5 text-xs text-amber-600">
+            <div key={k} className="flex items-start gap-1.5 text-xs text-[#C98A2B]">
               <span className="mt-0.5 shrink-0">✗</span>
               <span>{PASS1_CHECK_LABELS[k]}</span>
             </div>
@@ -639,7 +639,7 @@ function CopyRow({ label, value, mono }: { label: string; value: string; mono?: 
         )}
       </div>
       <div className={`shrink-0 mt-1 text-xs font-medium transition-colors ${
-        copied ? "text-emerald-500" : "text-muted-foreground group-hover:text-primary"
+        copied ? "text-foreground" : "text-muted-foreground group-hover:text-primary"
       }`}>
         {copied ? "Copied!" : <ClipboardCopy className="h-3.5 w-3.5" />}
       </div>
@@ -1060,24 +1060,24 @@ export default function ArticleReview() {
 
   return (
     <DashboardLayout>
-    <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", background:"#faf9f5" }}>
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", background:"#F4F1E8" }}>
       <StageStepper currentStage={allApproved ? Math.max(currentStage, 6) : currentStage} activeStage={allApproved ? 6 : 5} />
       <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       {/* ── Left sidebar: article list ─────────────────────────────────── */}
       <div className="w-60 min-w-[220px] border-r border-border flex flex-col bg-card overflow-y-auto">
         {/* Header — green banner when all approved, otherwise normal progress */}
         {allApproved ? (
-          <div className="px-4 py-3 border-b border-border bg-emerald-500/10">
+          <div className="px-4 py-3 border-b border-border bg-secondary">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-xs font-bold text-emerald-600">Ready to publish</p>
-                <p className="text-[10px] text-emerald-600/80 mt-0.5">{approvedCount} / {totalCount} approved</p>
+                <p className="text-xs font-bold text-foreground">Ready to publish</p>
+                <p className="text-[10px] text-foreground/80 mt-0.5">{approvedCount} / {totalCount} approved</p>
               </div>
               <Button
                 size="sm"
                 type="button"
                 className="shrink-0 text-xs font-bold"
-                style={{ background: "#7c3aed", color: "#fff" }}
+                style={{ background: "#7c3aed", color: "#F4F1E8" }}
                 onClick={() => navigate("/publish")}
               >
                 Proceed to Schedule <ArrowRight className="ml-1 h-3 w-3" />
@@ -1141,7 +1141,7 @@ export default function ArticleReview() {
                       <span className="flex items-center gap-1">
                         Low quality score
                         {lowPass2Count > 0 && (
-                          <span className="bg-amber-500/20 text-amber-600 text-[10px] px-1 rounded font-semibold">{lowPass2Count}</span>
+                          <span className="bg-secondary text-[#C98A2B] text-[10px] px-1 rounded font-semibold">{lowPass2Count}</span>
                         )}
                       </span>
                     )}
@@ -1160,7 +1160,7 @@ export default function ArticleReview() {
                     className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
                       listFilter === f
                         ? f === "low_pass2"
-                          ? "bg-amber-500/20 border-amber-500/40 text-amber-600 font-semibold"
+                          ? "bg-secondary border-border text-[#C98A2B] font-semibold"
                           : "bg-primary/10 border-primary/40 text-primary font-semibold"
                         : "bg-transparent border-border text-muted-foreground hover:bg-muted/50"
                     }`}
@@ -1280,10 +1280,10 @@ export default function ArticleReview() {
                         return (
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                             displayScore >= 15
-                              ? "bg-emerald-500/15 text-emerald-500"
+                              ? "bg-secondary text-foreground"
                               : displayScore >= 13
-                              ? "bg-blue-500/15 text-blue-400"
-                              : "bg-amber-500/15 text-amber-500"
+                              ? "bg-secondary text-foreground"
+                              : "bg-secondary text-[#C98A2B]"
                           }`}>
                             ✓1 {displayScore}/16
                           </span>
@@ -1292,8 +1292,8 @@ export default function ArticleReview() {
                       {item.pass2Score != null && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                           item.pass2Score >= 75
-                            ? "bg-emerald-500/15 text-emerald-500"
-                            : "bg-amber-500/15 text-amber-500"
+                            ? "bg-secondary text-foreground"
+                            : "bg-secondary text-[#C98A2B]"
                         }`}>
                           {item.pass2Score >= 75 ? "Excellent — ready to publish" : "Improving quality..."}
                         </span>
@@ -1387,8 +1387,8 @@ export default function ArticleReview() {
                           onClick={() => setAiPanelOpen(v => !v)}
                           className={`text-xs px-3 py-1.5 rounded-md border font-medium transition-colors ${
                             aiPanelOpen
-                              ? "bg-violet-100 border-violet-300 text-violet-700 hover:bg-violet-200"
-                              : "bg-violet-50 border-violet-200 text-violet-600 hover:bg-violet-100"
+                              ? "bg-secondary border-border text-foreground hover:bg-secondary"
+                              : "bg-secondary border-border text-foreground hover:bg-secondary"
                           }`}
                         >
                           ✨ AI Edit Instruction
@@ -1421,18 +1421,18 @@ export default function ArticleReview() {
 
                   {/* AI Instruction Panel */}
                   {aiPanelOpen && !bodyEditMode && !isApproved && (
-                    <div className="mb-4 p-4 rounded-xl border border-violet-200 bg-violet-50/60">
+                    <div className="mb-4 p-4 rounded-xl border border-border bg-secondary">
                       <div className="flex items-start gap-2 mb-3">
-                        <span className="text-violet-600 text-base mt-0.5">✨</span>
+                        <span className="text-foreground text-base mt-0.5">✨</span>
                         <div>
-                          <p className="text-sm font-semibold text-violet-800">AI Edit Instruction</p>
-                          <p className="text-xs text-violet-600 mt-0.5">
+                          <p className="text-sm font-semibold text-foreground">AI Edit Instruction</p>
+                          <p className="text-xs text-foreground mt-0.5">
                             Describe what you want changed in plain English. The AI will apply only your instruction and preserve everything else.
                           </p>
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-xs text-violet-500 font-medium">Examples:</p>
+                        <p className="text-xs text-foreground font-medium">Examples:</p>
                         <div className="flex flex-wrap gap-1.5">
                           {[
                             "Change '1 year in business' to reflect 30+ years of combined experience",
@@ -1444,14 +1444,14 @@ export default function ArticleReview() {
                               key={example}
                               type="button"
                               onClick={() => setAiInstruction(example)}
-                              className="text-xs px-2 py-1 rounded-md bg-violet-100 border border-violet-200 text-violet-700 hover:bg-violet-200 transition-colors text-left"
+                              className="text-xs px-2 py-1 rounded-md bg-secondary border border-border text-foreground hover:bg-secondary transition-colors text-left"
                             >
                               {example}
                             </button>
                           ))}
                         </div>
                         <textarea
-                          className="w-full min-h-[80px] text-sm bg-white border border-violet-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-violet-300"
+                          className="w-full min-h-[80px] text-sm bg-card border border-border rounded-lg p-3 resize-y focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-foreground"
                           placeholder="e.g. Change '1 year in business' to reflect 30+ years of combined business experience across multiple businesses..."
                           value={aiInstruction}
                           onChange={e => setAiInstruction(e.target.value)}
@@ -1465,7 +1465,7 @@ export default function ArticleReview() {
                               if (!selectedItem?.id || !aiInstruction.trim()) return;
                               aiEditInstruction.mutate({ articleId: selectedItem.id, instruction: aiInstruction.trim() });
                             }}
-                            className="text-sm px-4 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="text-sm px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
                           >
                             {aiEditInstruction.isPending ? (
                               <><Loader2 className="h-4 w-4 animate-spin" />Applying AI edit…</>
@@ -1476,13 +1476,13 @@ export default function ArticleReview() {
                           <button
                             type="button"
                             onClick={() => { setAiPanelOpen(false); setAiInstruction(""); }}
-                            className="text-sm px-3 py-2 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-100 transition-colors"
+                            className="text-sm px-3 py-2 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors"
                             disabled={aiEditInstruction.isPending}
                           >
                             Cancel
                           </button>
                           {aiEditInstruction.isPending && (
-                            <span className="text-xs text-violet-500">This may take 15–30 seconds…</span>
+                            <span className="text-xs text-foreground">This may take 15–30 seconds…</span>
                           )}
                         </div>
                       </div>
@@ -1505,7 +1505,7 @@ export default function ArticleReview() {
                         </div>
                       )}
                       {((fullArticle as any).pendingLinkCount ?? 0) > 0 && (
-                        <div className="mb-4 px-3 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 font-medium">
+                        <div className="mb-4 px-3 py-1.5 rounded-md bg-secondary border border-border text-xs text-[#C98A2B] font-medium">
                           🔗 {(fullArticle as any).pendingLinkCount} internal link{(fullArticle as any).pendingLinkCount !== 1 ? "s" : ""} shown as plain text — {(fullArticle as any).pendingLinkCount !== 1 ? "they" : "it"} will become {(fullArticle as any).pendingLinkCount !== 1 ? "live links" : "a live link"} once the target post{(fullArticle as any).pendingLinkCount !== 1 ? "s are" : " is"} published.
                         </div>
                       )}
@@ -1528,8 +1528,8 @@ export default function ArticleReview() {
               {/* URL Slug */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Label className={`text-xs font-semibold ${fieldFailing("urlSlug") ? "text-amber-600" : "text-foreground"}`}>URL Slug</Label>
-                  {fieldFailing("urlSlug") && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                  <Label className={`text-xs font-semibold ${fieldFailing("urlSlug") ? "text-[#C98A2B]" : "text-foreground"}`}>URL Slug</Label>
+                  {fieldFailing("urlSlug") && <AlertTriangle className="h-3 w-3 text-[#C98A2B]" />}
                   <HelpLink slug="url-slug-best-practices" label="How to write a good URL slug" />
                 </div>
                 <div className="flex gap-1">
@@ -1537,7 +1537,7 @@ export default function ArticleReview() {
                     value={seoEdits.urlSlug}
                     onChange={e => setSeoEdits(prev => ({ ...prev, urlSlug: e.target.value }))}
                     placeholder="url-slug-here"
-                    className={`text-xs font-mono flex-1 ${fieldFailing("urlSlug") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
+                    className={`text-xs font-mono flex-1 ${fieldFailing("urlSlug") ? "border-border focus-visible:ring-primary" : ""}`}
                     disabled={seoFieldsLocked}
                   />
                   <button
@@ -1550,15 +1550,15 @@ export default function ArticleReview() {
                   </button>
                 </div>
                 {fieldFailing("urlSlug") && (
-                  <p className="text-[11px] text-amber-600">Include your focus keyword in the slug (e.g. focus-keyword-topic)</p>
+                  <p className="text-[11px] text-[#C98A2B]">Include your focus keyword in the slug (e.g. focus-keyword-topic)</p>
                 )}
               </div>
 
               {/* Meta Title */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Label className={`text-xs font-semibold ${fieldFailing("metaTitle") ? "text-red-600" : "text-foreground"}`}>Meta Title</Label>
-                  {fieldFailing("metaTitle") && <XCircle className="h-3 w-3 text-red-500" />}
+                  <Label className={`text-xs font-semibold ${fieldFailing("metaTitle") ? "text-destructive" : "text-foreground"}`}>Meta Title</Label>
+                  {fieldFailing("metaTitle") && <XCircle className="h-3 w-3 text-destructive" />}
                   <HelpLink slug="meta-title-description" label="Meta title best practices" />
                 </div>
                 <div className="flex gap-1">
@@ -1566,7 +1566,7 @@ export default function ArticleReview() {
                     value={seoEdits.metaTitle}
                     onChange={e => setSeoEdits(prev => ({ ...prev, metaTitle: e.target.value }))}
                     placeholder="Meta title (max 60 chars)"
-                    className={`text-xs flex-1 ${fieldFailing("metaTitle") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                    className={`text-xs flex-1 ${fieldFailing("metaTitle") ? "border-destructive/30 focus-visible:ring-primary" : ""}`}
                     disabled={seoFieldsLocked}
                   />
                   <button
@@ -1580,7 +1580,7 @@ export default function ArticleReview() {
                 </div>
                 <div className={`text-xs text-right ${
                   metaTitleLen > 60 ? "text-destructive" :
-                  fieldFailing("metaTitle") ? "text-amber-600" :
+                  fieldFailing("metaTitle") ? "text-[#C98A2B]" :
                   "text-muted-foreground"
                 }`}>
                   {metaTitleLen} / 60 chars {metaTitleLen <= 60 && !fieldFailing("metaTitle") ? "✓" : metaTitleLen > 60 ? "✗ too long" : "⚠ add keyword"}
@@ -1590,8 +1590,8 @@ export default function ArticleReview() {
               {/* Meta Description */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Label className={`text-xs font-semibold ${fieldFailing("metaDescription") ? "text-red-600" : "text-foreground"}`}>Meta Description</Label>
-                  {fieldFailing("metaDescription") && <XCircle className="h-3 w-3 text-red-500" />}
+                  <Label className={`text-xs font-semibold ${fieldFailing("metaDescription") ? "text-destructive" : "text-foreground"}`}>Meta Description</Label>
+                  {fieldFailing("metaDescription") && <XCircle className="h-3 w-3 text-destructive" />}
                   <HelpLink slug="meta-title-description" label="Meta description best practices" />
                 </div>
                 <div className="relative">
@@ -1599,7 +1599,7 @@ export default function ArticleReview() {
                     value={seoEdits.metaDescription}
                     onChange={e => setSeoEdits(prev => ({ ...prev, metaDescription: e.target.value }))}
                     placeholder="Meta description (140–160 chars)"
-                    className={`text-xs min-h-[70px] resize-none pr-8 ${fieldFailing("metaDescription") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                    className={`text-xs min-h-[70px] resize-none pr-8 ${fieldFailing("metaDescription") ? "border-destructive/30 focus-visible:ring-primary" : ""}`}
                     disabled={seoFieldsLocked}
                   />
                   <button
@@ -1612,8 +1612,8 @@ export default function ArticleReview() {
                   </button>
                 </div>
                 <div className={`text-xs text-right ${
-                  (metaDescLen < 140 || metaDescLen > 160) ? "text-amber-600" :
-                  fieldFailing("metaDescription") ? "text-amber-600" :
+                  (metaDescLen < 140 || metaDescLen > 160) ? "text-[#C98A2B]" :
+                  fieldFailing("metaDescription") ? "text-[#C98A2B]" :
                   "text-muted-foreground"
                 }`}>
                   {metaDescLen} / 160 chars {metaDescLen >= 140 && metaDescLen <= 160 && !fieldFailing("metaDescription") ? "✓" : metaDescLen < 140 ? "⚠ too short" : metaDescLen > 160 ? "⚠ too long" : "⚠ add keyword"}
@@ -1623,8 +1623,8 @@ export default function ArticleReview() {
               {/* Focus Keyword */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Label className={`text-xs font-semibold ${fieldFailing("focusKeyword") ? "text-amber-600" : "text-foreground"}`}>Focus Keyword</Label>
-                  {fieldFailing("focusKeyword") && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                  <Label className={`text-xs font-semibold ${fieldFailing("focusKeyword") ? "text-[#C98A2B]" : "text-foreground"}`}>Focus Keyword</Label>
+                  {fieldFailing("focusKeyword") && <AlertTriangle className="h-3 w-3 text-[#C98A2B]" />}
                   <HelpLink slug="focus-keyword" label="What is a focus keyword?" />
                 </div>
                 <div className="flex gap-1">
@@ -1632,7 +1632,7 @@ export default function ArticleReview() {
                     value={seoEdits.focusKeyword}
                     onChange={e => setSeoEdits(prev => ({ ...prev, focusKeyword: e.target.value }))}
                     placeholder="focus keyword phrase"
-                    className={`text-xs flex-1 ${fieldFailing("focusKeyword") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
+                    className={`text-xs flex-1 ${fieldFailing("focusKeyword") ? "border-border focus-visible:ring-primary" : ""}`}
                     disabled={seoFieldsLocked}
                   />
                   <button
@@ -1645,7 +1645,7 @@ export default function ArticleReview() {
                   </button>
                 </div>
                 {fieldFailing("focusKeyword") && (
-                  <p className="text-[11px] text-amber-600">Keyword should appear in H1, H2, first 150 words, meta title, and slug</p>
+                  <p className="text-[11px] text-[#C98A2B]">Keyword should appear in H1, H2, first 150 words, meta title, and slug</p>
                 )}
               </div>
 
@@ -1692,7 +1692,7 @@ export default function ArticleReview() {
                     {approve.isPending ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1" />
                     ) : approveJustSucceeded ? (
-                      <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" />
+                      <CheckCircle2 className="h-3 w-3 mr-1 text-foreground" />
                     ) : (
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                     )}
@@ -1706,7 +1706,7 @@ export default function ArticleReview() {
                     <div>
                       <div className="font-semibold">Publish failed</div>
                       {selectedItem.errorMessage && (
-                        <div className="mt-1 text-red-600">{selectedItem.errorMessage}</div>
+                        <div className="mt-1 text-destructive">{selectedItem.errorMessage}</div>
                       )}
                     </div>
                   </div>
@@ -1741,7 +1741,7 @@ export default function ArticleReview() {
                 </div>
               ) : selectedItem.status === "published" ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary border border-border text-xs text-foreground">
                     <CheckCircle2 className="h-4 w-4" />
                     Article published successfully.
                   </div>
@@ -1758,10 +1758,10 @@ export default function ArticleReview() {
                   )}
                   {/* Wix manual fields notice */}
                   {connectedPlatforms.includes("wix") && (
-                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+                    <div className="rounded-lg border border-border bg-secondary p-3 space-y-2">
                       <div className="flex items-start gap-2">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
-                        <div className="text-[11px] text-amber-400 leading-relaxed">
+                        <AlertTriangle className="h-3.5 w-3.5 text-[#C98A2B] mt-0.5 shrink-0" />
+                        <div className="text-[11px] text-[#C98A2B] leading-relaxed">
                           <span className="font-semibold">2 fields must be set manually in Wix</span> — the Wix API does not support setting these programmatically. Copy them below and paste into your Wix post editor.
                         </div>
                       </div>
@@ -1851,7 +1851,7 @@ export default function ArticleReview() {
                           </div>
                         </div>
                       ) : (
-                        <div className="text-xs text-amber-500 flex items-center gap-1.5">
+                        <div className="text-xs text-[#C98A2B] flex items-center gap-1.5">
                           <AlertTriangle className="h-3 w-3" />
                           No CMS connected. <a href="/integrations" className="underline">Go to Integrations</a>
                         </div>
@@ -1931,7 +1931,7 @@ export default function ArticleReview() {
               ) : (
                 /* ── Per-article publish action panel ───────────────────── */
                 <div className="space-y-2 mt-1">
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground">
                     <span className="flex items-center gap-1.5">
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                       {selectedItem?.status === "scheduled"
@@ -1941,7 +1941,7 @@ export default function ArticleReview() {
                     {selectedItem?.status === "approved" && (
                       <button
                         type="button"
-                        className="text-[10px] text-amber-500 hover:text-amber-400 underline transition-colors"
+                        className="text-[10px] text-[#C98A2B] hover:text-[#C98A2B] underline transition-colors"
                         onClick={() => selectedItem?.id && updateStatus.mutate({ articleId: selectedItem.id, status: "pending_approval" })}
                         disabled={updateStatus.isPending}
                       >
@@ -1970,7 +1970,7 @@ export default function ArticleReview() {
                   {!publishPanelOpen ? (
                     selectedItem?.status === "scheduled" ? (
                       <div className="space-y-2">
-                        <div className="w-full rounded-md border border-blue-600/30 bg-blue-600/15 py-2 text-center text-xs font-semibold text-blue-600">
+                        <div className="w-full rounded-md border border-border bg-secondary py-2 text-center text-xs font-semibold text-foreground">
                           ⏰ Scheduled{(fullArticle as any)?.scheduledPublishAt ? ` — ${new Date((fullArticle as any).scheduledPublishAt).toLocaleString()}` : ""}
                         </div>
                         <Button
@@ -2035,7 +2035,7 @@ export default function ArticleReview() {
                           </div>
                         </div>
                       ) : (
-                        <div className="text-xs text-amber-500 flex items-center gap-1.5">
+                        <div className="text-xs text-[#C98A2B] flex items-center gap-1.5">
                           <AlertTriangle className="h-3 w-3" />
                           No CMS connected. <a href="/integrations" className="underline">Go to Integrations</a>
                         </div>
@@ -2139,21 +2139,21 @@ export default function ArticleReview() {
                   : [];
 
                 const cp1Color = liveScore >= 15
-                  ? { bg: "bg-emerald-500/10 border-emerald-500/30", text: "text-emerald-500" }
+                  ? { bg: "bg-secondary border-border", text: "text-foreground" }
                   : liveScore >= 13
-                  ? { bg: "bg-blue-500/10 border-blue-500/30", text: "text-blue-400" }
-                  : { bg: "bg-amber-500/10 border-amber-500/30", text: "text-amber-500" };
+                  ? { bg: "bg-secondary border-border", text: "text-foreground" }
+                  : { bg: "bg-secondary border-border", text: "text-[#C98A2B]" };
 
                 // Status label for the top of the Quality Checkpoints section
                 const statusLabel = liveScore >= 16
-                  ? { emoji: "✨", label: "Perfect Score — 16/16", sub: "All 16 SEO checks passed. Publish with confidence.", cls: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400", sub_cls: "text-emerald-600" }
+                  ? { emoji: "✨", label: "Perfect Score — 16/16", sub: "All 16 SEO checks passed. Publish with confidence.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
                   : liveScore >= 15
-                  ? { emoji: "✅", label: "Authority Ready — 15/16", sub: "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards.", cls: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400", sub_cls: "text-emerald-600" }
+                  ? { emoji: "✅", label: "Authority Ready — 15/16", sub: "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
                   : liveScore >= 14
-                  ? { emoji: "✅", label: "Ready to Publish — 14/16", sub: "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards.", cls: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400", sub_cls: "text-emerald-600" }
+                  ? { emoji: "✅", label: "Ready to Publish — 14/16", sub: "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
                   : liveScore >= 13
-                  ? { emoji: "⚡", label: `Strong — ${liveScore}/16`, sub: "Good SEO structure. A few optional improvements available.", cls: "bg-blue-500/10 border-blue-500/30 text-blue-400", sub_cls: "text-blue-500" }
-                  : { emoji: "⚠️", label: `Needs Review — ${liveScore}/16`, sub: "Below the 13-point threshold. Review the items below before publishing.", cls: "bg-amber-500/10 border-amber-500/30 text-amber-500", sub_cls: "text-amber-600" };
+                  ? { emoji: "⚡", label: `Strong — ${liveScore}/16`, sub: "Good SEO structure. A few optional improvements available.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
+                  : { emoji: "⚠️", label: `Needs Review — ${liveScore}/16`, sub: "Below the 13-point threshold. Review the items below before publishing.", cls: "bg-secondary border-border text-[#C98A2B]", sub_cls: "text-[#C98A2B]" };
 
                 return (
                   <div className="space-y-2 mt-1">
@@ -2181,15 +2181,15 @@ export default function ArticleReview() {
                         (selectedItem as any).pass2Score == null
                           ? "bg-muted/30 border-border"
                           : (selectedItem as any).pass2Score >= 75
-                          ? "bg-emerald-500/10 border-emerald-500/30"
-                          : "bg-amber-500/10 border-amber-500/30"
+                          ? "bg-secondary border-border"
+                          : "bg-secondary border-border"
                       }`}>
                         <div className={`text-[11px] font-semibold leading-tight ${
                           (selectedItem as any).pass2Score == null
                             ? "text-muted-foreground"
                             : (selectedItem as any).pass2Score >= 75
-                            ? "text-emerald-500"
-                            : "text-amber-500"
+                            ? "text-foreground"
+                            : "text-[#C98A2B]"
                         }`}>
                           {(selectedItem as any).pass2Score == null
                             ? "—"
@@ -2201,7 +2201,7 @@ export default function ArticleReview() {
                           (selectedItem as any).pass2Score < 75 &&
                           (selectedItem as any).pass2Details && (
                           <div className="text-[9px] text-muted-foreground/80 mt-1 leading-tight text-left px-0.5">
-                            <span className="font-medium text-amber-500/80">Low score reason:</span>{" "}
+                            <span className="font-medium text-[#C98A2B]/80">Low score reason:</span>{" "}
                             {(selectedItem as any).pass2Details}
                           </div>
                         )}
@@ -2214,13 +2214,13 @@ export default function ArticleReview() {
                     {liveScore < 16 && failingKeys.length > 0 && (
                       <div className={`rounded-lg border p-2.5 ${
                         liveScore >= 15
-                          ? "bg-emerald-500/5 border-emerald-500/20"
+                          ? "bg-secondary border-border"
                           : liveScore >= 13
-                          ? "bg-blue-500/5 border-blue-500/20"
-                          : "bg-amber-500/5 border-amber-500/20"
+                          ? "bg-secondary border-border"
+                          : "bg-secondary border-border"
                       }`}>
                         <div className={`text-[10px] font-semibold mb-1.5 ${
-                          liveScore >= 15 ? "text-emerald-600" : liveScore >= 13 ? "text-blue-400" : "text-amber-500"
+                          liveScore >= 15 ? "text-foreground" : liveScore >= 13 ? "text-foreground" : "text-[#C98A2B]"
                         }`}>
                           {liveScore >= 15 ? `Missed point${failingKeys.length > 1 ? 's' : ''} (optional to fix):` : liveScore >= 13 ? "Optional improvements:" : "Points to fix:"}
                         </div>
@@ -2228,10 +2228,10 @@ export default function ArticleReview() {
                           {failingKeys.map(k => (
                             <div key={k} className="flex items-start gap-1.5">
                               <span className={`mt-0.5 shrink-0 text-[10px] ${
-                                liveScore >= 15 ? "text-emerald-600" : liveScore >= 13 ? "text-blue-400/70" : "text-amber-500"
+                                liveScore >= 15 ? "text-foreground" : liveScore >= 13 ? "text-foreground/70" : "text-[#C98A2B]"
                               }`}>{liveScore >= 13 ? "◦" : "✗"}</span>
                               <span className={`text-[10px] leading-tight ${
-                                liveScore >= 15 ? "text-emerald-700" : liveScore >= 13 ? "text-muted-foreground" : "text-amber-600"
+                                liveScore >= 15 ? "text-foreground" : liveScore >= 13 ? "text-muted-foreground" : "text-[#C98A2B]"
                               }`}>
                                 {k === "p1_keyword_density"
                                   ? getKeywordDensityLabel(storedMetrics, selectedItem.level)
@@ -2241,8 +2241,8 @@ export default function ArticleReview() {
                           ))}
                           {/* Schema markup — always shown as last item: a point gained automatically on publish */}
                           <div className="flex items-start gap-1.5">
-                            <span className="mt-0.5 shrink-0 text-[10px] text-emerald-500">✓</span>
-                            <span className="text-[10px] leading-tight text-emerald-600">
+                            <span className="mt-0.5 shrink-0 text-[10px] text-foreground">✓</span>
+                            <span className="text-[10px] leading-tight text-foreground">
                               Schema markup — added automatically on publish (+1 point)
                             </span>
                           </div>
@@ -2297,8 +2297,8 @@ export default function ArticleReview() {
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
           <DialogHeader className="items-center">
-            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle2 className="h-12 w-12 text-emerald-600" />
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
+              <CheckCircle2 className="h-12 w-12 text-foreground" />
             </div>
             <DialogTitle className="text-2xl font-bold">All articles approved!</DialogTitle>
             <DialogDescription className="text-base mt-2">
@@ -2308,7 +2308,7 @@ export default function ArticleReview() {
           <DialogFooter className="mt-6 flex-col gap-2 sm:flex-col">
             <Button
               className="w-full text-base py-6 font-bold"
-              style={{ background: "#7c3aed", color: "#fff" }}
+              style={{ background: "#7c3aed", color: "#F4F1E8" }}
               onClick={() => {
                 setShowApprovalModal(false);
                 navigate("/publish");

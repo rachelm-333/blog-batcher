@@ -31,14 +31,14 @@ interface UpgradePromptProps {
 
 const PLAN_ICONS: Record<string, React.ReactNode> = {
   citation_starter: <Zap className="h-5 w-5 text-primary" />,
-  citation_authority: <Star className="h-5 w-5 text-amber-500" />,
-  credit_topup: <CreditCard className="h-5 w-5 text-emerald-500" />,
+  citation_authority: <Star className="h-5 w-5 text-[#C98A2B]" />,
+  credit_topup: <CreditCard className="h-5 w-5 text-foreground" />,
 };
 
 const PLAN_COLORS: Record<string, string> = {
-  citation_starter: "border-blue-200 bg-blue-50/50",
-  citation_authority: "border-amber-200 bg-amber-50/50 ring-2 ring-amber-300",
-  credit_topup: "border-emerald-200 bg-emerald-50/50",
+  citation_starter: "border-border bg-secondary",
+  citation_authority: "border-border bg-secondary ring-2 ring-primary",
+  credit_topup: "border-border bg-secondary",
 };
 
 export function UpgradePrompt({ open, onClose, reason = "trial_complete" }: UpgradePromptProps) {
@@ -112,7 +112,7 @@ export function UpgradePrompt({ open, onClose, reason = "trial_complete" }: Upgr
                 className={`relative rounded-xl border p-5 flex flex-col gap-3 transition-shadow hover:shadow-md ${PLAN_COLORS[product.key] ?? "border-border bg-background"}`}
               >
                 {product.recommended && (
-                  <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-xs px-2 py-0.5 shadow">
+                  <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-secondary text-white text-xs px-2 py-0.5 shadow">
                     Recommended
                   </Badge>
                 )}
@@ -129,20 +129,20 @@ export function UpgradePrompt({ open, onClose, reason = "trial_complete" }: Upgr
                 <div className="flex flex-col gap-1 text-xs">
                   {(product.articleCount ?? 0) > 0 && (
                     <span className="flex items-center gap-1.5 text-foreground">
-                      <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                      <CheckCircle className="h-3.5 w-3.5 text-foreground shrink-0" />
                       {product.articleCount} articles
                     </span>
                   )}
                   <span className="flex items-center gap-1.5 text-foreground">
-                    <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    <CheckCircle className="h-3.5 w-3.5 text-foreground shrink-0" />
                     {product.credits} credits
                   </span>
                   <span className="flex items-center gap-1.5 text-foreground">
-                    <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    <CheckCircle className="h-3.5 w-3.5 text-foreground shrink-0" />
                     Full 16-point Authority Standard
                   </span>
                   <span className="flex items-center gap-1.5 text-foreground">
-                    <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    <CheckCircle className="h-3.5 w-3.5 text-foreground shrink-0" />
                     AI fingerprint scrub
                   </span>
                 </div>

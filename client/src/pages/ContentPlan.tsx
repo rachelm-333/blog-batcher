@@ -20,17 +20,17 @@ import { toast } from "sonner";
 /* ─── Level badge ────────────────────────────────────────── */
 function LevelBadge({ level }: { level: string }) {
   if (level === "cornerstone") return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#ede9ff", color:"#6e5afe", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#0E0E0C", whiteSpace:"nowrap" }}>
       ◆ Cornerstone
     </span>
   );
   if (level === "pillar") return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#dbeafe", color:"#1e40af", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#2C2C28", whiteSpace:"nowrap" }}>
       ▲ Pillar
     </span>
   );
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#f3f4f6", color:"#6b7280", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#5A5A52", whiteSpace:"nowrap" }}>
       ● Cluster
     </span>
   );
@@ -38,7 +38,7 @@ function LevelBadge({ level }: { level: string }) {
 
 function CompBadge({ comp }: { comp: string | null }) {
   if (comp === "high") return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#dc2626", fontWeight:600 }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#D24A2A", fontWeight:600 }}>
       <BarChart2 style={{ width:13, height:13 }} /> High
     </span>
   );
@@ -48,7 +48,7 @@ function CompBadge({ comp }: { comp: string | null }) {
     </span>
   );
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#16a34a", fontWeight:600 }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#0E0E0C", fontWeight:600 }}>
       <BarChart2 style={{ width:13, height:13 }} /> Low
     </span>
   );
@@ -134,8 +134,8 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
 
   return (
     <div style={{
-      background:"#fff",
-      border:"1px solid #e5e7eb",
+      background:"#FBFAF4",
+      border:"1px solid rgba(14,14,12,0.08)",
       borderRadius:12,
       padding:24,
       display:"flex",
@@ -148,8 +148,8 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
         <span style={{
           fontFamily:"monospace",
           fontSize:12,
-          background:"#f3f4f6",
-          color:"#374151",
+          background:"#EFEBDF",
+          color:"#2C2C28",
           padding:"3px 10px",
           borderRadius:6,
           fontWeight:600,
@@ -157,7 +157,7 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
           {item.keyword}
         </span>
         {item.msv !== null && (
-          <span style={{ fontSize:11, color:"#9ca3af", fontWeight:500 }}>
+          <span style={{ fontSize:11, color:"#8E8E84", fontWeight:500 }}>
             {item.msv.toLocaleString()} searches/mo
           </span>
         )}
@@ -166,7 +166,7 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
 
       {/* Editable title */}
       <div>
-        <label style={{ fontSize:11, fontWeight:600, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", display:"block", marginBottom:6 }}>
+        <label style={{ fontSize:11, fontWeight:600, color:"#5A5A52", textTransform:"uppercase", letterSpacing:"0.06em", display:"block", marginBottom:6 }}>
           Article title
         </label>
         <input
@@ -178,26 +178,26 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
             width:"100%",
             fontSize:15,
             fontWeight:600,
-            color:"#1a1a2e",
-            border:"1.5px solid #e5e7eb",
+            color:"#0E0E0C",
+            border:"1.5px solid rgba(14,14,12,0.08)",
             borderRadius:8,
             padding:"10px 14px",
             outline:"none",
             boxSizing:"border-box",
             transition:"border-color 0.15s",
           }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = "#6e5afe"; }}
-          onBlurCapture={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = "#0E0E0C"; }}
+          onBlurCapture={(e) => { e.currentTarget.style.borderColor = "rgba(14,14,12,0.08)"; }}
         />
       </div>
 
       {/* Angle (read-only) */}
       {item.angle && (
         <div>
-          <span style={{ fontSize:11, fontWeight:600, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+          <span style={{ fontSize:11, fontWeight:600, color:"#8E8E84", textTransform:"uppercase", letterSpacing:"0.06em" }}>
             What this post covers:
           </span>
-          <p style={{ fontSize:13, color:"#6b7280", margin:"4px 0 0", lineHeight:1.55 }}>
+          <p style={{ fontSize:13, color:"#5A5A52", margin:"4px 0 0", lineHeight:1.55 }}>
             {item.angle}
           </p>
         </div>
@@ -206,10 +206,10 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
       {/* Key section (read-only) */}
       {item.keySection && (
         <div>
-          <span style={{ fontSize:11, fontWeight:600, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+          <span style={{ fontSize:11, fontWeight:600, color:"#8E8E84", textTransform:"uppercase", letterSpacing:"0.06em" }}>
             Most valuable section:
           </span>
-          <p style={{ fontSize:13, color:"#374151", margin:"4px 0 0", fontWeight:500 }}>
+          <p style={{ fontSize:13, color:"#2C2C28", margin:"4px 0 0", fontWeight:500 }}>
             {item.keySection}
           </p>
         </div>
@@ -217,7 +217,7 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
 
       {/* Direction textarea */}
       <div>
-        <label style={{ fontSize:11, fontWeight:600, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", display:"block", marginBottom:6 }}>
+        <label style={{ fontSize:11, fontWeight:600, color:"#5A5A52", textTransform:"uppercase", letterSpacing:"0.06em", display:"block", marginBottom:6 }}>
           Add direction <span style={{ fontWeight:400, textTransform:"none", fontSize:11 }}>(optional)</span>
         </label>
         <textarea
@@ -229,8 +229,8 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
           style={{
             width:"100%",
             fontSize:13,
-            color:"#374151",
-            border:"1.5px solid #e5e7eb",
+            color:"#2C2C28",
+            border:"1.5px solid rgba(14,14,12,0.08)",
             borderRadius:8,
             padding:"10px 14px",
             outline:"none",
@@ -240,8 +240,8 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
             lineHeight:1.5,
             transition:"border-color 0.15s",
           }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = "#6e5afe"; }}
-          onBlurCapture={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = "#0E0E0C"; }}
+          onBlurCapture={(e) => { e.currentTarget.style.borderColor = "rgba(14,14,12,0.08)"; }}
         />
       </div>
     </div>
@@ -252,8 +252,8 @@ const ArticleCard = forwardRef<ArticleCardHandle, {
 function SkeletonCard() {
   return (
     <div style={{
-      background:"#fff",
-      border:"1px solid #e5e7eb",
+      background:"#FBFAF4",
+      border:"1px solid rgba(14,14,12,0.08)",
       borderRadius:12,
       padding:24,
       display:"flex",
@@ -261,13 +261,13 @@ function SkeletonCard() {
       gap:14,
     }}>
       <div style={{ display:"flex", gap:8 }}>
-        <div style={{ height:22, width:100, borderRadius:99, background:"#f3f4f6", animation:"pulse 1.5s ease-in-out infinite" }} />
-        <div style={{ height:22, width:140, borderRadius:6, background:"#f3f4f6", animation:"pulse 1.5s ease-in-out infinite" }} />
+        <div style={{ height:22, width:100, borderRadius:99, background:"#EFEBDF", animation:"pulse 1.5s ease-in-out infinite" }} />
+        <div style={{ height:22, width:140, borderRadius:6, background:"#EFEBDF", animation:"pulse 1.5s ease-in-out infinite" }} />
       </div>
-      <div style={{ height:42, borderRadius:8, background:"#f3f4f6", animation:"pulse 1.5s ease-in-out infinite" }} />
-      <div style={{ height:14, width:"80%", borderRadius:4, background:"#f3f4f6", animation:"pulse 1.5s ease-in-out infinite" }} />
-      <div style={{ height:14, width:"60%", borderRadius:4, background:"#f3f4f6", animation:"pulse 1.5s ease-in-out infinite" }} />
-      <div style={{ height:56, borderRadius:8, background:"#f3f4f6", animation:"pulse 1.5s ease-in-out infinite" }} />
+      <div style={{ height:42, borderRadius:8, background:"#EFEBDF", animation:"pulse 1.5s ease-in-out infinite" }} />
+      <div style={{ height:14, width:"80%", borderRadius:4, background:"#EFEBDF", animation:"pulse 1.5s ease-in-out infinite" }} />
+      <div style={{ height:14, width:"60%", borderRadius:4, background:"#EFEBDF", animation:"pulse 1.5s ease-in-out infinite" }} />
+      <div style={{ height:56, borderRadius:8, background:"#EFEBDF", animation:"pulse 1.5s ease-in-out infinite" }} />
     </div>
   );
 }
@@ -394,7 +394,7 @@ export default function ContentPlan() {
     return (
       <DashboardLayout>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", minHeight:400 }}>
-          <Loader2 style={{ width:32, height:32, color:"#6e5afe" }} className="animate-spin" />
+          <Loader2 style={{ width:32, height:32, color:"#0E0E0C" }} className="animate-spin" />
         </div>
       </DashboardLayout>
     );
@@ -418,17 +418,17 @@ export default function ContentPlan() {
         <StageStepper currentStage={currentStage} />
 
         {/* Scrollable content */}
-        <div style={{ flex:1, overflowY:"auto", padding:"24px 32px", background:"#faf9f5" }}>
+        <div style={{ flex:1, overflowY:"auto", padding:"24px 32px", background:"#F4F1E8" }}>
           {/* Page header */}
           <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:28 }}>
             <div>
-              <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#9ca3af", marginBottom:6 }}>
+              <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#8E8E84", marginBottom:6 }}>
                 Stage 3 · Content Plan
               </div>
-              <h1 style={{ fontSize:28, fontWeight:800, color:"#1a1a2e", lineHeight:1.2, margin:0 }}>
+              <h1 style={{ fontSize:28, fontWeight:800, color:"#0E0E0C", lineHeight:1.2, margin:0 }}>
                 Your content plan
               </h1>
-              <p style={{ fontSize:14, color:"#6b7280", marginTop:8, maxWidth:520 }}>
+              <p style={{ fontSize:14, color:"#5A5A52", marginTop:8, maxWidth:520 }}>
                 Here's what we're going to write. Edit any title or add direction before we start.
               </p>
             </div>
@@ -450,12 +450,12 @@ export default function ContentPlan() {
           </div>
 
           {/* Batch purpose — the shared goal that keeps this batch cohesive + SEO-aligned */}
-          <div style={{ background:"#fff", border:"2px solid #6e5afe", borderRadius:12, padding:"18px 20px", marginBottom:24 }}>
+          <div style={{ background:"#FBFAF4", border:"2px solid #0E0E0C", borderRadius:12, padding:"18px 20px", marginBottom:24 }}>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-              <Sparkles style={{ width:16, height:16, color:"#6e5afe" }} />
-              <h2 style={{ fontSize:15, fontWeight:700, color:"#1a1a2e", margin:0 }}>Purpose of this blog batch</h2>
+              <Sparkles style={{ width:16, height:16, color:"#0E0E0C" }} />
+              <h2 style={{ fontSize:15, fontWeight:700, color:"#0E0E0C", margin:0 }}>Purpose of this blog batch</h2>
             </div>
-            <p style={{ fontSize:12.5, color:"#6b7280", margin:"0 0 10px", lineHeight:1.5 }}>
+            <p style={{ fontSize:12.5, color:"#5A5A52", margin:"0 0 10px", lineHeight:1.5 }}>
               What should this whole set of posts achieve? This keeps every article on-topic and working together toward
               one goal — and directs the titles and writing to rank for it. e.g. <em>"Educate our audience on what brand
               architecture is, how to use it in their marketing, and why it matters."</em>
@@ -465,7 +465,7 @@ export default function ContentPlan() {
               onChange={(e) => setPurpose(e.target.value)}
               placeholder="Describe the goal of this batch of blog posts…"
               rows={3}
-              style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5 }}
+              style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid rgba(14,14,12,0.08)", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5 }}
             />
             <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:10 }}>
               <button
@@ -478,16 +478,16 @@ export default function ContentPlan() {
                   ? <><Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Applying & refreshing titles…</>
                   : <><Sparkles style={{ width:14, height:14 }} /> Save purpose & refresh titles</>}
               </button>
-              <span style={{ fontSize:11.5, color:"#9ca3af" }}>Refreshes the proposed titles to match your goal. You can still edit each one below.</span>
+              <span style={{ fontSize:11.5, color:"#8E8E84" }}>Refreshes the proposed titles to match your goal. You can still edit each one below.</span>
             </div>
           </div>
 
           {/* PAA warning banner */}
           {hasPaaWarning && !isLoading && (
-            <div style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 18px", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, marginBottom:20 }}>
+            <div style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 18px", background:"#EFEBDF", border:"1px solid rgba(14,14,12,0.16)", borderRadius:10, marginBottom:20 }}>
               <AlertTriangle style={{ width:16, height:16, color:"#d97706", flexShrink:0, marginTop:2 }} />
               <div>
-                <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#92400e" }}>
+                <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#0E0E0C" }}>
                   {paaWarningNodes.length} article{paaWarningNodes.length > 1 ? "s" : ""} still need a PAA question approved
                 </p>
                 <p style={{ margin:"4px 0 0", fontSize:12, color:"#a16207" }}>
@@ -498,7 +498,7 @@ export default function ContentPlan() {
               </div>
               <button
                 onClick={() => setLocation("/keywords")}
-                style={{ marginLeft:"auto", flexShrink:0, fontSize:12, fontWeight:600, color:"#d97706", background:"none", border:"1px solid #fde68a", borderRadius:6, padding:"5px 12px", cursor:"pointer", whiteSpace:"nowrap" }}
+                style={{ marginLeft:"auto", flexShrink:0, fontSize:12, fontWeight:600, color:"#d97706", background:"none", border:"1px solid rgba(14,14,12,0.16)", borderRadius:6, padding:"5px 12px", cursor:"pointer", whiteSpace:"nowrap" }}
               >
                 Go back
               </button>
@@ -508,9 +508,9 @@ export default function ContentPlan() {
           {/* Loading state */}
           {isLoading && (
             <>
-              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:20, padding:"12px 16px", background:"#f5f3ff", borderRadius:10, border:"1px solid #ede9ff" }}>
-                <Loader2 style={{ width:16, height:16, color:"#6e5afe" }} className="animate-spin" />
-                <span style={{ fontSize:13, color:"#6e5afe", fontWeight:500 }}>Planning your content…</span>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:20, padding:"12px 16px", background:"#f5f3ff", borderRadius:10, border:"1px solid #EFEBDF" }}>
+                <Loader2 style={{ width:16, height:16, color:"#0E0E0C" }} className="animate-spin" />
+                <span style={{ fontSize:13, color:"#0E0E0C", fontWeight:500 }}>Planning your content…</span>
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
                 {[1,2,3].map((i) => <SkeletonCard key={i} />)}
@@ -537,7 +537,7 @@ export default function ContentPlan() {
 
           {/* Bottom CTA */}
           {!isLoading && planItems && planItems.length > 0 && (
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:28, paddingTop:20, borderTop:"1px solid #e5e7eb" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:28, paddingTop:20, borderTop:"1px solid rgba(14,14,12,0.08)" }}>
               <button
                 className="btn-ghost"
                 onClick={() => setLocation("/keywords")}

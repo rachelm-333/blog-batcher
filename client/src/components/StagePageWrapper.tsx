@@ -37,18 +37,18 @@ export default function StagePageWrapper({
       <StageStepper currentStage={currentStage} />
 
       {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px", background: "#faf9f5" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px", background: "#F4F1E8" }}>
         {/* Eyebrow + heading row */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8E8E84", marginBottom: 6 }}>
               Stage {stageNum} · {stageLabel}
             </div>
-            <h1 style={{ fontSize: 32, fontWeight: 800, color: "#1a1a2e", lineHeight: 1.15, margin: 0 }}>
+            <h1 style={{ fontSize: 32, fontWeight: 800, color: "#0E0E0C", lineHeight: 1.15, margin: 0 }}>
               {heading}
             </h1>
             {subtitle && (
-              <p style={{ fontSize: 14, color: "#6b7280", marginTop: 8 }}>{subtitle}</p>
+              <p style={{ fontSize: 14, color: "#5A5A52", marginTop: 8 }}>{subtitle}</p>
             )}
           </div>
           {/* CTA button */}

@@ -62,8 +62,8 @@ export default function ResetPassword() {
             </Link>
           </div>
           <div className="bg-card rounded-2xl shadow-sm border border-border p-10">
-            <div className="w-16 h-16 bg-emerald-500/15 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>

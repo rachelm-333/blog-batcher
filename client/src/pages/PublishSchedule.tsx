@@ -99,7 +99,7 @@ const PUBLISH_METHODS: {
     id: "zapier",
     label: "Zapier",
     description: "Send to any platform via Zapier webhook",
-    icon: <Zap className="h-6 w-6 text-orange-500" />,
+    icon: <Zap className="h-6 w-6 text-[#C98A2B]" />,
   },
   {
     id: "export_zip",
@@ -418,10 +418,10 @@ export default function PublishSchedule() {
 
   return (
     <DashboardLayout>
-    <div style={{ background:"#faf9f5", minHeight:"100%" }}>
+    <div style={{ background:"#F4F1E8", minHeight:"100%" }}>
       <StageStepper currentStage={currentStage} activeStage={6} />
       {/* Header */}
-      <div style={{ borderBottom:"1px solid #e5e7eb", background:"#fff", padding:"16px 24px" }}>
+      <div style={{ borderBottom:"1px solid rgba(14,14,12,0.08)", background:"#FBFAF4", padding:"16px 24px" }}>
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate("/review")} className="text-xs">
@@ -440,13 +440,13 @@ export default function PublishSchedule() {
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
         {/* Gate warning */}
         {!allApproved && (
-          <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-400 flex items-start gap-3">
+          <div className="p-4 rounded-lg bg-secondary border border-border text-sm text-[#C98A2B] flex items-start gap-3">
             <span className="text-lg">⚠️</span>
             <div>
               <div className="font-semibold">All articles must be approved before publishing.</div>
               <div className="text-xs mt-1">
                 {totalCount - approvedCount} article{totalCount - approvedCount !== 1 ? "s" : ""} still need approval.{" "}
-                <button className="underline text-amber-400" onClick={() => navigate("/review")}>
+                <button className="underline text-[#C98A2B]" onClick={() => navigate("/review")}>
                   Go to Review →
                 </button>
               </div>
@@ -491,17 +491,17 @@ export default function PublishSchedule() {
                 onClick={() => setSelectedMethod("zapier")}
                 className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all ${
                   selectedMethod === "zapier"
-                    ? "bg-orange-500/10 border-orange-400 shadow-sm"
+                    ? "bg-secondary border-border shadow-sm"
                     : "bg-card border-border hover:bg-muted/50"
                 }`}
               >
-                <Zap className="h-5 w-5 text-orange-500 mt-0.5 shrink-0" />
+                <Zap className="h-5 w-5 text-[#C98A2B] mt-0.5 shrink-0" />
                 <div>
                   <div className="text-sm font-semibold text-foreground">Zapier Webhook</div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     Send articles to any platform — Shopify, Webflow, Squarespace, Ghost, or any CMS via Zapier automation.
                   </div>
-                  <div className="mt-2 text-xs text-orange-500 font-medium">Set up webhook URL in Integrations →</div>
+                  <div className="mt-2 text-xs text-[#C98A2B] font-medium">Set up webhook URL in Integrations →</div>
                 </div>
               </button>
               <button
@@ -565,9 +565,9 @@ export default function PublishSchedule() {
           {scheduleMode === "auto" && (
             <div className="space-y-6">
               {/* SEO Advisory */}
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/8 border border-blue-500/20">
-                <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-                <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-secondary border border-border">
+                <Info className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+                <div className="text-xs text-foreground space-y-1">
                   <p className="font-semibold">SEO Publishing Frequency Guide</p>
                   <p>
                     <strong>Optimal for SEO: 2–3 posts per week</strong> (every 2–4 days). Consistent, frequent publishing signals authority and freshness to search engines, helping your content rank faster.
@@ -575,7 +575,7 @@ export default function PublishSchedule() {
                   <p>
                     <strong>Special dates:</strong> For seasonal content (Christmas, EOFY, etc.), publish 3–6 months in advance to allow Google time to index and rank before the peak period.
                   </p>
-                  <p className="text-blue-600 dark:text-blue-400">
+                  <p className="text-foreground ">
                     Avoid publishing more than once per day — it dilutes the SEO value of each post.
                   </p>
                 </div>
@@ -646,14 +646,14 @@ export default function PublishSchedule() {
 
               {/* Preview summary */}
               {autoPreviewDates.length > 0 && (
-                <div className="p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
+                <div className="p-4 rounded-xl bg-secondary border border-border">
                   <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="h-4 w-4 text-foreground" />
+                    <span className="text-sm font-semibold text-foreground ">
                       {autoPreviewDates.length} articles will be auto-scheduled
                     </span>
                   </div>
-                  <div className="text-xs text-emerald-600 dark:text-emerald-400 space-y-0.5">
+                  <div className="text-xs text-foreground space-y-0.5">
                     <p>First article: <strong>{autoPreviewDates[0].date.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</strong></p>
                     {autoPreviewDates.length > 1 && (
                       <p>Last article: <strong>{autoPreviewDates[autoPreviewDates.length - 1].date.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</strong></p>
@@ -661,7 +661,7 @@ export default function PublishSchedule() {
                     {totalAutoWeeks > 0 && (
                       <p>Total span: <strong>{totalAutoWeeks} week{totalAutoWeeks !== 1 ? "s" : ""}</strong></p>
                     )}
-                    <p className="text-emerald-500 mt-1">Articles publish automatically at {publishHourDisplay}:{String(publishMinute).padStart(2,'0')} {publishAmPm} — no manual action needed.</p>
+                    <p className="text-foreground mt-1">Articles publish automatically at {publishHourDisplay}:{String(publishMinute).padStart(2,'0')} {publishAmPm} — no manual action needed.</p>
                   </div>
                 </div>
               )}
@@ -722,14 +722,14 @@ export default function PublishSchedule() {
 
               {/* Auto-schedule success panel */}
               {autoScheduledDates && autoScheduledDates.length > 0 ? (
-                <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/8 p-6 space-y-4">
+                <div className="rounded-xl border border-border bg-secondary p-6 space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                      <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                      <CheckCircle2 className="h-6 w-6 text-foreground" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-emerald-700 dark:text-emerald-300">Articles scheduled successfully</h3>
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      <h3 className="text-base font-bold text-foreground ">Articles scheduled successfully</h3>
+                      <p className="text-xs text-foreground mt-0.5">
                         Your {autoScheduledDates.length} articles are queued and will publish automatically:
                       </p>
                     </div>
@@ -737,7 +737,7 @@ export default function PublishSchedule() {
                   <ul className="space-y-2">
                     {autoScheduledDates.map((item, idx) => (
                       <li key={idx} className="flex items-start gap-3 text-sm">
-                        <span className="mt-0.5 text-emerald-500 font-bold text-base leading-none">✓</span>
+                        <span className="mt-0.5 text-foreground font-bold text-base leading-none">✓</span>
                         <div className="flex-1 min-w-0">
                           <span className="font-medium text-foreground truncate block">{item.title}</span>
                           <span className="text-xs text-muted-foreground">
@@ -748,7 +748,7 @@ export default function PublishSchedule() {
                       </li>
                     ))}
                   </ul>
-                  <div className="pt-2 border-t border-emerald-500/20 flex items-center gap-3">
+                  <div className="pt-2 border-t border-border flex items-center gap-3">
                     <Button
                       variant="outline"
                       size="sm"
@@ -756,7 +756,7 @@ export default function PublishSchedule() {
                         const calEl = document.getElementById("publishing-calendar");
                         if (calEl) calEl.scrollIntoView({ behavior: "smooth" });
                       }}
-                      className="text-emerald-700 dark:text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10"
+                      className="text-foreground border-border hover:bg-secondary"
                     >
                       <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
                       View publishing calendar →
@@ -789,13 +789,13 @@ export default function PublishSchedule() {
                   </Button>
                   {/* Error state */}
                   {autoScheduleError && (
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-500">
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/15 border border-destructive/30 text-sm text-destructive">
                       <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                       <span>{autoScheduleError}</span>
                     </div>
                   )}
                   {!allApproved && (
-                    <p className="text-xs text-amber-500 flex items-center gap-1.5">
+                    <p className="text-xs text-[#C98A2B] flex items-center gap-1.5">
                       <AlertTriangle className="h-3 w-3" />
                       Approve all articles first before auto-scheduling.
                     </p>
@@ -809,9 +809,9 @@ export default function PublishSchedule() {
           {scheduleMode === "manual" && (
             <div className="space-y-6">
               {/* SEO Advisory */}
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/8 border border-blue-500/20">
-                <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-                <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-secondary border border-border">
+                <Info className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+                <div className="text-xs text-foreground space-y-1">
                   <p className="font-semibold">SEO Publishing Frequency Guide</p>
                   <p>
                     <strong>Optimal for SEO: 2–3 posts per week.</strong> "Every 3 Days" or "Every 2 Days" are the sweet spots for most businesses — frequent enough to signal authority, manageable enough to sustain.
@@ -1054,7 +1054,7 @@ export default function PublishSchedule() {
                             key={j}
                             className={`text-[10px] px-1 py-0.5 rounded mb-0.5 truncate font-medium ${
                               a.level === "cornerstone"
-                                ? "bg-violet-500/15 text-violet-400"
+                                ? "bg-secondary text-foreground"
                                 : a.level === "pillar"
                                 ? "bg-primary/15 text-primary"
                                 : "bg-secondary text-muted-foreground"

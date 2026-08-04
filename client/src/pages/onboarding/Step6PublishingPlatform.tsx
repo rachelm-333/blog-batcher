@@ -136,7 +136,7 @@ export default function Step6PublishingPlatform({ businessId, initial, onNext, o
                 : "border-border hover:border-primary/50"
             )}
           >
-            <Zap className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+            <Zap className="h-5 w-5 text-[#C98A2B] mt-0.5 shrink-0" />
             <div>
               <div className="font-medium text-sm">Zapier Webhook</div>
               <div className="text-xs text-muted-foreground mt-1">

@@ -55,13 +55,13 @@ function StatusBadge({ status }: { status: string }) {
 function ActionBadge({ action }: { action: string }) {
   const colors: Record<string, string> = {
     scheduled_publish_attempted: "bg-primary/15 text-primary",
-    scheduled_publish_succeeded: "bg-emerald-500/15 text-emerald-400",
+    scheduled_publish_succeeded: "bg-secondary text-foreground",
     scheduled_publish_failed: "bg-destructive/15 text-destructive",
-    retry_attempted: "bg-amber-500/15 text-amber-400",
-    retry_succeeded: "bg-emerald-500/15 text-emerald-400",
+    retry_attempted: "bg-secondary text-[#C98A2B]",
+    retry_succeeded: "bg-secondary text-foreground",
     retry_failed: "bg-destructive/15 text-destructive",
     schedule_cancelled: "bg-secondary text-foreground",
-    schedule_rescheduled: "bg-violet-500/15 text-violet-400",
+    schedule_rescheduled: "bg-secondary text-foreground",
   };
   const label = action.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
   return (
@@ -266,7 +266,7 @@ export default function ScheduleManagement() {
           <Card>
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                <CheckCircle2 className="h-5 w-5 text-foreground shrink-0" />
                 <div>
                   <p className="text-2xl font-bold">{published.length}</p>
                   <p className="text-xs text-muted-foreground">Published</p>
@@ -277,7 +277,7 @@ export default function ScheduleManagement() {
           <Card>
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
-                <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
                 <div>
                   <p className="text-2xl font-bold">{failed.length}</p>
                   <p className="text-xs text-muted-foreground">Failed</p>
@@ -338,11 +338,11 @@ export default function ScheduleManagement() {
                               </span>
                             )}
                             {article.scheduleCronTaskUid && (
-                              <span className="text-green-600 font-medium">Job active</span>
+                              <span className="text-foreground font-medium">Job active</span>
                             )}
                           </div>
                           {article.retryScheduledAt && (
-                            <p className="text-xs text-yellow-600 mt-1">
+                            <p className="text-xs text-[#C98A2B] mt-1">
                               Retry scheduled: {new Date(article.retryScheduledAt).toLocaleString()}
                             </p>
                           )}
@@ -420,7 +420,7 @@ export default function ScheduleManagement() {
                           <div className="flex items-center gap-4 mt-1.5 text-xs text-muted-foreground">
                             {article.publishedAt && (
                               <span className="flex items-center gap-1">
-                                <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                <CheckCircle2 className="h-3 w-3 text-foreground" />
                                 Published {new Date(article.publishedAt).toLocaleString()}
                               </span>
                             )}

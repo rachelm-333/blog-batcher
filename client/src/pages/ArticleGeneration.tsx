@@ -23,17 +23,17 @@ const WORD_COUNT_MIN: Record<string, number> = {
 /* ─── Level badge ────────────────────────────────────────── */
 function LevelBadge({ level }: { level: string }) {
   if (level === "cornerstone") return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#ede9ff", color:"#6e5afe", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#0E0E0C", whiteSpace:"nowrap" }}>
       ◆ Cornerstone
     </span>
   );
   if (level === "pillar") return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#dbeafe", color:"#1e40af", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#2C2C28", whiteSpace:"nowrap" }}>
       ▲ Pillar
     </span>
   );
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#f3f4f6", color:"#6b7280", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#5A5A52", whiteSpace:"nowrap" }}>
       ● Cluster
     </span>
   );
@@ -42,14 +42,14 @@ function LevelBadge({ level }: { level: string }) {
 /* ─── Status badge ───────────────────────────────────────── */
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; icon: React.ReactNode; label: string }> = {
-    pending_generation: { bg:"#f3f4f6",  color:"#6b7280", icon:<Clock style={{ width:11, height:11 }} />,         label:"Queued" },
-    generating:         { bg:"#ede9ff",  color:"#6e5afe", icon:<Loader2 style={{ width:11, height:11 }} className="animate-spin" />, label:"Generating…" },
-    generated:          { bg:"#dbeafe",  color:"#1e40af", icon:<CheckCircle2 style={{ width:11, height:11 }} />,  label:"Draft ready" },
-    pending_approval:   { bg:"#fef9c3",  color:"#854d0e", icon:<AlertTriangle style={{ width:11, height:11 }} />, label:"Needs review" },
-    approved:           { bg:"#dbeafe",  color:"#1e40af", icon:<CheckCircle2 style={{ width:11, height:11 }} />,  label:"Approved" },
-    scheduled:          { bg:"#ede9ff",  color:"#6e5afe", icon:<Clock style={{ width:11, height:11 }} />,         label:"Scheduled" },
-    published:          { bg:"#dcfce7",  color:"#166534", icon:<CheckCircle2 style={{ width:11, height:11 }} />,  label:"Published" },
-    failed:             { bg:"#fee2e2",  color:"#991b1b", icon:<AlertTriangle style={{ width:11, height:11 }} />, label:"Failed" },
+    pending_generation: { bg:"#EFEBDF",  color:"#5A5A52", icon:<Clock style={{ width:11, height:11 }} />,         label:"Queued" },
+    generating:         { bg:"#EFEBDF",  color:"#0E0E0C", icon:<Loader2 style={{ width:11, height:11 }} className="animate-spin" />, label:"Generating…" },
+    generated:          { bg:"#EFEBDF",  color:"#2C2C28", icon:<CheckCircle2 style={{ width:11, height:11 }} />,  label:"Draft ready" },
+    pending_approval:   { bg:"#EFEBDF",  color:"#5A5A52", icon:<AlertTriangle style={{ width:11, height:11 }} />, label:"Needs review" },
+    approved:           { bg:"#EFEBDF",  color:"#2C2C28", icon:<CheckCircle2 style={{ width:11, height:11 }} />,  label:"Approved" },
+    scheduled:          { bg:"#EFEBDF",  color:"#0E0E0C", icon:<Clock style={{ width:11, height:11 }} />,         label:"Scheduled" },
+    published:          { bg:"#EFEBDF",  color:"#5A5A52", icon:<CheckCircle2 style={{ width:11, height:11 }} />,  label:"Published" },
+    failed:             { bg:"#EFEBDF",  color:"#D24A2A", icon:<AlertTriangle style={{ width:11, height:11 }} />, label:"Failed" },
   };
   const s = map[status] ?? map.queued;
   return (
@@ -61,8 +61,8 @@ function StatusBadge({ status }: { status: string }) {
 
 /* ─── SEO Score ring ─────────────────────────────────────── */
 function ScoreRing({ score }: { score: number | null }) {
-  if (!score) return <span style={{ color:"#9ca3af", fontSize:13 }}>—</span>;
-  const color = score >= 80 ? "#22c55e" : score >= 65 ? "#6e5afe" : "#f59e0b";
+  if (!score) return <span style={{ color:"#8E8E84", fontSize:13 }}>—</span>;
+  const color = score >= 80 ? "#D9F542" : score >= 65 ? "#0E0E0C" : "#C98A2B";
   return (
     <div style={{ display:"inline-flex", alignItems:"center", gap:6 }}>
       <div style={{ width:28, height:28, borderRadius:"50%", border:`2.5px solid ${color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color }}>
@@ -199,7 +199,7 @@ export default function ArticleGeneration() {
     return (
       <DashboardLayout>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", minHeight:400 }}>
-          <Loader2 style={{ width:32, height:32, color:"#6e5afe" }} className="animate-spin" />
+          <Loader2 style={{ width:32, height:32, color:"#0E0E0C" }} className="animate-spin" />
         </div>
       </DashboardLayout>
     );
@@ -213,17 +213,17 @@ export default function ArticleGeneration() {
         <StageStepper currentStage={currentStage} />
 
         {/* Scrollable content */}
-        <div style={{ flex:1, overflowY:"auto", padding:"24px 32px", background:"#faf9f5" }}>
+        <div style={{ flex:1, overflowY:"auto", padding:"24px 32px", background:"#F4F1E8" }}>
           {/* Page header */}
           <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24 }}>
             <div>
-              <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#9ca3af", marginBottom:6 }}>
+              <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#8E8E84", marginBottom:6 }}>
                 Stage 4 · Article Generation
               </div>
-              <h1 style={{ fontSize:32, fontWeight:800, color:"#1a1a2e", lineHeight:1.15, margin:0 }}>
-                Your drafts, written <em style={{ fontFamily:"Lora, Georgia, serif", fontStyle:"italic", fontWeight:600 }}>while</em> you grab a coffee.
+              <h1 style={{ fontSize:32, fontWeight:800, color:"#0E0E0C", lineHeight:1.15, margin:0 }}>
+                Your drafts, written <em style={{ fontFamily:"'Instrument Serif', Georgia, serif", fontStyle:"italic", fontWeight:400 }}>while</em> you grab a coffee.
               </h1>
-              <p style={{ fontSize:14, color:"#6b7280", marginTop:8 }}>
+              <p style={{ fontSize:14, color:"#5A5A52", marginTop:8 }}>
                 Each approved keyword becomes a full, SEO-scored draft. One click starts the batch.
               </p>
             </div>
@@ -245,7 +245,7 @@ export default function ArticleGeneration() {
               {hasArticles && underTargetCount > 0 && !generating && (
                 <button
                   className="btn-ghost"
-                  style={{ border:"1.5px solid #6e5afe", color:"#6e5afe", padding:"8px 16px", borderRadius:8, fontSize:13, fontWeight:600, display:"flex", alignItems:"center", gap:6, cursor:"pointer", background:"#fff" }}
+                  style={{ border:"1.5px solid #0E0E0C", color:"#0E0E0C", padding:"8px 16px", borderRadius:8, fontSize:13, fontWeight:600, display:"flex", alignItems:"center", gap:6, cursor:"pointer", background:"#FBFAF4" }}
                   onClick={() => regenUnderTargetMutation.mutate({ businessId })}
                   disabled={regenUnderTargetMutation.isPending}
                 >
@@ -264,11 +264,11 @@ export default function ArticleGeneration() {
               { label:"Scored", value:`${scoredCount}`, denom:`/${nodeTotal || totalCount || "?"}`, sub: scoredCount === 0 ? "Scored after generation" : "articles scored", highlight: false },
               { label:"Avg SEO score", value: avgScore ? `${avgScore}` : "—", denom: null, sub: avgScore ? `${scoredCount} articles scored` : "Waiting on first score", highlight: false },
             ].map(card => (
-              <div key={card.label} className="kpi-card" style={{ background: card.highlight ? "#ede9ff" : "#fff" }}>
+              <div key={card.label} className="kpi-card" style={{ background: card.highlight ? "#EFEBDF" : "#FBFAF4" }}>
                 <div className="kpi-label">{card.label}</div>
                 <div className="kpi-value">
                   {card.value}
-                  {card.denom && <span style={{ fontSize:16, fontWeight:500, color:"#9ca3af" }}>{card.denom}</span>}
+                  {card.denom && <span style={{ fontSize:16, fontWeight:500, color:"#8E8E84" }}>{card.denom}</span>}
                 </div>
                 <div className="kpi-sub">{card.sub}</div>
               </div>
@@ -277,8 +277,8 @@ export default function ArticleGeneration() {
 
           {/* Live generating banner */}
           {generating && (
-            <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 18px", marginBottom:16, background:"#ede9ff", border:"1px solid #c4b5fd", borderRadius:12 }}>
-              <Loader2 style={{ width:20, height:20, color:"#6e5afe", flexShrink:0 }} className="animate-spin" />
+            <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 18px", marginBottom:16, background:"#EFEBDF", border:"1px solid rgba(14,14,12,0.16)", borderRadius:12 }}>
+              <Loader2 style={{ width:20, height:20, color:"#0E0E0C", flexShrink:0 }} className="animate-spin" />
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:700, color:"#4c1d95" }}>
                   Writing your articles… {writtenCount}/{totalCount} done
@@ -288,24 +288,24 @@ export default function ArticleGeneration() {
                 </div>
                 {/* progress bar */}
                 <div style={{ height:6, background:"#ddd6fe", borderRadius:99, marginTop:8, overflow:"hidden" }}>
-                  <div style={{ height:"100%", width:`${totalCount ? Math.round((writtenCount/totalCount)*100) : 0}%`, background:"#6e5afe", transition:"width 400ms" }} />
+                  <div style={{ height:"100%", width:`${totalCount ? Math.round((writtenCount/totalCount)*100) : 0}%`, background:"#0E0E0C", transition:"width 400ms" }} />
                 </div>
               </div>
             </div>
           )}
 
           {/* Batch table */}
-          <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden" }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid #e5e7eb" }}>
-              <h3 style={{ fontSize:14, fontWeight:700, color:"#1a1a2e", margin:0 }}>The batch</h3>
-              <span style={{ fontSize:12, color:"#9ca3af" }}>{writtenCount} / {totalCount} written</span>
+          <div style={{ background:"#FBFAF4", border:"1px solid rgba(14,14,12,0.08)", borderRadius:12, overflow:"hidden" }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid rgba(14,14,12,0.08)" }}>
+              <h3 style={{ fontSize:14, fontWeight:700, color:"#0E0E0C", margin:0 }}>The batch</h3>
+              <span style={{ fontSize:12, color:"#8E8E84" }}>{writtenCount} / {totalCount} written</span>
             </div>
 
             {/* Failed articles warning banner */}
             {!generating && failedCount > 0 && (
               <div style={{ padding:"12px 20px", borderBottom:"1px solid #fecaca", background:"#fff1f2", display:"flex", alignItems:"center", gap:10 }}>
-                <AlertTriangle style={{ width:15, height:15, color:"#dc2626", flexShrink:0 }} />
-                <span style={{ fontSize:13, color:"#991b1b", fontWeight:500 }}>
+                <AlertTriangle style={{ width:15, height:15, color:"#D24A2A", flexShrink:0 }} />
+                <span style={{ fontSize:13, color:"#D24A2A", fontWeight:500 }}>
                   {failedCount} article{failedCount > 1 ? "s" : ""} failed to generate. Use the Retry button to regenerate {failedCount > 1 ? "them" : "it"}, or proceed to review the {writtenCount - failedCount} successful articles.
                 </span>
               </div>
@@ -313,14 +313,14 @@ export default function ArticleGeneration() {
 
             {/* Generating progress bar */}
             {generating && (
-              <div style={{ padding:"12px 20px", borderBottom:"1px solid #f3f4f6", background:"#ede9ff" }}>
+              <div style={{ padding:"12px 20px", borderBottom:"1px solid #EFEBDF", background:"#EFEBDF" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-                  <Loader2 style={{ width:14, height:14, color:"#6e5afe" }} className="animate-spin" />
-                  <span style={{ fontSize:13, fontWeight:600, color:"#6e5afe" }}>Generating articles…</span>
-                  <span style={{ fontSize:12, color:"#9ca3af", marginLeft:"auto" }}>{writtenCount} / {totalCount}</span>
+                  <Loader2 style={{ width:14, height:14, color:"#0E0E0C" }} className="animate-spin" />
+                  <span style={{ fontSize:13, fontWeight:600, color:"#0E0E0C" }}>Generating articles…</span>
+                  <span style={{ fontSize:12, color:"#8E8E84", marginLeft:"auto" }}>{writtenCount} / {totalCount}</span>
                 </div>
-                <div style={{ height:4, background:"#e5e7eb", borderRadius:99, overflow:"hidden" }}>
-                  <div style={{ height:4, background:"#6e5afe", borderRadius:99, width:`${totalCount > 0 ? (writtenCount / totalCount) * 100 : 0}%`, transition:"width 600ms ease" }} />
+                <div style={{ height:4, background:"rgba(14,14,12,0.08)", borderRadius:99, overflow:"hidden" }}>
+                  <div style={{ height:4, background:"#0E0E0C", borderRadius:99, width:`${totalCount > 0 ? (writtenCount / totalCount) * 100 : 0}%`, transition:"width 600ms ease" }} />
                 </div>
               </div>
             )}
@@ -328,29 +328,29 @@ export default function ArticleGeneration() {
             <div style={{ overflowX:"auto" }}>
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
                 <thead>
-                  <tr style={{ background:"#faf9f5" }}>
+                  <tr style={{ background:"#F4F1E8" }}>
                     {["Level", "Article title", "Keyword", "Words", "Checkpoints", "Status", ""].map(h => (
-                      <th key={h} style={{ textAlign:"left", padding:"10px 16px", fontSize:11, fontWeight:600, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
+                      <th key={h} style={{ textAlign:"left", padding:"10px 16px", fontSize:11, fontWeight:600, color:"#8E8E84", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {articlesLoading ? (
                     <tr><td colSpan={6} style={{ textAlign:"center", padding:32 }}>
-                      <Loader2 style={{ width:20, height:20, color:"#6e5afe" }} className="animate-spin" />
+                      <Loader2 style={{ width:20, height:20, color:"#0E0E0C" }} className="animate-spin" />
                     </td></tr>
                   ) : !hasArticles ? (
-                    <tr><td colSpan={6} style={{ textAlign:"center", padding:48, color:"#9ca3af", fontSize:13 }}>
+                    <tr><td colSpan={6} style={{ textAlign:"center", padding:48, color:"#8E8E84", fontSize:13 }}>
                       No articles yet — approve keywords in Stage 3, then click Generate.
                     </td></tr>
                   ) : articles?.map(article => (
-                    <tr key={article.id} style={{ borderBottom:"1px solid #f3f4f6" }}>
+                    <tr key={article.id} style={{ borderBottom:"1px solid #EFEBDF" }}>
                       <td style={{ padding:"12px 16px" }}><LevelBadge level={article.level ?? "cluster"} /></td>
-                      <td style={{ padding:"12px 16px", fontSize:13, fontWeight:500, color:"#1a1a2e", maxWidth:280 }}>
-                        {article.title ?? <span style={{ color:"#9ca3af" }}>Generating…</span>}
+                      <td style={{ padding:"12px 16px", fontSize:13, fontWeight:500, color:"#0E0E0C", maxWidth:280 }}>
+                        {article.title ?? <span style={{ color:"#8E8E84" }}>Generating…</span>}
                       </td>
                       <td style={{ padding:"12px 16px" }}>
-                        <span style={{ fontSize:12, fontFamily:"monospace", color:"#6b7280", background:"#f3f4f6", padding:"2px 6px", borderRadius:4 }}>
+                        <span style={{ fontSize:12, fontFamily:"monospace", color:"#5A5A52", background:"#EFEBDF", padding:"2px 6px", borderRadius:4 }}>
                           {article.focusKeyword ?? "—"}
                         </span>
                       </td>
@@ -360,12 +360,12 @@ export default function ArticleGeneration() {
                             fontSize:12, fontWeight:600,
                             color: (() => {
                               const min = WORD_COUNT_MIN[article.level ?? "cluster"] ?? 800;
-                              return (article.wordCount ?? 0) < min ? "#b45309" : "#166534";
+                              return (article.wordCount ?? 0) < min ? "#C98A2B" : "#5A5A52";
                             })(),
                           }}>
                             {article.wordCount.toLocaleString()}
                           </span>
-                        ) : <span style={{ color:"#9ca3af", fontSize:12 }}>—</span>}
+                        ) : <span style={{ color:"#8E8E84", fontSize:12 }}>—</span>}
                       </td>
                       <td style={{ padding:"12px 16px" }}>
                         {article.internalScore != null ? (
@@ -373,8 +373,8 @@ export default function ArticleGeneration() {
                             {/* Checkpoint 1 — SEO Structure */}
                             {(() => {
                               const pts = Math.round((article.internalScore / 100) * 16);
-                              const color = pts >= 15 ? "#22c55e" : pts >= 13 ? "#3b82f6" : "#f59e0b";
-                              const bg = pts >= 15 ? "#dcfce7" : pts >= 13 ? "#dbeafe" : "#fef9c3";
+                              const color = pts >= 15 ? "#D9F542" : pts >= 13 ? "#5A5A52" : "#C98A2B";
+                              const bg = pts >= 15 ? "#EFEBDF" : pts >= 13 ? "#EFEBDF" : "#EFEBDF";
                               return (
                                 <span style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:99, fontSize:10, fontWeight:600, background:bg, color, whiteSpace:"nowrap" }}>
                                   ✓1 {pts}/16
@@ -385,7 +385,7 @@ export default function ArticleGeneration() {
                             {(article as any).pass2Score != null ? (() => {
                               const s = (article as any).pass2Score as number;
                               const isExcellent = s >= 75;
-                              const color = isExcellent ? "#22c55e" : "#f59e0b";
+                              const color = isExcellent ? "#D9F542" : "#C98A2B";
                               const bg = isExcellent ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.12)";
                               return (
                                 <span style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:99, fontSize:10, fontWeight:600, background:bg, color, whiteSpace:"nowrap" }}>
@@ -393,10 +393,10 @@ export default function ArticleGeneration() {
                                 </span>
                               );
                             })() : (
-                              <span style={{ fontSize:10, color:"#9ca3af" }}>—</span>
+                              <span style={{ fontSize:10, color:"#8E8E84" }}>—</span>
                             )}
                           </div>
-                        ) : <span style={{ color:"#9ca3af", fontSize:13 }}>—</span>}
+                        ) : <span style={{ color:"#8E8E84", fontSize:13 }}>—</span>}
                       </td>
                       <td style={{ padding:"12px 16px" }}><StatusBadge status={article.status} /></td>
                       <td style={{ padding:"12px 16px" }}>
@@ -411,7 +411,7 @@ export default function ArticleGeneration() {
                             {article.hasContent ? (
                               <button
                                 className="btn-ghost"
-                                style={{ padding:"5px 10px", fontSize:11, color:"#166534", borderColor:"#86efac", display:"flex", alignItems:"center", gap:3, whiteSpace:"nowrap" }}
+                                style={{ padding:"5px 10px", fontSize:11, color:"#5A5A52", borderColor:"rgba(14,14,12,0.16)", display:"flex", alignItems:"center", gap:3, whiteSpace:"nowrap" }}
                                 disabled={markReadyMutation.isPending}
                                 onClick={() => markReadyMutation.mutate({ articleId: article.id, status: "pending_approval" })}
                               >
@@ -422,7 +422,7 @@ export default function ArticleGeneration() {
                             ) : null}
                             <button
                               className="btn-ghost"
-                              style={{ padding:"5px 10px", fontSize:11, color:"#dc2626", borderColor:"#fca5a5", display:"flex", alignItems:"center", gap:3 }}
+                              style={{ padding:"5px 10px", fontSize:11, color:"#D24A2A", borderColor:"rgba(14,14,12,0.16)", display:"flex", alignItems:"center", gap:3 }}
                               disabled={regenerateSingleMutation.isPending}
                               onClick={() => regenerateSingleMutation.mutate({ articleId: article.id })}
                             >
@@ -442,12 +442,12 @@ export default function ArticleGeneration() {
 
           {/* Completion banner */}
           {allWritten && failedCount === 0 && (
-            <div style={{ marginTop:24, padding:"20px 24px", background:"#f0fdf4", border:"1.5px solid #86efac", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
+            <div style={{ marginTop:24, padding:"20px 24px", background:"#EFEBDF", border:"1.5px solid rgba(14,14,12,0.16)", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                <CheckCircle2 style={{ width:22, height:22, color:"#16a34a", flexShrink:0 }} />
+                <CheckCircle2 style={{ width:22, height:22, color:"#0E0E0C", flexShrink:0 }} />
                 <div>
                   <p style={{ fontSize:15, fontWeight:700, color:"#14532d", margin:0 }}>All {writtenCount} articles written — ready to review</p>
-                  <p style={{ fontSize:13, color:"#166534", margin:"2px 0 0" }}>Check scores, make edits, and schedule your posts.</p>
+                  <p style={{ fontSize:13, color:"#5A5A52", margin:"2px 0 0" }}>Check scores, make edits, and schedule your posts.</p>
                 </div>
               </div>
               <button
@@ -460,12 +460,12 @@ export default function ArticleGeneration() {
             </div>
           )}
           {allWritten && failedCount > 0 && (
-            <div style={{ marginTop:24, padding:"20px 24px", background:"#fffbeb", border:"1.5px solid #fcd34d", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
+            <div style={{ marginTop:24, padding:"20px 24px", background:"#EFEBDF", border:"1.5px solid #fcd34d", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                <AlertTriangle style={{ width:22, height:22, color:"#b45309", flexShrink:0 }} />
+                <AlertTriangle style={{ width:22, height:22, color:"#C98A2B", flexShrink:0 }} />
                 <div>
-                  <p style={{ fontSize:15, fontWeight:700, color:"#78350f", margin:0 }}>{writtenCount - failedCount} of {writtenCount} articles written — {failedCount} failed</p>
-                  <p style={{ fontSize:13, color:"#92400e", margin:"2px 0 0" }}>You can retry failed articles or proceed to review the successful ones.</p>
+                  <p style={{ fontSize:15, fontWeight:700, color:"#2C2C28", margin:0 }}>{writtenCount - failedCount} of {writtenCount} articles written — {failedCount} failed</p>
+                  <p style={{ fontSize:13, color:"#0E0E0C", margin:"2px 0 0" }}>You can retry failed articles or proceed to review the successful ones.</p>
                 </div>
               </div>
               <button

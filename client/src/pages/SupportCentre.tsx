@@ -110,9 +110,9 @@ function ContentBlockRenderer({ block }: { block: ContentBlock }) {
       );
     case "warning":
       return (
-        <div className="flex gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md mb-3">
-          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-700 dark:text-amber-300 leading-relaxed">{block.text}</p>
+        <div className="flex gap-3 p-3 bg-secondary border border-border rounded-md mb-3">
+          <AlertTriangle className="h-4 w-4 text-[#C98A2B] flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-[#C98A2B] dark:text-[#C98A2B] leading-relaxed">{block.text}</p>
         </div>
       );
     default:
@@ -140,8 +140,8 @@ function ContactForm() {
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-emerald-500/15 flex items-center justify-center">
-          <Mail className="h-6 w-6 text-green-600" />
+        <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
+          <Mail className="h-6 w-6 text-foreground" />
         </div>
         <h3 className="font-semibold text-foreground">Message sent</h3>
         <p className="text-sm text-muted-foreground max-w-sm">

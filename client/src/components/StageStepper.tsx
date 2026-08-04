@@ -41,8 +41,8 @@ export default function StageStepper({ currentStage, activeStage, onNavigate }: 
       display: "flex",
       alignItems: "center",
       padding: "10px 24px",
-      background: "#ffffff",
-      borderBottom: "1px solid #e5e7eb",
+      background: "#FBFAF4",
+      borderBottom: "1px solid rgba(14,14,12,0.08)",
       overflowX: "auto",
       gap: 0,
       flexShrink: 0,
@@ -73,7 +73,7 @@ export default function StageStepper({ currentStage, activeStage, onNavigate }: 
                 transition: "background 160ms",
               }}
               onMouseEnter={e => {
-                if (!isLocked) (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec";
+                if (!isLocked) (e.currentTarget as HTMLButtonElement).style.background = "#EFEBDF";
               }}
               onMouseLeave={e => {
                 (e.currentTarget as HTMLButtonElement).style.background = "none";
@@ -90,9 +90,9 @@ export default function StageStepper({ currentStage, activeStage, onNavigate }: 
                 fontSize: 10,
                 fontWeight: 700,
                 flexShrink: 0,
-                background: isComplete ? "#D9F542" : isActive ? "#6e5afe" : "#f3f4f6",
-                color: isComplete ? "#1a1a2e" : isActive ? "#ffffff" : "#9ca3af",
-                border: isLocked ? "1.5px solid #e5e7eb" : "none",
+                background: isComplete ? "#D9F542" : isActive ? "#0E0E0C" : "#EFEBDF",
+                color: isComplete ? "#0E0E0C" : isActive ? "#FBFAF4" : "#8E8E84",
+                border: isLocked ? "1.5px solid rgba(14,14,12,0.08)" : "none",
               }}>
                 {isComplete ? "✓" : stage.id}
               </div>
@@ -100,7 +100,7 @@ export default function StageStepper({ currentStage, activeStage, onNavigate }: 
               <span style={{
                 fontSize: 12,
                 fontWeight: isActive ? 600 : 400,
-                color: isActive ? "#6e5afe" : isLocked ? "#d1d5db" : "#4b5563",
+                color: isActive ? "#0E0E0C" : isLocked ? "#C9C7BD" : "#2C2C28",
               }}>
                 {stage.label}
               </span>
@@ -112,7 +112,7 @@ export default function StageStepper({ currentStage, activeStage, onNavigate }: 
                 flex: 1,
                 height: 1,
                 minWidth: 12,
-                background: isComplete ? "#D9F542" : "#e5e7eb",
+                background: isComplete ? "#D9F542" : "rgba(14,14,12,0.08)",
                 margin: "0 2px",
               }} />
             )}

@@ -56,9 +56,9 @@ interface SeedGroup {
 }
 
 const COMPETITION_COLOUR: Record<string, string> = {
-  high: "#ef4444",
-  medium: "#f59e0b",
-  low: "#22c55e",
+  high: "#D24A2A",
+  medium: "#C98A2B",
+  low: "#D9F542",
 };
 
 export default function Step8KeywordSeeds({ businessId, onNext, onBack, articlesNeeded }: Props) {
@@ -297,10 +297,10 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
           <strong>Search DataForSEO</strong> to get real keyword ideas with monthly search volume, competition, and CPC.
           Tick the ones most relevant to your business — Stage 3 uses your selections to assign one keyword per article.
         </p>
-        <div className="mt-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800">
+        <div className="mt-3 px-3 py-2 rounded-md bg-secondary border border-border text-xs text-[#C98A2B]">
           <strong>Tip:</strong> Keep seeds short and broad for the best results.
-          {" "}<span className="text-green-700 font-medium">✓ Good:</span> "workplace wellbeing", "mental health", "employee assistance"
-          {"  "}<span className="text-red-600 font-medium">✗ Too long:</span> "workplace mental health compliance documentation"
+          {" "}<span className="text-foreground font-medium">✓ Good:</span> "workplace wellbeing", "mental health", "employee assistance"
+          {"  "}<span className="text-destructive font-medium">✗ Too long:</span> "workplace mental health compliance documentation"
         </div>
       </div>
 
@@ -398,8 +398,8 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
         {(totalKeywords > 0 || selectedCount > 0) && (
           <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium ${
             selectedCount >= articleCount
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-amber-50 text-amber-700 border border-amber-200"
+              ? "bg-secondary text-foreground border border-border"
+              : "bg-secondary text-[#C98A2B] border border-border"
           }`}>
             <CheckSquare size={14} />
             <span>
@@ -410,7 +410,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
 
         {/* No-results guidance */}
         {groups.length > 0 && groups.every((g) => g.keywords.length === 0) && (
-          <div className="px-3 py-3 rounded-md bg-red-50 border border-red-200 text-xs text-red-800 space-y-1">
+          <div className="px-3 py-3 rounded-md bg-destructive/15 border border-destructive/30 text-xs text-destructive space-y-1">
             <p className="font-semibold">No keyword data returned.</p>
             <p>Your seed terms may be too long or too specific for Google Ads to have data. Try shorter seeds:</p>
             <ul className="list-disc list-inside space-y-0.5 mt-1">
@@ -513,7 +513,7 @@ export default function Step8KeywordSeeds({ businessId, onNext, onBack, articles
                                     {kw.competition ? (
                                       <span
                                         className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold text-white"
-                                        style={{ backgroundColor: COMPETITION_COLOUR[kw.competition] ?? "#6b7280" }}
+                                        style={{ backgroundColor: COMPETITION_COLOUR[kw.competition] ?? "#5A5A52" }}
                                       >
                                         {kw.competition}
                                       </span>

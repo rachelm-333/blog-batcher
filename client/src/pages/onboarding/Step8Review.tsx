@@ -97,7 +97,7 @@ export default function Step8Review({ businessId, summary, onBack }: Props) {
           <div key={item.label} className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
               <CheckCircle2
-                className={`h-4 w-4 shrink-0 ${item.ok ? "text-green-500" : "text-muted-foreground"}`}
+                className={`h-4 w-4 shrink-0 ${item.ok ? "text-foreground" : "text-muted-foreground"}`}
               />
               <span className="text-sm font-medium">{item.label}</span>
             </div>

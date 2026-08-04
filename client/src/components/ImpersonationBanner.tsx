@@ -21,7 +21,7 @@ export default function ImpersonationBanner() {
   const adminUserId = impersonationQuery.data?.adminUserId;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-primary text-primary-foreground px-4 py-2 flex items-center justify-between shadow-lg">
       <div className="flex items-center gap-2 text-sm font-medium">
         <Eye className="h-4 w-4" />
         <span>
@@ -30,7 +30,7 @@ export default function ImpersonationBanner() {
         </span>
       </div>
       <button
-        className="bg-amber-950 text-amber-50 border border-amber-900 hover:bg-amber-900 px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+        className="bg-foreground text-background border border-foreground hover:bg-foreground/90 px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
         onClick={() => stopMutation.mutate()}
         disabled={stopMutation.isPending}
       >

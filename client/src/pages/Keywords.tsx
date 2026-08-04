@@ -79,17 +79,17 @@ function deriveNodeLabel(rows: KwRow[], row: KwRow): string {
 
 function LevelBadge({ level }: { level: string }) {
   if (level === "cornerstone") return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#ede9ff", color:"#6e5afe", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#0E0E0C", whiteSpace:"nowrap" }}>
       ◆ Cornerstone
     </span>
   );
   if (level === "pillar") return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#dbeafe", color:"#1e40af", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#2C2C28", whiteSpace:"nowrap" }}>
       ▲ Pillar
     </span>
   );
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#f3f4f6", color:"#6b7280", whiteSpace:"nowrap" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#5A5A52", whiteSpace:"nowrap" }}>
       ● Cluster
     </span>
   );
@@ -97,7 +97,7 @@ function LevelBadge({ level }: { level: string }) {
 
 function CompBadge({ comp }: { comp: string | null }) {
   if (comp === "high") return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#dc2626", fontWeight:600 }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#D24A2A", fontWeight:600 }}>
       <BarChart2 style={{ width:13, height:13 }} /> High
     </span>
   );
@@ -108,7 +108,7 @@ function CompBadge({ comp }: { comp: string | null }) {
   );
   // null means either 'low' from DataForSEO or Claude-assigned (no data) — show Low
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#16a34a", fontWeight:600 }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#0E0E0C", fontWeight:600 }}>
       <BarChart2 style={{ width:13, height:13 }} /> Low
     </span>
   );
@@ -116,12 +116,12 @@ function CompBadge({ comp }: { comp: string | null }) {
 
 function StatusBadge({ approved }: { approved: boolean }) {
   if (approved) return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#dcfce7", color:"#166534" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:"#EFEBDF", color:"#5A5A52" }}>
       <CheckCircle2 style={{ width:11, height:11 }} /> Approved
     </span>
   );
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:600, background:"#f3f4f6", color:"#6b7280" }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:600, background:"#EFEBDF", color:"#5A5A52" }}>
       Pending
     </span>
   );
@@ -219,7 +219,7 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict, sa
           maxHeight: "90vh",
           display: "flex",
           flexDirection: "column",
-          background: "#fff",
+          background: "#FBFAF4",
           borderRadius: 12,
           boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
           overflow: "hidden",
@@ -231,7 +231,7 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict, sa
           onMouseDown={onMouseDown}
           style={{
             padding: "16px 20px 14px",
-            borderBottom: "1px solid #e5e7eb",
+            borderBottom: "1px solid rgba(14,14,12,0.08)",
             flexShrink: 0,
             cursor: "grab",
             background: "#fafafa",
@@ -239,24 +239,24 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict, sa
         >
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
             <div>
-              <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1a1a2e" }}>Swap Keyword</p>
-              <p style={{ margin: "4px 0 0", fontSize: 13, color: "#6b7280" }}>
-                Replace <strong style={{ color: "#1a1a2e" }}>{kwRow?.primaryKeyword}</strong> with a different keyword.
+              <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0E0E0C" }}>Swap Keyword</p>
+              <p style={{ margin: "4px 0 0", fontSize: 13, color: "#5A5A52" }}>
+                Replace <strong style={{ color: "#0E0E0C" }}>{kwRow?.primaryKeyword}</strong> with a different keyword.
               </p>
             </div>
             <button
               onClick={onClose}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#9ca3af", lineHeight: 1, fontSize: 18 }}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#8E8E84", lineHeight: 1, fontSize: 18 }}
               title="Close"
             >
               ✕
             </button>
           </div>
-          <p style={{ margin: "8px 0 0", fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 4 }}>
+          <p style={{ margin: "8px 0 0", fontSize: 11, color: "#8E8E84", display: "flex", alignItems: "center", gap: 4 }}>
             <span>⠿</span> Drag this panel to reposition it
           </p>
           {isConflict && (
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, padding:"8px 12px", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:8, fontSize:12, color:"#92400e" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, padding:"8px 12px", background:"#EFEBDF", border:"1px solid rgba(14,14,12,0.16)", borderRadius:8, fontSize:12, color:"#0E0E0C" }}>
               <AlertTriangle style={{ width:13, height:13, color:"#d97706", flexShrink:0 }} />
               <span><strong>Cannibalization conflict</strong> — this keyword overlaps with another article. Swap it to resolve.</span>
             </div>
@@ -268,17 +268,17 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict, sa
           {/* Saved selections from Step 8 — shown first as primary option */}
           {(savedSelections?.filter(s => s.keyword !== kwRow?.primaryKeyword) ?? []).length > 0 && (
             <div>
-              <p style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:4 }}>Your saved keywords</p>
-              <p style={{ fontSize:11, color:"#9ca3af", margin:"0 0 8px" }}>From your Step 8 selections — real MSV data included</p>
+              <p style={{ fontSize:13, fontWeight:600, color:"#0E0E0C", marginBottom:4 }}>Your saved keywords</p>
+              <p style={{ fontSize:11, color:"#8E8E84", margin:"0 0 8px" }}>From your Step 8 selections — real MSV data included</p>
               <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
                 {savedSelections!.filter(s => s.keyword !== kwRow?.primaryKeyword).map(s => (
                   <button key={s.id} onClick={() => { setSelected(s.keyword); setManualKw(""); }}
-                    style={{ textAlign:"left", padding:"9px 14px", borderRadius:8, border: selected === s.keyword ? "1.5px solid #6e5afe" : "1px solid #e5e7eb", background: selected === s.keyword ? "#ede9ff" : s.isAssigned ? "#f9fafb" : "#fff", cursor:"pointer", transition:"all 160ms", opacity: s.isAssigned ? 0.6 : 1 }}>
+                    style={{ textAlign:"left", padding:"9px 14px", borderRadius:8, border: selected === s.keyword ? "1.5px solid #0E0E0C" : "1px solid rgba(14,14,12,0.08)", background: selected === s.keyword ? "#EFEBDF" : s.isAssigned ? "#EFEBDF" : "#FBFAF4", cursor:"pointer", transition:"all 160ms", opacity: s.isAssigned ? 0.6 : 1 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", flex:1 }}>{s.keyword}</span>
-                      {s.isAssigned && <span style={{ fontSize:10, color:"#9ca3af", background:"#f3f4f6", padding:"1px 5px", borderRadius:3 }}>Used: {s.assignedLabel}</span>}
+                      <span style={{ fontSize:13, fontWeight:600, color:"#0E0E0C", flex:1 }}>{s.keyword}</span>
+                      {s.isAssigned && <span style={{ fontSize:10, color:"#8E8E84", background:"#EFEBDF", padding:"1px 5px", borderRadius:3 }}>Used: {s.assignedLabel}</span>}
                     </div>
-                    <span style={{ fontSize:11, color:"#9ca3af" }}>
+                    <span style={{ fontSize:11, color:"#8E8E84" }}>
                       {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
                       {s.competitionLevel ? ` · ${s.competitionLevel} comp` : ""}
                     </span>
@@ -289,19 +289,19 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict, sa
           )}
 
           {suggestions.isLoading && (
-            <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:"#9ca3af" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:"#8E8E84" }}>
               <Loader2 style={{ width:14, height:14 }} className="animate-spin" /> Fetching DataForSEO suggestions…
             </div>
           )}
           {!suggestions.isLoading && (suggestions.data?.length ?? 0) > 0 && (
             <div>
-              <p style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:8 }}>DataForSEO Suggestions</p>
+              <p style={{ fontSize:13, fontWeight:600, color:"#0E0E0C", marginBottom:8 }}>DataForSEO Suggestions</p>
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 {suggestions.data?.map(s => (
                   <button key={s.keyword} onClick={() => { setSelected(s.keyword); setManualKw(""); }}
-                    style={{ textAlign:"left", padding:"10px 14px", borderRadius:8, border: selected === s.keyword ? "1.5px solid #6e5afe" : "1px solid #e5e7eb", background: selected === s.keyword ? "#ede9ff" : "#fff", cursor:"pointer", transition:"all 160ms" }}>
-                    <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e" }}>{s.keyword}</span>
-                    <span style={{ fontSize:12, color:"#9ca3af", marginLeft:8 }}>
+                    style={{ textAlign:"left", padding:"10px 14px", borderRadius:8, border: selected === s.keyword ? "1.5px solid #0E0E0C" : "1px solid rgba(14,14,12,0.08)", background: selected === s.keyword ? "#EFEBDF" : "#FBFAF4", cursor:"pointer", transition:"all 160ms" }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:"#0E0E0C" }}>{s.keyword}</span>
+                    <span style={{ fontSize:12, color:"#8E8E84", marginLeft:8 }}>
                       {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
                       {s.competition ? ` · ${s.competition} comp` : ""}
                     </span>
@@ -311,20 +311,20 @@ function SwapModal({ open, onClose, businessId, kwRow, onSwapped, isConflict, sa
             </div>
           )}
           {!suggestions.isLoading && (suggestions.data?.length ?? 0) === 0 && (
-            <p style={{ fontSize:12, color:"#9ca3af", margin:0 }}>No suggestions found — enter a keyword manually below.</p>
+            <p style={{ fontSize:12, color:"#8E8E84", margin:0 }}>No suggestions found — enter a keyword manually below.</p>
           )}
           <div>
-            <p style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", marginBottom:6 }}>Or enter manually</p>
+            <p style={{ fontSize:13, fontWeight:600, color:"#0E0E0C", marginBottom:6 }}>Or enter manually</p>
             <Input placeholder="Type a custom keyword…" value={manualKw}
               onChange={e => { setManualKw(e.target.value); setSelected(null); }} />
           </div>
         </div>
 
         {/* Sticky footer */}
-        <div style={{ padding:"14px 24px", borderTop:"1px solid #e5e7eb", flexShrink:0, display:"flex", gap:8, justifyContent:"flex-end", background:"#fff" }}>
+        <div style={{ padding:"14px 24px", borderTop:"1px solid rgba(14,14,12,0.08)", flexShrink:0, display:"flex", gap:8, justifyContent:"flex-end", background:"#FBFAF4" }}>
           {selected && (
-            <span style={{ fontSize:12, color:"#6b7280", alignSelf:"center", marginRight:"auto" }}>
-              Selected: <strong style={{ color:"#1a1a2e" }}>{selected}</strong>
+            <span style={{ fontSize:12, color:"#5A5A52", alignSelf:"center", marginRight:"auto" }}>
+              Selected: <strong style={{ color:"#0E0E0C" }}>{selected}</strong>
             </span>
           )}
           <button className="btn-ghost" onClick={onClose}>Cancel</button>
@@ -550,7 +550,7 @@ export default function Keywords() {
     return (
       <DashboardLayout>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", minHeight:400 }}>
-          <Loader2 style={{ width:32, height:32, color:"#6e5afe" }} className="animate-spin" />
+          <Loader2 style={{ width:32, height:32, color:"#0E0E0C" }} className="animate-spin" />
         </div>
       </DashboardLayout>
     );
@@ -561,22 +561,22 @@ export default function Keywords() {
   const renderAssign = () => (
     <div style={{ maxWidth:600 }}>
       {/* Grounded AI hub — cornerstone keyword + batch purpose → coherent hierarchy */}
-      <div style={{ background:"#fff", border:"2px solid #6e5afe", borderRadius:12, padding:28, marginBottom:20 }}>
+      <div style={{ background:"#FBFAF4", border:"2px solid #0E0E0C", borderRadius:12, padding:28, marginBottom:20 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:"#ede9ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <Sparkles style={{ width:18, height:18, color:"#6e5afe" }} />
+          <div style={{ width:36, height:36, borderRadius:10, background:"#EFEBDF", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <Sparkles style={{ width:18, height:18, color:"#0E0E0C" }} />
           </div>
-          <h2 style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", margin:0 }}>Build your keyword hub</h2>
+          <h2 style={{ fontSize:16, fontWeight:700, color:"#0E0E0C", margin:0 }}>Build your keyword hub</h2>
         </div>
-        <p style={{ fontSize:13, color:"#6b7280", lineHeight:1.6, marginBottom:18 }}>
+        <p style={{ fontSize:13, color:"#5A5A52", lineHeight:1.6, marginBottom:18 }}>
           Two steps: first say what this batch of posts should achieve, then give the one main topic that captures it.
           The system pulls real search data around that topic and builds a flat set — <strong>pillar pages</strong> +
           long-tail <strong>cluster posts</strong> (no cornerstone) — kept inside <strong>{(business.industry as string | undefined) ?? "your industry"}</strong>,
           validated for search volume, and distinct from earlier batches.
         </p>
 
-        <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#1a1a2e", marginBottom:2 }}>Step 1 — Purpose of this batch</label>
-        <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 6px", lineHeight:1.5 }}>
+        <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#0E0E0C", marginBottom:2 }}>Step 1 — Purpose of this batch</label>
+        <p style={{ fontSize:12, color:"#5A5A52", margin:"0 0 6px", lineHeight:1.5 }}>
           What should these posts achieve for your audience? Describe the goal, then pull your main keyword from it in Step 2.
         </p>
         <textarea
@@ -584,11 +584,11 @@ export default function Keywords() {
           onChange={(e) => setBatchPurpose(e.target.value)}
           placeholder="e.g. Educate our audience on what brand architecture is, how to use it in their marketing, and why it matters."
           rows={3}
-          style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5, marginBottom:16 }}
+          style={{ width:"100%", boxSizing:"border-box", fontSize:13, padding:"10px 12px", border:"1px solid rgba(14,14,12,0.08)", borderRadius:8, resize:"vertical", fontFamily:"inherit", lineHeight:1.5, marginBottom:16 }}
         />
 
-        <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#1a1a2e", marginBottom:2 }}>Step 2 — Main topic keyword</label>
-        <p style={{ fontSize:12, color:"#6b7280", margin:"0 0 6px", lineHeight:1.5 }}>
+        <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#0E0E0C", marginBottom:2 }}>Step 2 — Main topic keyword</label>
+        <p style={{ fontSize:12, color:"#5A5A52", margin:"0 0 6px", lineHeight:1.5 }}>
           The main topic/keyword from your purpose above — the system builds your pillar pages and cluster posts around it.
         </p>
 
@@ -598,13 +598,13 @@ export default function Keywords() {
           const prior = (batchHistory.data ?? []).filter((b) => b.batchNumber < activeBatch && b.total > 0);
           if (prior.length === 0) return null;
           return (
-            <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:8, padding:"10px 12px", margin:"0 0 12px" }}>
-              <p style={{ fontSize:12, color:"#92400e", margin:"0 0 6px", lineHeight:1.5, fontWeight:600 }}>
+            <div style={{ background:"#EFEBDF", border:"1px solid rgba(14,14,12,0.16)", borderRadius:8, padding:"10px 12px", margin:"0 0 12px" }}>
+              <p style={{ fontSize:12, color:"#0E0E0C", margin:"0 0 6px", lineHeight:1.5, fontWeight:600 }}>
                 ⚠️ Choose a NEW focus keyword — different from your earlier batches. Targeting the same topic twice makes your posts compete with each other for the same Google ranking (keyword cannibalization).
               </p>
-              <p style={{ fontSize:11, color:"#92400e", margin:"0 0 4px", opacity:0.85 }}>Already built for this business:</p>
+              <p style={{ fontSize:11, color:"#0E0E0C", margin:"0 0 4px", opacity:0.85 }}>Already built for this business:</p>
               {prior.map((b) => (
-                <div key={b.batchNumber} style={{ fontSize:12, color:"#78350f", lineHeight:1.5 }}>
+                <div key={b.batchNumber} style={{ fontSize:12, color:"#2C2C28", lineHeight:1.5 }}>
                   <strong>Batch {b.batchNumber}</strong> ({b.total} posts)
                   {b.focusKeyword
                     ? <> — focus: <strong>{b.focusKeyword}</strong></>
@@ -620,7 +620,7 @@ export default function Keywords() {
           value={cornerstoneKw}
           onChange={(e) => setCornerstoneKw(e.target.value)}
           placeholder="e.g. brand architecture"
-          style={{ width:"100%", boxSizing:"border-box", fontSize:14, padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:8, marginBottom:16 }}
+          style={{ width:"100%", boxSizing:"border-box", fontSize:14, padding:"10px 12px", border:"1px solid rgba(14,14,12,0.08)", borderRadius:8, marginBottom:16 }}
         />
 
         <button
@@ -642,33 +642,33 @@ export default function Keywords() {
     const unassigned = (savedSelections ?? []).filter(s => !s.isAssigned);
     const assigned = (savedSelections ?? []).filter(s => s.isAssigned);
     return (
-      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden", marginBottom:16 }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid #e5e7eb", background:"#faf9f5" }}>
+      <div style={{ background:"#FBFAF4", border:"1px solid rgba(14,14,12,0.08)", borderRadius:12, overflow:"hidden", marginBottom:16 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid rgba(14,14,12,0.08)", background:"#F4F1E8" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <BarChart2 style={{ width:16, height:16, color:"#6e5afe" }} />
-            <h3 style={{ fontSize:14, fontWeight:700, color:"#1a1a2e", margin:0 }}>Your Selected Keywords</h3>
-            <span style={{ fontSize:11, background:"#ede9ff", color:"#6e5afe", padding:"2px 8px", borderRadius:20, fontWeight:600 }}>
+            <BarChart2 style={{ width:16, height:16, color:"#0E0E0C" }} />
+            <h3 style={{ fontSize:14, fontWeight:700, color:"#0E0E0C", margin:0 }}>Your Selected Keywords</h3>
+            <span style={{ fontSize:11, background:"#EFEBDF", color:"#0E0E0C", padding:"2px 8px", borderRadius:20, fontWeight:600 }}>
               {(savedSelections ?? []).length} total
             </span>
           </div>
-          <span style={{ fontSize:12, color:"#9ca3af" }}>
-            <span style={{ color:"#22c55e", fontWeight:600 }}>{assigned.length}</span> assigned · <span style={{ color:"#f59e0b", fontWeight:600 }}>{unassigned.length}</span> unassigned
+          <span style={{ fontSize:12, color:"#8E8E84" }}>
+            <span style={{ color:"#D9F542", fontWeight:600 }}>{assigned.length}</span> assigned · <span style={{ color:"#C98A2B", fontWeight:600 }}>{unassigned.length}</span> unassigned
           </span>
         </div>
         {savedSelectionsLoading ? (
-          <div style={{ padding:24, textAlign:"center" }}><Loader2 style={{ width:18, height:18, color:"#6e5afe" }} className="animate-spin" /></div>
+          <div style={{ padding:24, textAlign:"center" }}><Loader2 style={{ width:18, height:18, color:"#0E0E0C" }} className="animate-spin" /></div>
         ) : (savedSelections ?? []).length === 0 ? (
-          <div style={{ padding:"20px 24px", fontSize:13, color:"#9ca3af" }}>
+          <div style={{ padding:"20px 24px", fontSize:13, color:"#8E8E84" }}>
             No keywords saved from Step 8 yet. Go back to Keyword Research (Stage 1 → Step 8) to select and save keywords.
           </div>
         ) : (
           <div style={{ padding:"12px 20px", display:"flex", flexDirection:"column", gap:4, maxHeight:320, overflowY:"auto" }}>
             {unassigned.length > 0 && (
               <>
-                <p style={{ fontSize:11, fontWeight:600, color:"#f59e0b", textTransform:"uppercase", letterSpacing:"0.06em", margin:"4px 0 6px" }}>Unassigned — click to swap onto an article</p>
+                <p style={{ fontSize:11, fontWeight:600, color:"#C98A2B", textTransform:"uppercase", letterSpacing:"0.06em", margin:"4px 0 6px" }}>Unassigned — click to swap onto an article</p>
                 {unassigned.map(s => (
                   <div key={s.id}
-                    style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:8, border:"1px solid #fde68a", background:"#fffbeb", cursor:"pointer" }}
+                    style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:8, border:"1px solid rgba(14,14,12,0.16)", background:"#EFEBDF", cursor:"pointer" }}
                     onClick={() => {
                       // Pre-fill swap modal with this keyword
                       setSwapTarget(null); // clear first
@@ -676,29 +676,29 @@ export default function Keywords() {
                     }}
                     title="Click to use this keyword in a swap"
                   >
-                    <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", flex:1 }}>{s.keyword}</span>
-                    <span style={{ fontSize:11, color:"#9ca3af", whiteSpace:"nowrap" }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:"#0E0E0C", flex:1 }}>{s.keyword}</span>
+                    <span style={{ fontSize:11, color:"#8E8E84", whiteSpace:"nowrap" }}>
                       {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
                       {s.competitionLevel ? ` · ${s.competitionLevel} comp` : ""}
                     </span>
-                    <span style={{ fontSize:11, color:"#f59e0b", fontWeight:600, background:"#fef3c7", padding:"2px 6px", borderRadius:4 }}>Unassigned</span>
+                    <span style={{ fontSize:11, color:"#C98A2B", fontWeight:600, background:"#EFEBDF", padding:"2px 6px", borderRadius:4 }}>Unassigned</span>
                   </div>
                 ))}
               </>
             )}
             {assigned.length > 0 && (
               <>
-                <p style={{ fontSize:11, fontWeight:600, color:"#22c55e", textTransform:"uppercase", letterSpacing:"0.06em", margin:"8px 0 6px" }}>Assigned</p>
+                <p style={{ fontSize:11, fontWeight:600, color:"#D9F542", textTransform:"uppercase", letterSpacing:"0.06em", margin:"8px 0 6px" }}>Assigned</p>
                 {assigned.map(s => (
                   <div key={s.id}
-                    style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:8, border:"1px solid #d1fae5", background:"#f0fdf4" }}
+                    style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:8, border:"1px solid #d1fae5", background:"#EFEBDF" }}
                   >
-                    <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e", flex:1 }}>{s.keyword}</span>
-                    <span style={{ fontSize:11, color:"#9ca3af", whiteSpace:"nowrap" }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:"#0E0E0C", flex:1 }}>{s.keyword}</span>
+                    <span style={{ fontSize:11, color:"#8E8E84", whiteSpace:"nowrap" }}>
                       {s.msv !== null ? `${s.msv.toLocaleString()} MSV` : "MSV n/a"}
                       {s.competitionLevel ? ` · ${s.competitionLevel} comp` : ""}
                     </span>
-                    <span style={{ fontSize:11, color:"#15803d", fontWeight:600, background:"#dcfce7", padding:"2px 6px", borderRadius:4 }}>
+                    <span style={{ fontSize:11, color:"#0E0E0C", fontWeight:600, background:"#EFEBDF", padding:"2px 6px", borderRadius:4 }}>
                       {s.assignedLabel ?? "Assigned"}
                     </span>
                   </div>
@@ -716,11 +716,11 @@ export default function Keywords() {
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
       {/* Cannibalization warning */}
       {cannibalizationConflicts.length > 0 && (
-        <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"12px 16px", display:"flex", gap:10 }}>
+        <div style={{ background:"#EFEBDF", border:"1px solid rgba(14,14,12,0.16)", borderRadius:10, padding:"12px 16px", display:"flex", gap:10 }}>
           <AlertTriangle style={{ width:16, height:16, color:"#d97706", flexShrink:0, marginTop:2 }} />
           <div>
-            <p style={{ fontSize:13, fontWeight:600, color:"#92400e", margin:"0 0 4px" }}>Keyword cannibalization detected</p>
-            <p style={{ fontSize:12, color:"#78350f", margin:0 }}>
+            <p style={{ fontSize:13, fontWeight:600, color:"#0E0E0C", margin:"0 0 4px" }}>Keyword cannibalization detected</p>
+            <p style={{ fontSize:12, color:"#2C2C28", margin:0 }}>
               {cannibalizationConflicts.length} keyword{cannibalizationConflicts.length > 1 ? "s" : ""} may compete with each other. Swap one to resolve.
             </p>
           </div>
@@ -728,19 +728,19 @@ export default function Keywords() {
       )}
 
       {/* Tip banner */}
-      <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"10px 16px", display:"flex", gap:10, alignItems:"flex-start" }}>
+      <div style={{ background:"#EFEBDF", border:"1px solid rgba(14,14,12,0.16)", borderRadius:10, padding:"10px 16px", display:"flex", gap:10, alignItems:"flex-start" }}>
         <span style={{ fontSize:14, flexShrink:0 }}>💡</span>
-        <p style={{ fontSize:12, color:"#78350f", margin:0, lineHeight:1.6 }}>
+        <p style={{ fontSize:12, color:"#2C2C28", margin:0, lineHeight:1.6 }}>
           Aim for a mix of competition levels. A few <strong>higher-volume pillar pages</strong> plus easy-win, low-competition clusters ranks faster than chasing only the big terms.
         </p>
       </div>
 
       {/* Cross-batch cannibalization banner */}
       {crossBatchConflicts.length > 0 && (
-        <div style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 18px", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, marginBottom:16 }}>
+        <div style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 18px", background:"#EFEBDF", border:"1px solid rgba(14,14,12,0.16)", borderRadius:10, marginBottom:16 }}>
           <AlertTriangle style={{ width:16, height:16, color:"#d97706", flexShrink:0, marginTop:2 }} />
           <div>
-            <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#92400e" }}>
+            <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#0E0E0C" }}>
               {crossBatchConflicts.length} keyword{crossBatchConflicts.length > 1 ? "s are" : " is"} already used in an earlier batch
             </p>
             <p style={{ margin:"4px 0 0", fontSize:12, color:"#a16207", lineHeight:1.5 }}>
@@ -752,29 +752,29 @@ export default function Keywords() {
       )}
 
       {/* Table */}
-      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden" }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid #e5e7eb" }}>
-          <h3 style={{ fontSize:14, fontWeight:700, color:"#1a1a2e", margin:0 }}>Proposed articles</h3>
-          <span style={{ fontSize:12, color:"#9ca3af" }}>{approvedCount} / {totalCount} approved</span>
+      <div style={{ background:"#FBFAF4", border:"1px solid rgba(14,14,12,0.08)", borderRadius:12, overflow:"hidden" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid rgba(14,14,12,0.08)" }}>
+          <h3 style={{ fontSize:14, fontWeight:700, color:"#0E0E0C", margin:0 }}>Proposed articles</h3>
+          <span style={{ fontSize:12, color:"#8E8E84" }}>{approvedCount} / {totalCount} approved</span>
         </div>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
-              <tr style={{ background:"#faf9f5" }}>
+              <tr style={{ background:"#F4F1E8" }}>
                 {["Level", "Article title", "Keyword", "MSV", "Competition", "Status", ""].map(h => (
-                  <th key={h} style={{ textAlign:"left", padding:"10px 16px", fontSize:11, fontWeight:600, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
+                  <th key={h} style={{ textAlign:"left", padding:"10px 16px", fontSize:11, fontWeight:600, color:"#8E8E84", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {kwLoading ? (
                 <tr><td colSpan={7} style={{ textAlign:"center", padding:32 }}>
-                  <Loader2 style={{ width:20, height:20, color:"#6e5afe" }} className="animate-spin" />
+                  <Loader2 style={{ width:20, height:20, color:"#0E0E0C" }} className="animate-spin" />
                 </td></tr>
               ) : kwData?.map(kw => {
                 const isConflict = liveConflictNodeIds.has(kw.articleNodeId);
                 return (
-                <tr key={kw.id} style={{ borderBottom:"1px solid #f3f4f6", background: isConflict ? "#fffbeb" : "transparent" }}>
+                <tr key={kw.id} style={{ borderBottom:"1px solid #EFEBDF", background: isConflict ? "#EFEBDF" : "transparent" }}>
                   <td style={{ padding:"12px 16px" }}><LevelBadge level={kw.nodeLevel} /></td>
                   <td style={{ padding:"12px 16px", minWidth:240 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
@@ -784,8 +784,8 @@ export default function Keywords() {
                         defaultValue={(kw as { plannedTitle?: string | null }).plannedTitle ?? ""}
                         placeholder={kwData ? deriveNodeLabel(kwData, kw) : "Article title…"}
                         title="Approved article title — the writer must deliver on this. Click to edit."
-                        style={{ fontSize:13, fontWeight:500, color:"#1a1a2e", width:"100%", border:"1px solid transparent", borderRadius:6, padding:"4px 6px", background:"transparent" }}
-                        onFocus={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#fff"; }}
+                        style={{ fontSize:13, fontWeight:500, color:"#0E0E0C", width:"100%", border:"1px solid transparent", borderRadius:6, padding:"4px 6px", background:"transparent" }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(14,14,12,0.08)"; e.currentTarget.style.background = "#FBFAF4"; }}
                         onBlur={(e) => {
                           e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.background = "transparent";
                           const v = e.currentTarget.value.trim();
@@ -796,9 +796,9 @@ export default function Keywords() {
                     </div>
                   </td>
                   <td style={{ padding:"12px 16px" }}>
-                    <span style={{ fontSize:12, fontFamily:"monospace", color:"#6b7280", background:"#f3f4f6", padding:"2px 6px", borderRadius:4 }}>{kw.primaryKeyword}</span>
+                    <span style={{ fontSize:12, fontFamily:"monospace", color:"#5A5A52", background:"#EFEBDF", padding:"2px 6px", borderRadius:4 }}>{kw.primaryKeyword}</span>
                   </td>
-                  <td style={{ padding:"12px 16px", fontSize:13, fontWeight:600, color: kw.monthlySearchVolume && kw.monthlySearchVolume >= 1000 ? "#16a34a" : "#6b7280" }}>
+                  <td style={{ padding:"12px 16px", fontSize:13, fontWeight:600, color: kw.monthlySearchVolume && kw.monthlySearchVolume >= 1000 ? "#0E0E0C" : "#5A5A52" }}>
                     {kw.monthlySearchVolume !== null ? kw.monthlySearchVolume.toLocaleString() : "—"}
                   </td>
                   <td style={{ padding:"12px 16px" }}><CompBadge comp={kw.competitionLevel} /></td>
@@ -863,15 +863,15 @@ export default function Keywords() {
   const renderPAAReview = () => (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
       {fetchPAA.isPending && (
-        <div style={{ background:"#ede9ff", border:"1px solid #c4b5fd", borderRadius:10, padding:"12px 16px", display:"flex", gap:10, alignItems:"center", fontSize:13, color:"#6e5afe" }}>
+        <div style={{ background:"#EFEBDF", border:"1px solid rgba(14,14,12,0.16)", borderRadius:10, padding:"12px 16px", display:"flex", gap:10, alignItems:"center", fontSize:13, color:"#0E0E0C" }}>
           <Loader2 style={{ width:14, height:14 }} className="animate-spin" />
           Fetching People Also Ask questions from DataForSEO…
         </div>
       )}
-      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, overflow:"hidden" }}>
-        <div style={{ padding:"14px 20px", borderBottom:"1px solid #e5e7eb" }}>
-          <h3 style={{ fontSize:14, fontWeight:700, color:"#1a1a2e", margin:0 }}>People Also Ask</h3>
-          <p style={{ fontSize:12, color:"#9ca3af", margin:"4px 0 0" }}>Select one PAA question per article to use as an H2 subheading</p>
+      <div style={{ background:"#FBFAF4", border:"1px solid rgba(14,14,12,0.08)", borderRadius:12, overflow:"hidden" }}>
+        <div style={{ padding:"14px 20px", borderBottom:"1px solid rgba(14,14,12,0.08)" }}>
+          <h3 style={{ fontSize:14, fontWeight:700, color:"#0E0E0C", margin:0 }}>People Also Ask</h3>
+          <p style={{ fontSize:12, color:"#8E8E84", margin:"4px 0 0" }}>Select one PAA question per article to use as an H2 subheading</p>
         </div>
         <div style={{ padding:20, display:"flex", flexDirection:"column", gap:16 }}>
           {kwData?.map(kw => {
@@ -884,24 +884,24 @@ export default function Keywords() {
             const currentValue = kw.approvedPaaQuestion ?? "";
             const displayValue = currentValue || (firstQ ?? "");
             return (
-              <div key={kw.id} style={{ background:"#faf9f5", border:"1px solid #e5e7eb", borderRadius:10, padding:16 }}>
+              <div key={kw.id} style={{ background:"#F4F1E8", border:"1px solid rgba(14,14,12,0.08)", borderRadius:10, padding:16 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, flexWrap:"wrap" }}>
                   <LevelBadge level={kw.nodeLevel} />
-                  <span style={{ fontSize:13, fontWeight:600, color:"#1a1a2e" }}>{kw.primaryKeyword}</span>
+                  <span style={{ fontSize:13, fontWeight:600, color:"#0E0E0C" }}>{kw.primaryKeyword}</span>
                   {questions.length > 0 && !kw.paaApproved && firstQ && (
-                    <span style={{ fontSize:10, background:"#fef3c7", color:"#92400e", padding:"2px 7px", borderRadius:20, fontWeight:600, marginLeft:"auto" }}>
+                    <span style={{ fontSize:10, background:"#EFEBDF", color:"#0E0E0C", padding:"2px 7px", borderRadius:20, fontWeight:600, marginLeft:"auto" }}>
                       Top suggestion pre-selected
                     </span>
                   )}
-                  {kw.paaApproved && <CheckCircle2 style={{ width:14, height:14, color:"#22c55e", marginLeft:"auto" }} />}
+                  {kw.paaApproved && <CheckCircle2 style={{ width:14, height:14, color:"#D9F542", marginLeft:"auto" }} />}
                 </div>
                 {questions.length === 0 ? (
                   <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                    <p style={{ fontSize:12, color:"#9ca3af", margin:0, flex:1 }}>Generating PAA questions — click Retry to fetch from DataForSEO or generate with AI.</p>
+                    <p style={{ fontSize:12, color:"#8E8E84", margin:0, flex:1 }}>Generating PAA questions — click Retry to fetch from DataForSEO or generate with AI.</p>
                     <button
                       onClick={() => retryPAA.mutate({ businessId, keywordId: kw.id })}
                       disabled={retryPAA.isPending && retryPAA.variables?.keywordId === kw.id}
-                      style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"5px 12px", borderRadius:6, border:"1px solid #c4b5fd", background:"#ede9ff", color:"#6e5afe", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}
+                      style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"5px 12px", borderRadius:6, border:"1px solid rgba(14,14,12,0.16)", background:"#EFEBDF", color:"#0E0E0C", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}
                     >
                       {retryPAA.isPending && retryPAA.variables?.keywordId === kw.id
                         ? <><Loader2 style={{ width:11, height:11 }} className="animate-spin" /> Generating…</>
@@ -910,7 +910,7 @@ export default function Keywords() {
                     <button
                       onClick={() => skipPAA.mutate({ businessId, keywordId: kw.id, approvedQuestion: "__skip__" })}
                       disabled={skipPAA.isPending && skipPAA.variables?.keywordId === kw.id}
-                      style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"5px 12px", borderRadius:6, border:"1px solid #e5e7eb", background:"#fff", color:"#6b7280", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}
+                      style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"5px 12px", borderRadius:6, border:"1px solid rgba(14,14,12,0.08)", background:"#FBFAF4", color:"#5A5A52", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}
                     >
                       {skipPAA.isPending && skipPAA.variables?.keywordId === kw.id
                         ? <><Loader2 style={{ width:11, height:11 }} className="animate-spin" /> Skipping…</>
@@ -934,7 +934,7 @@ export default function Keywords() {
                     {!kw.paaApproved && firstQ && displayValue === firstQ && (
                       <button
                         onClick={() => approvePAA.mutate({ businessId, keywordId: kw.id, approvedQuestion: firstQ })}
-                        style={{ alignSelf:"flex-start", display:"inline-flex", alignItems:"center", gap:5, padding:"4px 12px", borderRadius:6, border:"1px solid #bbf7d0", background:"#f0fdf4", color:"#166534", fontSize:12, fontWeight:600, cursor:"pointer" }}
+                        style={{ alignSelf:"flex-start", display:"inline-flex", alignItems:"center", gap:5, padding:"4px 12px", borderRadius:6, border:"1px solid #D9F542", background:"#EFEBDF", color:"#5A5A52", fontSize:12, fontWeight:600, cursor:"pointer" }}
                       >
                         <CheckCircle2 style={{ width:11, height:11 }} /> Lock in top suggestion
                       </button>
@@ -947,14 +947,14 @@ export default function Keywords() {
         </div>
       </div>
       {/* Sticky bottom bar — always visible in PAA review */}
-      <div style={{ position:"sticky", bottom:0, left:0, right:0, background:"#fff", borderTop:"1px solid #e5e7eb", padding:"12px 20px", display:"flex", alignItems:"center", justifyContent:"space-between", zIndex:10, borderRadius:"0 0 12px 12px" }}>
-        <span style={{ fontSize:13, color:"#6b7280", fontWeight:500 }}>
+      <div style={{ position:"sticky", bottom:0, left:0, right:0, background:"#FBFAF4", borderTop:"1px solid rgba(14,14,12,0.08)", padding:"12px 20px", display:"flex", alignItems:"center", justifyContent:"space-between", zIndex:10, borderRadius:"0 0 12px 12px" }}>
+        <span style={{ fontSize:13, color:"#5A5A52", fontWeight:500 }}>
           {paaApprovedCount} of {totalCount} PAA questions selected
         </span>
         {!allPaaFetched ? (
           <button
             disabled
-            style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 20px", borderRadius:8, background:"#e5e7eb", color:"#9ca3af", fontSize:13, fontWeight:600, cursor:"not-allowed", border:"none" }}
+            style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 20px", borderRadius:8, background:"rgba(14,14,12,0.08)", color:"#8E8E84", fontSize:13, fontWeight:600, cursor:"not-allowed", border:"none" }}
           >
             Generate PAA questions first
           </button>
@@ -990,10 +990,10 @@ export default function Keywords() {
 
   /* ── Complete sub-stage ── */
   const renderComplete = () => (
-    <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:48, textAlign:"center" }}>
-      <CheckCircle2 style={{ width:48, height:48, color:"#22c55e", margin:"0 auto 16px" }} />
-      <h2 style={{ fontSize:20, fontWeight:700, color:"#1a1a2e", marginBottom:8 }}>Stage 3 Complete</h2>
-      <p style={{ fontSize:13, color:"#6b7280", maxWidth:360, margin:"0 auto 24px" }}>
+    <div style={{ background:"#FBFAF4", border:"1px solid rgba(14,14,12,0.08)", borderRadius:12, padding:48, textAlign:"center" }}>
+      <CheckCircle2 style={{ width:48, height:48, color:"#D9F542", margin:"0 auto 16px" }} />
+      <h2 style={{ fontSize:20, fontWeight:700, color:"#0E0E0C", marginBottom:8 }}>Stage 3 Complete</h2>
+      <p style={{ fontSize:13, color:"#5A5A52", maxWidth:360, margin:"0 auto 24px" }}>
         All keywords and PAA questions are approved. Your articles are ready for generation.
       </p>
       <button className="btn-primary" onClick={() => setLocation("/content-plan")}>
@@ -1009,17 +1009,17 @@ export default function Keywords() {
         <StageStepper currentStage={currentStage} />
 
         {/* Scrollable content */}
-        <div style={{ flex:1, overflowY:"auto", padding:"24px 32px", background:"#faf9f5" }}>
+        <div style={{ flex:1, overflowY:"auto", padding:"24px 32px", background:"#F4F1E8" }}>
           {/* Page header */}
           <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24 }}>
             <div>
-              <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#9ca3af", marginBottom:6 }}>
+              <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#8E8E84", marginBottom:6 }}>
                 Stage 3 · Keyword Research
               </div>
-              <h1 style={{ fontSize:32, fontWeight:800, color:"#1a1a2e", lineHeight:1.15, margin:0 }}>
-                Lock the keywords <em style={{ fontFamily:"Lora, Georgia, serif", fontStyle:"italic", fontWeight:600 }}>worth</em> ranking for.
+              <h1 style={{ fontSize:32, fontWeight:800, color:"#0E0E0C", lineHeight:1.15, margin:0 }}>
+                Lock the keywords <em style={{ fontFamily:"'Instrument Serif', Georgia, serif", fontStyle:"italic", fontWeight:400 }}>worth</em> ranking for.
               </h1>
-              <p style={{ fontSize:14, color:"#6b7280", marginTop:8 }}>
+              <p style={{ fontSize:14, color:"#5A5A52", marginTop:8 }}>
                 {approvedCount} of {totalCount} approved. Swap any that don't fit — then generate the batch.
               </p>
             </div>
