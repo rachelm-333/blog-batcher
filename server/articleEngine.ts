@@ -2278,7 +2278,8 @@ export async function generateSingleArticle(
     }
 
     let parsedResult: ReturnType<typeof parseDelimitedResponse> = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         const result = await invokeLLMWithCost(
           {
@@ -2300,14 +2301,18 @@ export async function generateSingleArticle(
         if (parsedResult !== null) {
           break; // success
         }
-        // parsedResult is null = truncated response — retry
-        if (attempt === 2) {
+        // parsedResult is null = truncated response — retry (no backoff; not a transient network fault)
+        if (attempt === MAX_ATTEMPTS) {
           throw new Error(`Single-pass article generation truncated after ${attempt} attempts — response missing </ARTICLE_HTML> closing tag`);
         }
         console.warn(`[ArticleEngine] Write attempt ${attempt} truncated for node ${nodeId} — retrying with same token limit...`);
       } catch (err) {
-        if (attempt === 2) throw new Error(`Single-pass article generation failed after 2 attempts: ${err}`);
-        console.warn(`[ArticleEngine] Write attempt ${attempt} failed for node ${nodeId} — retrying...`);
+        if (attempt === MAX_ATTEMPTS) throw new Error(`Single-pass article generation failed after ${MAX_ATTEMPTS} attempts: ${err}`);
+        // Transient provider blips (Bedrock throttling, connection resets) clear if we
+        // wait a moment. Back off before retrying so a 2-second hiccup doesn't burn all attempts.
+        const backoffMs = attempt * 4000; // 4s, then 8s
+        console.warn(`[ArticleEngine] Write attempt ${attempt} failed for node ${nodeId} (${err}) — retrying in ${backoffMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
     }
 
