@@ -1816,7 +1816,10 @@ ${(ctx.verifiedFacts && ctx.verifiedFacts.length)
   : `No verified facts were provided. Do NOT invent statistics, first-hand experiences, or case studies. Demonstrate expertise through accurate, specific, general domain knowledge only.`}
 ${ctx.expertQuote
   ? `EXPERT QUOTE (insert verbatim as an attributed blockquote where it fits naturally): <blockquote>"${ctx.expertQuote.quote}" — ${ctx.expertQuote.author}</blockquote>`
-  : `No expert quote was provided — do NOT fabricate a quote or attribute words to a named person.`}
+  : `EXPERT / AUTHORITY QUOTE (MANDATORY — every article must include exactly one):
+- Add one <blockquote> attributed to a REAL, well-known organisation, brand, publication, or recognised expert that is genuinely relevant to ${ctx.industry || "this business's"} industry and audience and clearly makes sense for this business (${ctx.businessName}). Examples of the RIGHT kind of source: a leading industry association, a recognised authority brand, or a major trade publication in this niche.
+- Format: <blockquote>"…" — [Real Organisation or Expert Name]</blockquote>, and in the sentence that introduces it, link that source's name to its real homepage (root domain only, e.g. https://www.example.org) — the link is live-checked and stripped if dead, so use a source you are confident is real and live.
+- Paraphrase the source's GENUINE, publicly-known position or well-established guidance. Do NOT invent a specific private/verbatim quote, do NOT misquote, and do NOT attribute fabricated words to a named individual. If you cannot name a genuinely real, relevant source, cite a recognised industry body's known stance rather than inventing one.`}
 
 === PASS 2 QUALITY SCORING — WRITE TO SCORE 80+ ON ALL FIVE ===
 This article will be scored on these five dimensions. Write to score 80+ on all five:
@@ -1840,7 +1843,7 @@ Every article MUST end with a dedicated CTA section:
 Customise the H2 heading and body copy to match the article topic and brand voice. The CTA link MUST point to ${ctx.ctaUrl}.
 
 === ABSOLUTE RULES ===
-- DO NOT fabricate statistics, quotes, or data.
+- DO NOT fabricate statistics or data, and do NOT invent a private/verbatim quote or attribute made-up words to a named individual. (Citing a REAL, well-known organisation's publicly-known position as an attributed blockquote with a live link to that source IS required — see EXPERT / AUTHORITY QUOTE above.)
 - DO NOT invent URLs. Every link must use a real, verifiable URL.
 - DO NOT use em dashes (—) excessively.
 - DO NOT open with a rhetorical question.
