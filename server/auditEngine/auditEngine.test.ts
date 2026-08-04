@@ -38,10 +38,12 @@ const BAD_HTML = `
 <p>When looking at the history of this topic, many people delve into the bustling tapestry of options. Moreover it is a testament to the landscape. The price is set by the market and is determined by many factors. It was decided by committee. Things are influenced by trends. Decisions were made by stakeholders. The outcome was shaped by forces beyond control. Everything is connected to everything else.</p>
 </body></html>`;
 
-describe("29-point audit engine", () => {
-  it("has exactly 29 rules and weights summing to 100", () => {
-    expect(AUDIT_RULES.length).toBe(29 - 0); // 13 + 8 + 8 = 29
-    expect(AUDIT_MAX_POINTS).toBe(100);
+describe("27-point audit engine", () => {
+  it("has exactly 27 rules (site-level MAC-12/13 removed)", () => {
+    expect(AUDIT_RULES.length).toBe(27); // 11 + 8 + 8 = 27
+    expect(AUDIT_MAX_POINTS).toBe(91);   // 100 - 4 (MAC-12) - 5 (MAC-13)
+    expect(AUDIT_RULES.find(r => r.id === "MAC-12")).toBeUndefined();
+    expect(AUDIT_RULES.find(r => r.id === "MAC-13")).toBeUndefined();
   });
 
   it("scores a well-formed GEO article highly", () => {
@@ -113,16 +115,10 @@ describe("29-point audit engine", () => {
     expect(r.checks.find(c => c.id === "MAC-08")?.passed).toBe(true);
   });
 
-  it("live-only checks are N/A without a URL, and counted when provided", () => {
-    const noUrl = auditHtml({ html: GOOD_HTML, primaryKeyword: "brand strategy" });
-    expect(noUrl.checks.find(c => c.id === "MAC-12")?.passed).toBe(null);
-    expect(noUrl.applicable_max).toBeLessThan(100);
-
-    const withLive = auditHtml({
-      html: GOOD_HTML, primaryKeyword: "brand strategy",
-      liveChecks: { coreWebVitalsPass: true, llmsTxtPresent: true },
-    });
-    expect(withLive.checks.find(c => c.id === "MAC-12")?.passed).toBe(true);
+  it("no longer includes the removed site-level checks (MAC-12/MAC-13)", () => {
+    const r = auditHtml({ html: GOOD_HTML, primaryKeyword: "brand strategy" });
+    expect(r.checks.find(c => c.id === "MAC-12")).toBeUndefined();
+    expect(r.checks.find(c => c.id === "MAC-13")).toBeUndefined();
   });
 
   it("MAC-01 URL silo passes for clean nested path, fails for dated path", () => {

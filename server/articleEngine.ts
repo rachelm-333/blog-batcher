@@ -774,7 +774,7 @@ export function ensureKeywordInH3(
 }
 
 // ---------------------------------------------------------------------------
-// 29-point enforcement helpers (MIC-03, MIC-05, MIC-06, MIC-07, EAT-05)
+// 27-point enforcement helpers (MIC-03, MIC-05, MIC-06, MIC-07, EAT-05)
 // ---------------------------------------------------------------------------
 
 const H2_QUESTION_START = /^(what|how|why|is|are|can|should|does|do|who|where|when)\b/i;

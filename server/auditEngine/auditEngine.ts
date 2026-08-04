@@ -1,13 +1,13 @@
 /**
- * auditEngine.ts — the 29-point SEO & GEO parsing + scoring engine.
+ * auditEngine.ts — the 27-point SEO & GEO parsing + scoring engine.
  *
  * Implements every rule in auditRules.ts against raw HTML using cheerio (DOM
- * parsing). Returns { total_score (/100), failed_checks[], checks[] } exactly
- * as specified in the Gemini directive, plus per-check detail for the UI.
+ * parsing). Returns { total_score, normalized_score (/100), failed_checks[], checks[] }
+ * plus per-check detail for the UI.
  *
- * Pure + synchronous. Live-URL checks (Core Web Vitals, llms.txt) are NOT done
- * here — they require network/API calls; pass their results in via
- * `input.liveChecks`, otherwise they are reported as "not applicable".
+ * Pure + synchronous. The two site-level / live-URL checks (Core Web Vitals,
+ * llms.txt) were removed — a blog post can't control them — so every check here
+ * is one the post itself can satisfy.
  */
 import * as cheerio from "cheerio";
 import { AUDIT_RULES, AUDIT_MAX_POINTS, type AuditRule } from "./auditRules";
@@ -24,8 +24,6 @@ export interface AuditInput {
   metaDescription?: string;
   /** Is this page a hub/pillar? Affects MAC-10. */
   isHub?: boolean;
-  /** Results of network checks done elsewhere (Phase 3 auditor). */
-  liveChecks?: { coreWebVitalsPass?: boolean; llmsTxtPresent?: boolean };
 }
 
 export interface AuditCheckResult {
@@ -147,12 +145,6 @@ function evaluate(rule: AuditRule, $: cheerio.CheerioAPI, input: AuditInput): { 
       });
       return { passed: internal >= 1, detail: `${internal} internal links` };
     }
-    case "MAC-12":
-      if (input.liveChecks?.coreWebVitalsPass === undefined) return { passed: null, detail: "Requires live URL / PageSpeed API" };
-      return { passed: input.liveChecks.coreWebVitalsPass, detail: `CWV pass=${input.liveChecks.coreWebVitalsPass}` };
-    case "MAC-13":
-      if (input.liveChecks?.llmsTxtPresent === undefined) return { passed: null, detail: "Requires live URL check" };
-      return { passed: input.liveChecks.llmsTxtPresent, detail: `llms.txt=${input.liveChecks.llmsTxtPresent}` };
     case "MIC-01": {
       const n = $("h1").length;
       return { passed: n === 1, detail: `${n} h1 tags` };
