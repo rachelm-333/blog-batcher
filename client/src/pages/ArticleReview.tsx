@@ -1000,10 +1000,16 @@ export default function ArticleReview() {
 
   // SEO fields are always editable regardless of publish status
   const seoFieldsLocked = false;
-  const canRegenerate = !!selectedItem?.id &&
-    selectedItem?.status !== "approved" &&
-    selectedItem?.status !== "scheduled" &&
-    selectedItem?.status !== "published";
+  // Regenerate is available whenever the article isn't a finished, scored post —
+  // OR when it has no real content/score yet (e.g. blanked by a failed publish
+  // attempt but marked "approved"). internalScore == null means never successfully
+  // generated, so it must always be regeneratable.
+  const canRegenerate = !!selectedItem?.id && (
+    (selectedItem?.status !== "approved" &&
+     selectedItem?.status !== "scheduled" &&
+     selectedItem?.status !== "published")
+    || selectedItem?.internalScore == null
+  );
 
   // Guard: the loaded SEO fields must belong to the selected article. Prevents a
   // race where switching articles quickly saves the previous article's SEO values
@@ -2146,35 +2152,28 @@ export default function ArticleReview() {
 
               {/* Dual checkpoint badges */}
               {(() => {
-                // Always use the DB-stored internalScore (same source as the sidebar card).
-                // internalScore is 0-100; convert to a /16 display value.
-                const dbScore = selectedItem.internalScore != null ? Math.round((selectedItem.internalScore / 100) * 16) : null;
-                if (dbScore == null) return null;
-                const liveScore = dbScore;
+                // 27-point audit score (stored /100), shown as the 3-tier rating.
+                const s = selectedItem.internalScore;
+                if (s == null) return null;
+                const liveScore = s; // /100
 
-                // Failing checks: use stored pass1Details from the DB (handles both legacy boolean-map and new {points,metrics} format)
+                // Failing checks: stored pass1Details (supplementary structure notes)
                 const storedDetails = extractPass1Points((selectedItem as any).pass1Details);
                 const storedMetrics = extractPass1Metrics((selectedItem as any).pass1Details);
                 const failingKeys = storedDetails
                   ? (Object.keys(storedDetails) as string[]).filter(k => !storedDetails[k] && k !== "p13_schema")
                   : [];
 
-                const cp1Color = liveScore >= 15
-                  ? { bg: "bg-secondary border-border", text: "text-foreground" }
-                  : liveScore >= 13
+                const cp1Color = s >= 70
                   ? { bg: "bg-secondary border-border", text: "text-foreground" }
                   : { bg: "bg-secondary border-border", text: "text-[#C98A2B]" };
 
-                // Status label for the top of the Quality Checkpoints section
-                const statusLabel = liveScore >= 16
-                  ? { emoji: "✨", label: "Perfect Score — 16/16", sub: "All 16 SEO checks passed. Publish with confidence.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
-                  : liveScore >= 15
-                  ? { emoji: "✅", label: "Authority Ready — 15/16", sub: "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
-                  : liveScore >= 14
-                  ? { emoji: "✅", label: "Ready to Publish — 14/16", sub: "SEO optimised and ready to publish. Over-editing can reduce the human quality Google rewards.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
-                  : liveScore >= 13
-                  ? { emoji: "⚡", label: `Strong — ${liveScore}/16`, sub: "Good SEO structure. A few optional improvements available.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
-                  : { emoji: "⚠️", label: `Needs Review — ${liveScore}/16`, sub: "Below the 13-point threshold. Review the items below before publishing.", cls: "bg-secondary border-border text-[#C98A2B]", sub_cls: "text-[#C98A2B]" };
+                // Status label — 3-tier rating on the 27-point audit /100
+                const statusLabel = s >= 85
+                  ? { emoji: "🏆", label: `Superb — ${s}/100`, sub: "Excellent — SEO/GEO optimised and ready to publish.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
+                  : s >= 70
+                  ? { emoji: "✅", label: `Great — ${s}/100`, sub: "Meets the quality bar and is ready to publish.", cls: "bg-secondary border-border text-foreground", sub_cls: "text-foreground" }
+                  : { emoji: "⚠️", label: `Needs Work — ${s}/100`, sub: "Below the 70 quality floor — regenerate before publishing.", cls: "bg-secondary border-border text-[#C98A2B]", sub_cls: "text-[#C98A2B]" };
 
                 return (
                   <div className="space-y-2 mt-1">
@@ -2193,9 +2192,9 @@ export default function ArticleReview() {
                     <div className="flex gap-2">
                       {/* Checkpoint 1 — SEO Structure */}
                       <div className={`flex-1 rounded-lg border p-2 text-center ${cp1Color.bg}`}>
-                        <div className={`text-base font-bold ${cp1Color.text}`}>{liveScore}/16</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">SEO Structure</div>
-                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">Checkpoint 1</div>
+                        <div className={`text-base font-bold ${cp1Color.text}`}>{s >= 85 ? "Superb" : s >= 70 ? "Great" : "Needs Work"}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">SEO/GEO score · {s}/100</div>
+                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">27-point audit</div>
                       </div>
                       {/* Checkpoint 2 — Writing Quality (label only, no score number) */}
                       <div className={`flex-1 rounded-lg border p-2 text-center ${
@@ -2231,42 +2230,21 @@ export default function ArticleReview() {
                       </div>
                     </div>
 
-                    {/* Failing checklist breakdown — shown whenever score < 16 (even Authority Ready 15/16 shows the 1 missed point) */}
-                    {liveScore < 16 && failingKeys.length > 0 && (
-                      <div className={`rounded-lg border p-2.5 ${
-                        liveScore >= 15
-                          ? "bg-secondary border-border"
-                          : liveScore >= 13
-                          ? "bg-secondary border-border"
-                          : "bg-secondary border-border"
-                      }`}>
-                        <div className={`text-[10px] font-semibold mb-1.5 ${
-                          liveScore >= 15 ? "text-foreground" : liveScore >= 13 ? "text-foreground" : "text-[#C98A2B]"
-                        }`}>
-                          {liveScore >= 15 ? `Missed point${failingKeys.length > 1 ? 's' : ''} (optional to fix):` : liveScore >= 13 ? "Optional improvements:" : "Points to fix:"}
-                        </div>
+                    {/* Structure notes — only surfaced when the post is below the 70 floor */}
+                    {liveScore < 70 && failingKeys.length > 0 && (
+                      <div className="rounded-lg border p-2.5 bg-secondary border-border">
+                        <div className="text-[10px] font-semibold mb-1.5 text-[#C98A2B]">Points to fix:</div>
                         <div className="flex flex-col gap-1">
                           {failingKeys.map(k => (
                             <div key={k} className="flex items-start gap-1.5">
-                              <span className={`mt-0.5 shrink-0 text-[10px] ${
-                                liveScore >= 15 ? "text-foreground" : liveScore >= 13 ? "text-foreground/70" : "text-[#C98A2B]"
-                              }`}>{liveScore >= 13 ? "◦" : "✗"}</span>
-                              <span className={`text-[10px] leading-tight ${
-                                liveScore >= 15 ? "text-foreground" : liveScore >= 13 ? "text-muted-foreground" : "text-[#C98A2B]"
-                              }`}>
+                              <span className="mt-0.5 shrink-0 text-[10px] text-[#C98A2B]">✗</span>
+                              <span className="text-[10px] leading-tight text-[#C98A2B]">
                                 {k === "p1_keyword_density"
                                   ? getKeywordDensityLabel(storedMetrics, selectedItem.level)
                                   : (PASS1_CHECK_LABELS[k as keyof Pass1Checks] ?? k)}
                               </span>
                             </div>
                           ))}
-                          {/* Schema markup — always shown as last item: a point gained automatically on publish */}
-                          <div className="flex items-start gap-1.5">
-                            <span className="mt-0.5 shrink-0 text-[10px] text-foreground">✓</span>
-                            <span className="text-[10px] leading-tight text-foreground">
-                              Schema markup — added automatically on publish (+1 point)
-                            </span>
-                          </div>
                         </div>
                       </div>
                     )}
