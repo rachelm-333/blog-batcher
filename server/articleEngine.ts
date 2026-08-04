@@ -3057,6 +3057,22 @@ ${bodyHtml}`;
       audit = runAudit();
       console.log(`[ArticleEngine] Node ${nodeId} after improvement round ${improvementRounds}: ${audit.normalized_score}/100`);
     }
+
+    // FINAL LINK SAFETY — the improvement rounds / EAT-05 repair may have inserted
+    // new external links that were never live-checked. Re-verify every link now and
+    // strip any that is dead, so the published post only ever contains REAL, LIVE links.
+    const finalLinkCheck = await validateAndStripLinks(
+      bodyHtml,
+      ctx.linkAllowlist,
+      [ctx.websiteUrl ?? "", ctx.ctaUrl].filter(Boolean),
+    );
+    if (finalLinkCheck.strippedCount > 0) {
+      console.warn(`[ArticleEngine] Final link check stripped ${finalLinkCheck.strippedCount} dead/invalid link(s) for node ${nodeId}: ${finalLinkCheck.strippedUrls.join(", ")}`);
+      bodyHtml = finalLinkCheck.html;
+      wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+      audit = runAudit(); // re-score so the rating reflects the final, link-verified body
+    }
+
     const auditScore = audit.normalized_score;
     const belowFloor = auditScore < MIN_DELIVERY_SCORE;
 

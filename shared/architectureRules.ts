@@ -22,7 +22,7 @@ export type PackSize = (typeof PACK_SIZES)[number];
  */
 export const CLUSTERS_PER_PILLAR = 5;
 /** Alias for backward compatibility */
-export const DEFAULT_CLUSTERS_PER_PILLAR = CLUSTERS_PER_PILLAR;
+export const DEFAULT_CLUSTERS_PER_PILLAR = 3; // default to the leanest focused hub (1 pillar + 3 clusters)
 export const MIN_CLUSTERS_PER_PILLAR = 3;
 export const MAX_CLUSTERS_PER_PILLAR = 5;
 /** Max total articles (flat 2-tier: 6 pillars × 5 clusters + 6 = 36). */
