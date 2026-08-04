@@ -213,7 +213,7 @@ function UsersTab() {
                     {u.isSuspended ? (
                       <Badge variant="destructive">Suspended</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-emerald-400 border-emerald-500/50">Active</Badge>
+                      <Badge variant="outline" className="text-foreground border-border">Active</Badge>
                     )}
                   </TableCell>
                   <TableCell>
@@ -243,7 +243,7 @@ function UsersTab() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-emerald-400 border-emerald-500/50"
+                        className="text-foreground border-border"
                         onClick={() => {
                           setCreditDialog({ userId: u.id, userName: u.name ?? u.email ?? "User", currentBalance: u.creditBalance, mode: "add" });
                           setCreditAmount("10");
@@ -256,7 +256,7 @@ function UsersTab() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-amber-400 border-amber-500/50"
+                        className="text-[#C98A2B] border-border"
                         onClick={() => {
                           setCreditDialog({ userId: u.id, userName: u.name ?? u.email ?? "User", currentBalance: u.creditBalance, mode: "remove" });
                           setCreditAmount("10");
@@ -338,7 +338,7 @@ function UsersTab() {
             <Button
               onClick={handleCreditSubmit}
               disabled={addCreditsMutation.isPending || removeCreditsMutation.isPending}
-              className={creditDialog?.mode === "remove" ? "bg-amber-500 hover:bg-amber-600" : ""}
+              className={creditDialog?.mode === "remove" ? "bg-foreground hover:bg-foreground/90 text-background" : ""}
             >
               {creditDialog?.mode === "add" ? "Add Credits" : "Remove Credits"}
             </Button>
@@ -353,9 +353,9 @@ function UsersTab() {
             <DialogTitle>Impersonate User</DialogTitle>
           </DialogHeader>
           <div className="py-2 space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md">
-              <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
-              <div className="text-sm text-amber-300">
+              <div className="flex items-start gap-3 p-3 bg-secondary border border-border rounded-md">
+              <AlertTriangle className="h-5 w-5 text-[#C98A2B] mt-0.5 shrink-0" />
+              <div className="text-sm text-[#C98A2B]">
                 <p className="font-medium">You are about to impersonate <strong>{impersonateDialog?.userName}</strong>.</p>
                 <p className="mt-1">A banner will be shown at the top of every page while impersonation is active. Your session will be replaced for up to 2 hours.</p>
               </div>
@@ -366,7 +366,7 @@ function UsersTab() {
             <Button
               onClick={() => impersonateDialog && startImpersonationMutation.mutate({ targetUserId: impersonateDialog.userId })}
               disabled={startImpersonationMutation.isPending}
-              className="bg-amber-600 hover:bg-amber-700"
+              className="bg-foreground hover:bg-foreground/90 text-background"
             >
               <Eye className="h-4 w-4 mr-2" /> Start Impersonation
             </Button>
@@ -487,7 +487,7 @@ function RevenueTab() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Payments</CardTitle></CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-emerald-400">${data?.totalPaymentsUsd.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-foreground">${data?.totalPaymentsUsd.toFixed(2)}</div>
                 <div className="text-xs text-muted-foreground">{data?.paymentCount} transactions</div>
               </CardContent>
             </Card>
@@ -508,7 +508,7 @@ function RevenueTab() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Admin Grants</CardTitle></CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-amber-600">{data?.adminCreditGrants}</div>
+                <div className="text-2xl font-bold text-[#C98A2B]">{data?.adminCreditGrants}</div>
                 <div className="text-xs text-muted-foreground">credits granted manually</div>
               </CardContent>
             </Card>
@@ -626,7 +626,7 @@ function ErrorLogTab() {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     <div className="flex flex-col items-center gap-2">
-                      <CheckCircle className="h-8 w-8 text-emerald-400" />
+                      <CheckCircle className="h-8 w-8 text-foreground" />
                       <span>No errors logged — all systems healthy</span>
                     </div>
                   </TableCell>
@@ -941,7 +941,7 @@ function ImpersonationBanner({ adminUserId }: { adminUserId: number }) {
   });
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-primary text-primary-foreground px-4 py-2 flex items-center justify-between shadow-lg">
       <div className="flex items-center gap-2 text-sm font-medium">
         <Eye className="h-4 w-4" />
         <span>⚠️ IMPERSONATION ACTIVE — You are viewing the app as another user. Admin ID: #{adminUserId}</span>
@@ -949,7 +949,7 @@ function ImpersonationBanner({ adminUserId }: { adminUserId: number }) {
       <Button
         size="sm"
         variant="outline"
-        className="bg-amber-950 text-amber-50 border-amber-950 hover:bg-amber-900 h-7 text-xs"
+        className="bg-foreground text-background border-foreground hover:bg-foreground/90 h-7 text-xs"
         onClick={() => stopMutation.mutate()}
         disabled={stopMutation.isPending}
       >

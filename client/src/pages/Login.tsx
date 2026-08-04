@@ -151,7 +151,7 @@ function ResendVerificationLink({ email }: { email: string }) {
     onSuccess: () => setSent(true),
   });
 
-  if (sent) return <span className="text-emerald-600 font-medium text-sm">Verification email sent!</span>;
+  if (sent) return <span className="text-foreground font-medium text-sm">Verification email sent!</span>;
 
   return (
     <button

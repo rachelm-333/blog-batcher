@@ -32,18 +32,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading) return <DashboardLayoutSkeleton />;
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#faf9f5" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#F4F1E8" }}>
         <div className="flex flex-col items-center gap-6 p-8 max-w-sm w-full text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-2"
-            style={{ background: "#ede9ff", border: "1px solid #c4b5fd" }}>
-            <Shield className="w-8 h-8" style={{ color: "#6e5afe" }} />
+            style={{ background: "#EFEBDF", border: "1px solid rgba(14,14,12,0.16)" }}>
+            <Shield className="w-8 h-8" style={{ color: "#0E0E0C" }} />
           </div>
-          <h1 className="text-2xl font-bold" style={{ color: "#1a1a2e" }}>Sign in to continue</h1>
-          <p className="text-sm" style={{ color: "#6b7280" }}>Access to this dashboard requires authentication.</p>
+          <h1 className="text-2xl font-bold" style={{ color: "#0E0E0C" }}>Sign in to continue</h1>
+          <p className="text-sm" style={{ color: "#5A5A52" }}>Access to this dashboard requires authentication.</p>
           <button
             onClick={() => { window.location.href = getLoginUrl(); }}
             className="w-full py-3 px-6 rounded-lg font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98]"
-            style={{ background: "#6e5afe" }}
+            style={{ background: "#0E0E0C" }}
           >
             Sign in with Manus
           </button>
@@ -132,36 +132,36 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   /* ── Sidebar ── */
   function SidebarContent() {
     return (
-      <div className="flex flex-col h-full" style={{ background: "#ffffff", borderRight: "1px solid #e5e7eb", width: "200px" }}>
+      <div className="flex flex-col h-full" style={{ background: "#FBFAF4", borderRight: "1px solid rgba(14,14,12,0.08)", width: "200px" }}>
         {/* Logo */}
-        <div className="flex items-center gap-2 px-4 py-4 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
+        <div className="flex items-center gap-2 px-4 py-4 flex-shrink-0" style={{ borderBottom: "1px solid rgba(14,14,12,0.08)" }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: "#6e5afe" }}>
+            style={{ background: "#0E0E0C" }}>
             <span className="text-white font-bold text-xs">B</span>
           </div>
-          <span className="font-bold text-sm" style={{ color: "#1a1a2e" }}>BlogBatcher</span>
+          <span className="font-bold text-sm" style={{ color: "#0E0E0C" }}>BlogBatcher</span>
         </div>
 
         {/* Business switcher */}
-        <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
+        <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: "1px solid rgba(14,14,12,0.08)" }}>
           <div className="relative" ref={bizDropRef}>
             <button
               onClick={() => setBizDropOpen(v => !v)}
               className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-left transition-colors"
-              style={{ background: bizDropOpen ? "#ede9ff" : "#f5f3ec", border: "1px solid #e5e7eb" }}
+              style={{ background: bizDropOpen ? "#EFEBDF" : "#EFEBDF", border: "1px solid rgba(14,14,12,0.08)" }}
             >
               <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                style={{ background: "#6e5afe" }}>
+                style={{ background: "#0E0E0C" }}>
                 <span className="text-white font-bold" style={{ fontSize: "9px" }}>B</span>
               </div>
-              <span className="flex-1 truncate text-xs font-semibold" style={{ color: "#1a1a2e" }}>
+              <span className="flex-1 truncate text-xs font-semibold" style={{ color: "#0E0E0C" }}>
                 {activeBiz?.name ?? "Select business"}
               </span>
-              <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: "#9ca3af", transform: bizDropOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
+              <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: "#8E8E84", transform: bizDropOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
             </button>
             {bizDropOpen && (
               <div className="absolute left-0 right-0 top-full mt-1 rounded-lg shadow-lg z-50 overflow-hidden"
-                style={{ background: "#fff", border: "1px solid #e5e7eb" }}>
+                style={{ background: "#FBFAF4", border: "1px solid rgba(14,14,12,0.08)" }}>
                 {businesses?.map(biz => (
                   <button
                     key={biz.id}
@@ -171,22 +171,22 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                     style={{
-                      background: biz.id === activeBiz?.id ? "#ede9ff" : "transparent",
-                      color: biz.id === activeBiz?.id ? "#6e5afe" : "#374151",
+                      background: biz.id === activeBiz?.id ? "#EFEBDF" : "transparent",
+                      color: biz.id === activeBiz?.id ? "#0E0E0C" : "#2C2C28",
                       fontSize: "12px",
                       fontWeight: biz.id === activeBiz?.id ? 600 : 400,
                     }}
-                    onMouseEnter={e => { if (biz.id !== activeBiz?.id) (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec"; }}
+                    onMouseEnter={e => { if (biz.id !== activeBiz?.id) (e.currentTarget as HTMLButtonElement).style.background = "#EFEBDF"; }}
                     onMouseLeave={e => { if (biz.id !== activeBiz?.id) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
                   >
                     <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
-                      style={{ background: biz.id === activeBiz?.id ? "#6e5afe" : "#e5e7eb" }}>
-                      <span style={{ fontSize: "8px", color: biz.id === activeBiz?.id ? "#fff" : "#9ca3af", fontWeight: 700 }}>
+                      style={{ background: biz.id === activeBiz?.id ? "#0E0E0C" : "rgba(14,14,12,0.08)" }}>
+                      <span style={{ fontSize: "8px", color: biz.id === activeBiz?.id ? "#FBFAF4" : "#8E8E84", fontWeight: 700 }}>
                         {biz.name?.charAt(0).toUpperCase() ?? "B"}
                       </span>
                     </div>
                     <span className="flex-1 truncate">{biz.name}</span>
-                    {biz.id === activeBiz?.id && <span style={{ fontSize: 10, color: "#6e5afe" }}>✓</span>}
+                    {biz.id === activeBiz?.id && <span style={{ fontSize: 10, color: "#0E0E0C" }}>✓</span>}
                     {biz.id !== activeBiz?.id && (
                       <button
                         onClick={e => {
@@ -199,8 +199,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                           });
                         }}
                         title="Delete this business"
-                        style={{ color: deletingBizId === biz.id ? "#9ca3af" : "#ef4444", padding: "2px", borderRadius: "3px", lineHeight: 1 }}
-                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "#fee2e2"}
+                        style={{ color: deletingBizId === biz.id ? "#8E8E84" : "#D24A2A", padding: "2px", borderRadius: "3px", lineHeight: 1 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "#EFEBDF"}
                         onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}
                       >
                         <span style={{ fontSize: 11 }}>{deletingBizId === biz.id ? "…" : "✕"}</span>
@@ -208,12 +208,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     )}
                   </button>
                 ))}
-                <div style={{ borderTop: "1px solid #e5e7eb" }}>
+                <div style={{ borderTop: "1px solid rgba(14,14,12,0.08)" }}>
                   <button
                     onClick={() => { setBizDropOpen(false); setLocation("/onboarding?new=1"); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
-                    style={{ color: "#6e5afe", fontSize: "12px", fontWeight: 600 }}
-                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec"}
+                    style={{ color: "#0E0E0C", fontSize: "12px", fontWeight: 600 }}
+                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "#EFEBDF"}
                     onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -227,10 +227,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
         {/* Batch indicator + switcher */}
         {activeBiz && (
-          <div className="px-3 py-1.5 flex-shrink-0" style={{ borderBottom: "1px solid #e5e7eb" }}>
+          <div className="px-3 py-1.5 flex-shrink-0" style={{ borderBottom: "1px solid rgba(14,14,12,0.08)" }}>
             <div
               className="flex items-center justify-between px-2 py-1 rounded-md gap-2"
-              style={{ background: isBatchComplete ? "#dcfce7" : "#f5f3ec" }}
+              style={{ background: isBatchComplete ? "#EFEBDF" : "#EFEBDF" }}
             >
               {(batchInfo?.maxBatch ?? 1) > 1 ? (
                 <select
@@ -243,7 +243,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     }
                   }}
                   className="text-xs font-semibold bg-transparent cursor-pointer outline-none"
-                  style={{ color: isBatchComplete ? "#16a34a" : "#6b7280" }}
+                  style={{ color: isBatchComplete ? "#0E0E0C" : "#5A5A52" }}
                   title="Switch batch"
                 >
                   {Array.from({ length: batchInfo?.maxBatch ?? 1 }, (_, i) => i + 1).map((n) => (
@@ -251,16 +251,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   ))}
                 </select>
               ) : (
-                <span className="text-xs font-semibold" style={{ color: isBatchComplete ? "#16a34a" : "#6b7280" }}>
+                <span className="text-xs font-semibold" style={{ color: isBatchComplete ? "#0E0E0C" : "#5A5A52" }}>
                   Batch {activeBatch}
                 </span>
               )}
               {setActiveBatchMutation.isPending ? (
-                <span className="text-xs" style={{ color: "#9ca3af" }}>Switching…</span>
+                <span className="text-xs" style={{ color: "#8E8E84" }}>Switching…</span>
               ) : isBatchComplete ? (
-                <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ background: "#bbf7d0", color: "#15803d" }}>Complete ✓</span>
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ background: "#D9F542", color: "#0E0E0C" }}>Complete ✓</span>
               ) : (
-                <span className="text-xs" style={{ color: "#9ca3af" }}>In progress</span>
+                <span className="text-xs" style={{ color: "#8E8E84" }}>In progress</span>
               )}
             </div>
           </div>
@@ -268,7 +268,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         {/* Scrollable nav */}
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {/* WORKFLOW */}
-          <div className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: "#9ca3af" }}>
+          <div className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: "#8E8E84" }}>
             Workflow
           </div>
           {WORKFLOW_ITEMS.map(item => {
@@ -289,14 +289,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 }}
                 className="w-full flex items-center gap-2 px-2 py-2 rounded-md mb-0.5 text-left transition-colors"
                 style={{
-                  background: active ? "#ede9ff" : "transparent",
-                  color: active ? "#6e5afe" : stageLocked ? "#d1d5db" : "#4b5563",
+                  background: active ? "#EFEBDF" : "transparent",
+                  color: active ? "#0E0E0C" : stageLocked ? "#C9C7BD" : "#2C2C28",
                   cursor: stageLocked ? "default" : "pointer",
                   fontWeight: active ? 600 : 400,
                   fontSize: "13px",
                 }}
                 onMouseEnter={e => {
-                  if (!active && !stageLocked) (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec";
+                  if (!active && !stageLocked) (e.currentTarget as HTMLButtonElement).style.background = "#EFEBDF";
                 }}
                 onMouseLeave={e => {
                   if (!active) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
@@ -305,9 +305,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 {/* Stage dot */}
                 <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                   style={{
-                    background: stageComplete ? "#22c55e" : active ? "#6e5afe" : stageLocked ? "#f3f4f6" : "#f3f4f6",
-                    color: stageComplete ? "#fff" : active ? "#fff" : "#9ca3af",
-                    border: stageLocked ? "1.5px solid #e5e7eb" : "none",
+                    background: stageComplete ? "#D9F542" : active ? "#0E0E0C" : stageLocked ? "#EFEBDF" : "#EFEBDF",
+                    color: stageComplete ? "#FBFAF4" : active ? "#FBFAF4" : "#8E8E84",
+                    border: stageLocked ? "1.5px solid rgba(14,14,12,0.08)" : "none",
                   }}>
                   {stageComplete ? "✓" : item.num}
                 </div>
@@ -317,7 +317,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           })}
 
           {/* MANAGE */}
-          <div className="text-xs font-semibold uppercase tracking-widest mt-4 mb-2 px-1" style={{ color: "#9ca3af" }}>
+          <div className="text-xs font-semibold uppercase tracking-widest mt-4 mb-2 px-1" style={{ color: "#8E8E84" }}>
             Manage
           </div>
           {MANAGE_ITEMS.map(item => {
@@ -329,13 +329,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 onClick={() => setLocation(item.path)}
                 className="w-full flex items-center gap-2 px-2 py-2 rounded-md mb-0.5 text-left transition-colors"
                 style={{
-                  background: active ? "#ede9ff" : "transparent",
-                  color: active ? "#6e5afe" : "#4b5563",
+                  background: active ? "#EFEBDF" : "transparent",
+                  color: active ? "#0E0E0C" : "#2C2C28",
                   fontWeight: active ? 600 : 400,
                   fontSize: "13px",
                 }}
                 onMouseEnter={e => {
-                  if (!active) (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec";
+                  if (!active) (e.currentTarget as HTMLButtonElement).style.background = "#EFEBDF";
                 }}
                 onMouseLeave={e => {
                   if (!active) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
@@ -352,13 +352,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             onClick={() => setLocation("/support")}
             className="w-full flex items-center gap-2 px-2 py-2 rounded-md mb-0.5 text-left transition-colors"
             style={{
-              background: isActive("/support") ? "#ede9ff" : "transparent",
-              color: isActive("/support") ? "#6e5afe" : "#4b5563",
+              background: isActive("/support") ? "#EFEBDF" : "transparent",
+              color: isActive("/support") ? "#0E0E0C" : "#2C2C28",
               fontWeight: isActive("/support") ? 600 : 400,
               fontSize: "13px",
             }}
             onMouseEnter={e => {
-              if (!isActive("/support")) (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec";
+              if (!isActive("/support")) (e.currentTarget as HTMLButtonElement).style.background = "#EFEBDF";
             }}
             onMouseLeave={e => {
               if (!isActive("/support")) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
@@ -374,13 +374,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               onClick={() => setLocation("/admin")}
               className="w-full flex items-center gap-2 px-2 py-2 rounded-md mb-0.5 text-left transition-colors"
               style={{
-                background: isActive("/admin") ? "#ede9ff" : "transparent",
-                color: isActive("/admin") ? "#6e5afe" : "#4b5563",
+                background: isActive("/admin") ? "#EFEBDF" : "transparent",
+                color: isActive("/admin") ? "#0E0E0C" : "#2C2C28",
                 fontWeight: isActive("/admin") ? 600 : 400,
                 fontSize: "13px",
               }}
               onMouseEnter={e => {
-                if (!isActive("/admin")) (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ec";
+                if (!isActive("/admin")) (e.currentTarget as HTMLButtonElement).style.background = "#EFEBDF";
               }}
               onMouseLeave={e => {
                 if (!isActive("/admin")) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
@@ -393,14 +393,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Bottom: Credits + User */}
-        <div className="flex-shrink-0 px-3 py-3" style={{ borderTop: "1px solid #e5e7eb" }}>
+        <div className="flex-shrink-0 px-3 py-3" style={{ borderTop: "1px solid rgba(14,14,12,0.08)" }}>
           {/* Credits */}
-          <div className="rounded-lg p-3 mb-3" style={{ background: "#f5f3ec", border: "1px solid #e5e7eb" }}>
-            <div className="text-xs font-medium" style={{ color: "#9ca3af" }}>Authority pack</div>
-            <div className="text-sm font-bold mt-0.5" style={{ color: "#1a1a2e" }}>
-              {credits} <span className="font-normal text-xs" style={{ color: "#9ca3af" }}>credits</span>
+          <div className="rounded-lg p-3 mb-3" style={{ background: "#EFEBDF", border: "1px solid rgba(14,14,12,0.08)" }}>
+            <div className="text-xs font-medium" style={{ color: "#8E8E84" }}>Authority pack</div>
+            <div className="text-sm font-bold mt-0.5" style={{ color: "#0E0E0C" }}>
+              {credits} <span className="font-normal text-xs" style={{ color: "#8E8E84" }}>credits</span>
             </div>
-            <div className="text-[10px] mt-0.5" style={{ color: "#9ca3af" }}>
+            <div className="text-[10px] mt-0.5" style={{ color: "#8E8E84" }}>
               Shared across all your businesses
             </div>
             <button
@@ -413,14 +413,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           {/* User row */}
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-              style={{ background: "#6e5afe", color: "white" }}>
+              style={{ background: "#0E0E0C", color: "#F4F1E8" }}>
               {user?.name?.charAt(0).toUpperCase() ?? "?"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium truncate" style={{ color: "#1a1a2e" }}>{user?.name ?? "User"}</div>
+              <div className="text-xs font-medium truncate" style={{ color: "#0E0E0C" }}>{user?.name ?? "User"}</div>
             </div>
             <button onClick={logout} className="p-1 rounded transition-colors hover:bg-gray-100" title="Sign out">
-              <LogOut className="w-3.5 h-3.5" style={{ color: "#9ca3af" }} />
+              <LogOut className="w-3.5 h-3.5" style={{ color: "#8E8E84" }} />
             </button>
           </div>
         </div>
@@ -431,7 +431,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <ImpersonationBanner />
-      <div className="flex h-screen overflow-hidden" style={{ background: "#faf9f5" }}>
+      <div className="flex h-screen overflow-hidden" style={{ background: "#F4F1E8" }}>
         {/* Desktop sidebar */}
         <div className="hidden md:flex flex-shrink-0 flex-col h-full">
           <SidebarContent />
@@ -451,53 +451,53 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* ProDesk Top bar */}
           <div className="flex items-center justify-between px-4 h-12 flex-shrink-0"
-            style={{ background: "#ffffff", borderBottom: "1px solid #e5e7eb" }}>
+            style={{ background: "#FBFAF4", borderBottom: "1px solid rgba(14,14,12,0.08)" }}>
             <div className="flex items-center gap-3">
               {/* Mobile hamburger */}
               <button className="md:hidden p-1.5 rounded" onClick={() => setMobileOpen(v => !v)}>
                 {mobileOpen
-                  ? <X className="w-4 h-4" style={{ color: "#6b7280" }} />
-                  : <Menu className="w-4 h-4" style={{ color: "#6b7280" }} />
+                  ? <X className="w-4 h-4" style={{ color: "#5A5A52" }} />
+                  : <Menu className="w-4 h-4" style={{ color: "#5A5A52" }} />
                 }
               </button>
               {/* ProDesk wordmark */}
               <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "#6e5afe" }}>
+                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "#0E0E0C" }}>
                   <span className="text-white font-bold" style={{ fontSize: "9px" }}>P</span>
                 </div>
-                <span className="font-bold text-sm" style={{ color: "#1a1a2e" }}>ProDesk</span>
+                <span className="font-bold text-sm" style={{ color: "#0E0E0C" }}>ProDesk</span>
               </div>
-              <span className="text-xs hidden sm:inline" style={{ color: "#d1d5db" }}>·</span>
-              <span className="text-xs font-semibold uppercase tracking-wide hidden sm:inline" style={{ color: "#9ca3af" }}>
-                Suite / <span style={{ color: "#1a1a2e" }}>Blog Batcher</span>
+              <span className="text-xs hidden sm:inline" style={{ color: "#C9C7BD" }}>·</span>
+              <span className="text-xs font-semibold uppercase tracking-wide hidden sm:inline" style={{ color: "#8E8E84" }}>
+                Suite / <span style={{ color: "#0E0E0C" }}>Blog Batcher</span>
               </span>
             </div>
 
             {/* Search */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg flex-1 max-w-xs mx-4"
-              style={{ background: "#f5f3ec", border: "1px solid #e5e7eb" }}>
-              <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#9ca3af" }} />
+              style={{ background: "#EFEBDF", border: "1px solid rgba(14,14,12,0.08)" }}>
+              <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#8E8E84" }} />
               <input
                 type="text"
                 placeholder="Search articles, keywords…"
                 className="bg-transparent text-xs outline-none flex-1"
-                style={{ color: "#4b5563" }}
+                style={{ color: "#2C2C28" }}
               />
-              <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "#e5e7eb", color: "#9ca3af" }}>⌘K</span>
+              <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(14,14,12,0.08)", color: "#8E8E84" }}>⌘K</span>
             </div>
 
             {/* Right: All Apps + Avatar */}
             <div className="flex items-center gap-2">
               <button className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                style={{ background: "#f5f3ec", border: "1px solid #e5e7eb", color: "#4b5563" }}
-                onMouseEnter={e => (e.currentTarget.style.background = "#ede9de")}
-                onMouseLeave={e => (e.currentTarget.style.background = "#f5f3ec")}
+                style={{ background: "#EFEBDF", border: "1px solid rgba(14,14,12,0.08)", color: "#2C2C28" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#EFEBDF")}
+                onMouseLeave={e => (e.currentTarget.style.background = "#EFEBDF")}
               >
                 <Grid3X3 className="w-3.5 h-3.5" />
                 ALL APPS
               </button>
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                style={{ background: "#6e5afe", color: "white" }}>
+                style={{ background: "#0E0E0C", color: "#F4F1E8" }}>
                 {user?.name?.slice(0, 2).toUpperCase() ?? "MR"}
               </div>
             </div>

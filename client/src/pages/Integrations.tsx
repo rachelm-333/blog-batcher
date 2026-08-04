@@ -473,10 +473,10 @@ const CMS_PLATFORMS: CMSPlatform[] = [
 
 function ZapierSupportBadge({ level }: { level: CMSPlatform["zapierSupport"] }) {
   if (level === "excellent") {
-    return <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Excellent Zapier support</span>;
+    return <span className="text-xs font-medium text-foreground ">Excellent Zapier support</span>;
   }
   if (level === "good") {
-    return <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Good Zapier support</span>;
+    return <span className="text-xs font-medium text-foreground ">Good Zapier support</span>;
   }
   return <span className="text-xs font-medium text-muted-foreground">Coming soon</span>;
 }
@@ -491,7 +491,7 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
   }
   if (status === "connected") {
     return (
-      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs gap-1">
+      <Badge className="bg-secondary text-foreground border-border text-xs gap-1">
         <CheckCircle2 className="w-3 h-3" /> Connected
       </Badge>
     );
@@ -621,7 +621,7 @@ function SetupModal({
           >
             <Zap className="w-3.5 h-3.5 inline mr-1.5" />
             Via Zapier or Make
-            <Badge className="ml-2 text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">Recommended</Badge>
+            <Badge className="ml-2 text-xs bg-secondary text-foreground border-border">Recommended</Badge>
           </button>
           {platform.hasDirectApi && (
             <button
@@ -842,7 +842,7 @@ function PlatformCard({
 
   return (
     <>
-      <Card className={`flex flex-col transition-all hover:shadow-md ${isConnected ? "border-emerald-500/40" : ""}`}>
+      <Card className={`flex flex-col transition-all hover:shadow-md ${isConnected ? "border-border" : ""}`}>
         <CardContent className="pt-5 pb-4 flex flex-col gap-3 flex-1">
           {/* Header row */}
           <div className="flex items-start justify-between gap-2">
@@ -966,8 +966,8 @@ export default function IntegrationsPage() {
         <Card className="bg-muted/30">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-purple-500/15 flex items-center justify-center shrink-0">
-                <span className="text-purple-600 dark:text-purple-400 text-xs font-bold">M</span>
+              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                <span className="text-foreground text-xs font-bold">M</span>
               </div>
               <div className="text-sm">
                 <p className="font-semibold">Prefer Make (formerly Integromat)?</p>

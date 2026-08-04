@@ -59,14 +59,14 @@ export default function BatchComplete() {
         <div className="flex flex-col items-center text-center mb-10">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
-            style={{ background: "#dcfce7" }}
+            style={{ background: "#EFEBDF" }}
           >
-            <CheckCircle2 className="w-10 h-10" style={{ color: "#16a34a" }} />
+            <CheckCircle2 className="w-10 h-10" style={{ color: "#0E0E0C" }} />
           </div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: "#1a1a2e" }}>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: "#0E0E0C" }}>
             Batch {activeBatch} Complete
           </h1>
-          <p className="text-base" style={{ color: "#6b7280" }}>
+          <p className="text-base" style={{ color: "#5A5A52" }}>
             {publishedCount} of {totalArticles} article{totalArticles !== 1 ? "s" : ""} published or scheduled.
             Your previous batch is now locked and read-only.
           </p>
@@ -75,7 +75,7 @@ export default function BatchComplete() {
         {/* CTA */}
         <div
           className="rounded-xl p-6 mb-8 flex flex-col sm:flex-row items-center gap-4"
-          style={{ background: "#f5f3ff", border: "1.5px solid #c4b5fd" }}
+          style={{ background: "#f5f3ff", border: "1.5px solid rgba(14,14,12,0.16)" }}
         >
           <div className="flex-1 text-center sm:text-left">
             <p className="font-semibold text-base mb-1" style={{ color: "#4c1d95" }}>
@@ -90,7 +90,7 @@ export default function BatchComplete() {
             onClick={handleStartNewBatch}
             disabled={starting || startNewBatch.isPending}
             className="flex items-center gap-2 px-6 py-3 text-base font-semibold flex-shrink-0"
-            style={{ background: "#6e5afe", color: "#fff", minWidth: 200 }}
+            style={{ background: "#0E0E0C", color: "#F4F1E8", minWidth: 200 }}
           >
             {(starting || startNewBatch.isPending) ? (
               <>
@@ -109,26 +109,26 @@ export default function BatchComplete() {
         {/* Article list */}
         <div
           className="rounded-xl overflow-hidden"
-          style={{ border: "1px solid #e5e7eb" }}
+          style={{ border: "1px solid rgba(14,14,12,0.08)" }}
         >
           <div
             className="px-5 py-3 flex items-center justify-between"
-            style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}
+            style={{ background: "#EFEBDF", borderBottom: "1px solid rgba(14,14,12,0.08)" }}
           >
-            <span className="font-semibold text-sm" style={{ color: "#374151" }}>
+            <span className="font-semibold text-sm" style={{ color: "#2C2C28" }}>
               Published articles — Batch {activeBatch}
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "#dcfce7", color: "#16a34a" }}>
+            <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "#EFEBDF", color: "#0E0E0C" }}>
               {publishedCount} article{publishedCount !== 1 ? "s" : ""}
             </span>
           </div>
 
           {isLoading ? (
-            <div className="px-5 py-8 text-center text-sm" style={{ color: "#9ca3af" }}>
+            <div className="px-5 py-8 text-center text-sm" style={{ color: "#8E8E84" }}>
               Loading articles…
             </div>
           ) : publishedArticles.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm" style={{ color: "#9ca3af" }}>
+            <div className="px-5 py-8 text-center text-sm" style={{ color: "#8E8E84" }}>
               No published articles found in this batch.
             </div>
           ) : (
@@ -138,28 +138,28 @@ export default function BatchComplete() {
                   key={article.id}
                   className="px-5 py-3 flex items-center gap-3"
                   style={{
-                    borderBottom: i < publishedArticles.length - 1 ? "1px solid #f3f4f6" : "none",
+                    borderBottom: i < publishedArticles.length - 1 ? "1px solid #EFEBDF" : "none",
                   }}
                 >
-                  <FileText className="w-4 h-4 flex-shrink-0" style={{ color: "#9ca3af" }} />
+                  <FileText className="w-4 h-4 flex-shrink-0" style={{ color: "#8E8E84" }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "#1a1a2e" }}>
+                    <p className="text-sm font-medium truncate" style={{ color: "#0E0E0C" }}>
                       {article.title ?? article.focusKeyword ?? "Untitled"}
                     </p>
                     {article.urlSlug && (
-                      <p className="text-xs truncate" style={{ color: "#9ca3af" }}>
+                      <p className="text-xs truncate" style={{ color: "#8E8E84" }}>
                         /{article.urlSlug}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {article.status === "scheduled" ? (
-                      <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#eff6ff", color: "#2563eb" }}>
+                      <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#EFEBDF", color: "#2C2C28" }}>
                         <Calendar className="w-3 h-3" />
                         Scheduled
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#dcfce7", color: "#16a34a" }}>
+                      <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#EFEBDF", color: "#0E0E0C" }}>
                         <CheckCircle2 className="w-3 h-3" />
                         Published
                       </span>
@@ -172,7 +172,7 @@ export default function BatchComplete() {
         </div>
 
         {/* Footer note */}
-        <p className="text-center text-xs mt-6" style={{ color: "#9ca3af" }}>
+        <p className="text-center text-xs mt-6" style={{ color: "#8E8E84" }}>
           Batch {activeBatch} is locked. All articles are read-only and cannot be edited or regenerated.
           <br />
           Start a new batch to create fresh content for your blog.

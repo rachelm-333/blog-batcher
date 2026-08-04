@@ -36,8 +36,8 @@ export default function PaymentSuccess() {
             <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
           ) : (
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                <CheckCircle2 className="h-9 w-9 text-green-600" />
+              <div className="h-16 w-16 rounded-full bg-secondary flex items-center justify-center">
+                <CheckCircle2 className="h-9 w-9 text-foreground" />
               </div>
             </div>
           )}
@@ -70,7 +70,7 @@ export default function PaymentSuccess() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status</span>
-                <span className="font-medium text-green-600 capitalize">{data.status}</span>
+                <span className="font-medium text-foreground capitalize">{data.status}</span>
               </div>
             </div>
           )}

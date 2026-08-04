@@ -62,7 +62,7 @@ export default function Step7SocialProof({ businessId, initial, onNext, onBack }
           every article.
         </p>
         <div className="mt-3 flex gap-2 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-green-600" />
+          <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-foreground" />
           <span>
             Articles that include E-E-A-T signals consistently rank higher and are more likely to
             be cited by AI search engines like Perplexity and ChatGPT.

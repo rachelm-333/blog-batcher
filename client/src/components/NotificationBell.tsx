@@ -28,11 +28,11 @@ import { toast } from "sonner";
 function NotifIcon({ type }: { type: string }) {
   switch (type) {
     case "publish_success":
-      return <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />;
+      return <CheckCircle2 className="h-4 w-4 text-foreground shrink-0" />;
     case "publish_failed":
-      return <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0" />;
+      return <AlertCircle className="h-4 w-4 text-[#C98A2B] shrink-0" />;
     case "retry_failed":
-      return <XCircle className="h-4 w-4 text-red-500 shrink-0" />;
+      return <XCircle className="h-4 w-4 text-destructive shrink-0" />;
     case "schedule_cancelled":
       return <XCircle className="h-4 w-4 text-muted-foreground shrink-0" />;
     case "schedule_rescheduled":
@@ -81,7 +81,7 @@ export function NotificationBell() {
         >
           <Bell className="h-4.5 w-4.5 text-muted-foreground" />
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
+            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive/15 ring-2 ring-background" />
           )}
         </button>
       </PopoverTrigger>
@@ -96,7 +96,7 @@ export function NotificationBell() {
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">Notifications</h3>
             {unreadCount > 0 && (
-              <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-destructive/15 text-destructive px-1.5 py-0.5 rounded-full font-medium">
                 {unreadCount}
               </span>
             )}
@@ -129,7 +129,7 @@ export function NotificationBell() {
               {notifications.map((notif, i) => (
                 <div key={notif.id}>
                   <button
-                    className={`w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors ${!notif.read ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}
+                    className={`w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors ${!notif.read ? "bg-secondary " : ""}`}
                     onClick={() => {
                       if (!notif.read) {
                         markRead.mutate({ notificationId: notif.id });

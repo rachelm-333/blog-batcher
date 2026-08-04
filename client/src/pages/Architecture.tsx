@@ -67,14 +67,14 @@ function ArticleTypeSelect({
   const validTypes = VALID_TYPES_BY_LEVEL[level];
   if (level === "cornerstone") {
     return (
-      <span style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>
+      <span style={{ fontSize: 11, color: "#8E8E84", fontStyle: "italic" }}>
         Cornerstone Guide (fixed)
       </span>
     );
   }
   if (level === "cluster") {
     return (
-      <span style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>
+      <span style={{ fontSize: 11, color: "#8E8E84", fontStyle: "italic" }}>
         {ARTICLE_TYPE_LABELS[value as ArticleType] ?? "Specialist Post"}
       </span>
     );
@@ -86,7 +86,7 @@ function ArticleTypeSelect({
       onValueChange={(v) => onTypeChange(nodeId, v as ArticleType)}
       disabled={locked}
     >
-      <SelectTrigger style={{ height: 28, fontSize: 11, width: 160, border: "1px solid #e5e7eb" }}>
+      <SelectTrigger style={{ height: 28, fontSize: 11, width: 160, border: "1px solid rgba(14,14,12,0.08)" }}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -150,7 +150,7 @@ function LiveArchMap({
             <span
               style={{
                 background: "#0284c7",
-                color: "#fff",
+                color: "#F4F1E8",
                 fontSize: 9,
                 fontWeight: 700,
                 padding: "2px 7px",
@@ -173,7 +173,7 @@ function LiveArchMap({
               onTypeChange={onTypeChange}
             />
           ) : (
-            <span style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>
+            <span style={{ fontSize: 11, color: "#8E8E84", fontStyle: "italic" }}>
               {ARTICLE_TYPE_LABELS[pillarType]}
             </span>
           )}
@@ -186,8 +186,8 @@ function LiveArchMap({
               <div
                 key={clIdx}
                 style={{
-                  background: "#f9fafb",
-                  border: "1px solid #e5e7eb",
+                  background: "#EFEBDF",
+                  border: "1px solid rgba(14,14,12,0.08)",
                   borderRadius: 6,
                   padding: "8px 12px",
                   display: "flex",
@@ -198,8 +198,8 @@ function LiveArchMap({
               >
                 <span
                   style={{
-                    background: "#6b7280",
-                    color: "#fff",
+                    background: "#5A5A52",
+                    color: "#F4F1E8",
                     fontSize: 9,
                     fontWeight: 700,
                     padding: "2px 6px",
@@ -211,7 +211,7 @@ function LiveArchMap({
                 >
                   Cluster {label}.{clIdx + 1}
                 </span>
-                <span style={{ fontSize: 10, color: "#9ca3af" }}>800–1,200 w · Specialist Post</span>
+                <span style={{ fontSize: 10, color: "#8E8E84" }}>800–1,200 w · Specialist Post</span>
               </div>
             ))}
           </div>
@@ -373,7 +373,7 @@ export default function Architecture() {
   if (authLoading || archLoading || initDefault.isPending) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
       </div>
     );
   }
@@ -383,15 +383,15 @@ export default function Architecture() {
 
   return (
     <DashboardLayout>
-    <div style={{ background: "#faf9f5", minHeight: "100%" }}>
+    <div style={{ background: "#F4F1E8", minHeight: "100%" }}>
       <StageStepper currentStage={currentStage} />
       {/* Page header */}
-      <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "16px 24px" }}>
+      <div style={{ background: "#FBFAF4", borderBottom: "1px solid rgba(14,14,12,0.08)", padding: "16px 24px" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: "#0E0E0C", margin: 0 }}>
             Stage 2 — Blog Architecture
           </h1>
-          <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4, marginBottom: 0 }}>
+          <p style={{ fontSize: 13, color: "#5A5A52", marginTop: 4, marginBottom: 0 }}>
             Your content batch is a flat 2-tier hub — <strong>pillar pages</strong> with <strong>cluster posts</strong> under each (no cornerstone). Choose how many pillars, and how many clusters sit under each pillar.
           </p>
         </div>
@@ -417,7 +417,7 @@ export default function Architecture() {
               </div>
               {locked && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 99, fontSize: 11, fontWeight: 600, background: "#dcfce7", color: "#166534" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 99, fontSize: 11, fontWeight: 600, background: "#EFEBDF", color: "#5A5A52" }}>
                     <CheckCircle style={{ width: 12, height: 12 }} /> Confirmed
                   </span>
                   <Button
@@ -437,7 +437,7 @@ export default function Architecture() {
           <CardContent className="space-y-6">
             {/* Guardrail / dependency warnings */}
             {(guardrailWarnings.length > 0 || depWarnings.length > 0) && (
-              <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-sm text-amber-700">
+              <div className="flex items-start gap-2 rounded-lg bg-secondary border border-border px-4 py-3 text-sm text-[#C98A2B]">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   {[...depWarnings, ...guardrailWarnings].map((w, i) => (
@@ -450,7 +450,7 @@ export default function Architecture() {
             {/* Article count summary — live updating */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Pillars", value: liveBreakdown.totalPillars, colour: "text-sky-600" },
+                { label: "Pillars", value: liveBreakdown.totalPillars, colour: "text-foreground" },
                 { label: "Clusters", value: liveBreakdown.totalClusters, colour: "text-gray-500" },
                 { label: "Total Articles", value: liveBreakdown.total, colour: "text-foreground font-bold" },
               ].map((item) => (
@@ -467,9 +467,9 @@ export default function Architecture() {
             </div>
 
             {/* Flat 2-tier notice */}
-            <div className="rounded-lg bg-violet-500/5 border border-violet-500/20 px-4 py-3 text-sm text-muted-foreground">
+            <div className="rounded-lg bg-secondary border border-border px-4 py-3 text-sm text-muted-foreground">
               A flat 2-tier hub:{" "}
-              <strong className="text-sky-600">pillar pages</strong>{" → "}
+              <strong className="text-foreground">pillar pages</strong>{" → "}
               clusters under each pillar. <strong>No cornerstone.</strong> Each pillar's clusters
               are forced into different formats (how-to, comparison, listicle, troubleshooting, cost/ROI)
               so they never compete with each other.
@@ -482,7 +482,7 @@ export default function Architecture() {
               value={localPillars}
               min={MIN_PILLARS_PER_CORNERSTONE}
               max={MAX_PILLARS_PER_CORNERSTONE}
-              colour="text-sky-600"
+              colour="text-foreground"
               disabled={locked}
               onChange={handlePillarsChange}
             />
@@ -560,7 +560,7 @@ export default function Architecture() {
           <div className="flex justify-end">
             <Button
               size="lg"
-              className="bg-violet-600 hover:bg-violet-700 text-white px-8"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8"
               onClick={() => businessId && confirmArch.mutate({ businessId })}
               disabled={confirmArch.isPending}
             >
@@ -575,7 +575,7 @@ export default function Architecture() {
           <div className="flex justify-end">
             <Button
               size="lg"
-              className="bg-violet-600 hover:bg-violet-700 text-white px-8"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8"
               onClick={() => navigate("/keywords")}
             >
               Continue to Keyword Research →
@@ -586,35 +586,35 @@ export default function Architecture() {
 
         {/* ── Right-hand SEO explainer column ─────────────────────────────── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16, position: "sticky", top: 24 }}>
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 18px" }}>
+          <div style={{ background: "#FBFAF4", border: "1px solid rgba(14,14,12,0.08)", borderRadius: 12, padding: "20px 18px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Layers style={{ width: 16, height: 16, color: "#fff" }} />
+                <Layers style={{ width: 16, height: 16, color: "#F4F1E8" }} />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>Why Architecture Matters</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#0E0E0C" }}>Why Architecture Matters</span>
             </div>
-            <p style={{ fontSize: 13, color: "#4b5563", lineHeight: 1.6, margin: "0 0 14px" }}>
+            <p style={{ fontSize: 13, color: "#2C2C28", lineHeight: 1.6, margin: "0 0 14px" }}>
               Blog Batcher builds your content as a <strong>structured hierarchy</strong> — not just a list of posts.
               This is the proven SEO strategy that helps search engines see your site as an <strong>authority in your niche</strong>.
             </p>
 
             {/* Visual hierarchy diagram — flat 2-tier */}
-            <div style={{ background: "#faf9f5", borderRadius: 8, padding: "14px 12px", marginBottom: 14 }}>
+            <div style={{ background: "#F4F1E8", borderRadius: 8, padding: "14px 12px", marginBottom: 14 }}>
               {/* Pillars (top tier) */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
                 {["Pillar A", "Pillar B", "Pillar C"].map((label) => (
-                  <div key={label} style={{ background: "#dbeafe", borderRadius: 5, padding: "6px 8px", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#1e40af" }}>
+                  <div key={label} style={{ background: "#EFEBDF", borderRadius: 5, padding: "6px 8px", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#2C2C28" }}>
                     📄 {label}
-                    <div style={{ fontSize: 10, fontWeight: 400, color: "#3b82f6", marginTop: 1 }}>1,500–1,800 w</div>
+                    <div style={{ fontSize: 10, fontWeight: 400, color: "#5A5A52", marginTop: 1 }}>1,500–1,800 w</div>
                   </div>
                 ))}
               </div>
               {/* Arrow */}
-              <div style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", marginBottom: 6 }}>↑ Cluster posts link up to their pillar</div>
+              <div style={{ textAlign: "center", fontSize: 11, color: "#8E8E84", marginBottom: 6 }}>↑ Cluster posts link up to their pillar</div>
               {/* Clusters */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
                 {["How-to", "Comparison", "Listicle"].map((label) => (
-                  <div key={label} style={{ background: "#f3f4f6", borderRadius: 4, padding: "5px 6px", textAlign: "center", fontSize: 10, fontWeight: 500, color: "#6b7280" }}>
+                  <div key={label} style={{ background: "#EFEBDF", borderRadius: 4, padding: "5px 6px", textAlign: "center", fontSize: 10, fontWeight: 500, color: "#5A5A52" }}>
                     📝 {label}
                     <div style={{ fontSize: 9, marginTop: 1 }}>800–1,200 w</div>
                   </div>
@@ -622,20 +622,20 @@ export default function Architecture() {
               </div>
             </div>
 
-            <div style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.6 }}>
+            <div style={{ fontSize: 12, color: "#2C2C28", lineHeight: 1.6 }}>
               <p style={{ margin: "0 0 8px" }}>
-                <strong style={{ color: "#1e40af" }}>Pillar Pages</strong> — broad topic pages, one per theme.
+                <strong style={{ color: "#2C2C28" }}>Pillar Pages</strong> — broad topic pages, one per theme.
                 Each is the hub for a group of cluster posts that link up to it.
               </p>
               <p style={{ margin: 0 }}>
-                <strong style={{ color: "#6b7280" }}>Cluster Posts</strong> — short, focused articles, each a different
+                <strong style={{ color: "#5A5A52" }}>Cluster Posts</strong> — short, focused articles, each a different
                 format and search intent, targeting one precise long-tail keyword and linking up to its pillar.
               </p>
             </div>
           </div>
 
-          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "14px 16px" }}>
-            <p style={{ fontSize: 12, color: "#166534", lineHeight: 1.6, margin: 0 }}>
+          <div style={{ background: "#EFEBDF", border: "1px solid #D9F542", borderRadius: 10, padding: "14px 16px" }}>
+            <p style={{ fontSize: 12, color: "#5A5A52", lineHeight: 1.6, margin: 0 }}>
               <strong>This is ideal for SEO.</strong> When smaller, specific posts reference your larger posts with anchor text links,
               search engines understand the depth of your content and are more likely to rank your site as an authority in your niche.
               Blog Batcher SEO-optimises every article in this structure for you automatically.
@@ -643,16 +643,16 @@ export default function Architecture() {
           </div>
 
           {/* ── Tips Panel ────────────────────────────────────────────── */}
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 18px" }}>
+          <div style={{ background: "#FBFAF4", border: "1px solid rgba(14,14,12,0.08)", borderRadius: 12, padding: "20px 18px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
               <span style={{ fontSize: 16 }}>💡</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>Why architecture matters</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#0E0E0C" }}>Why architecture matters</span>
             </div>
 
             {/* Highlighted tip: the flat 2-tier hub */}
-            <div style={{ background: "#faf5ff", border: "1.5px solid #c4b5fd", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+            <div style={{ background: "#faf5ff", border: "1.5px solid rgba(14,14,12,0.16)", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed", background: "#ede9ff", padding: "2px 8px", borderRadius: 99 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed", background: "#EFEBDF", padding: "2px 8px", borderRadius: 99 }}>
                   ✦ Flat 2-tier hub
                 </span>
               </div>
@@ -660,7 +660,7 @@ export default function Architecture() {
                 Every batch is a flat <strong>pillar pages → clusters</strong> structure (no cornerstone) —
                 kept shallow so every post can rank on its own.
               </p>
-              <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.65, margin: 0, fontStyle: "italic" }}>
+              <p style={{ fontSize: 12, color: "#5A5A52", lineHeight: 1.65, margin: 0, fontStyle: "italic" }}>
                 Choose 3–6 pillars and 3–5 clusters each. More = deeper topical coverage.
               </p>
             </div>
@@ -669,13 +669,13 @@ export default function Architecture() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>📄</span>
-                <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.65, margin: 0 }}>
+                <p style={{ fontSize: 12, color: "#2C2C28", lineHeight: 1.65, margin: 0 }}>
                   <strong>Pillar pages are your topic hubs</strong> — each anchors a group of cluster posts on one theme.
                 </p>
               </div>
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🔗</span>
-                <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.65, margin: 0 }}>
+                <p style={{ fontSize: 12, color: "#2C2C28", lineHeight: 1.65, margin: 0 }}>
                   Each cluster article <strong>links back to its pillar</strong>, building your internal link structure automatically.
                 </p>
               </div>
