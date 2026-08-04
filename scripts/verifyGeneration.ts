@@ -133,7 +133,7 @@ async function main() {
   bodyHtml = linkRes.html;
   bodyHtml = removeOrphanFaqItems(bodyHtml).bodyHtml;
   bodyHtml = splitDenseParagraphs(bodyHtml, 4);
-  // 29-point enforcement (same order as the real pipeline)
+  // 27-point enforcement (same order as the real pipeline)
   bodyHtml = ensureQuestionH2s(bodyHtml).bodyHtml;                    // MIC-03
   bodyHtml = trimAnswersAfterH2(bodyHtml, 60).bodyHtml;              // MIC-05
   if (!hasList(bodyHtml)) {                                          // MIC-06
@@ -190,7 +190,7 @@ async function main() {
   console.log(`\nTitle: ${title}`);
   console.log(`Meta:  ${metaDescription}`);
 
-  // ---- 29-POINT GEO AUDIT on the full published-HTML doc ----
+  // ---- 27-POINT GEO AUDIT on the full published-HTML doc ----
   const schema = JSON.stringify({ "@context": "https://schema.org", "@graph": [
     { "@type": "Article" }, { "@type": "Organization" }, { "@type": "Person" }, { "@type": "FAQPage" },
   ] });
@@ -204,7 +204,7 @@ async function main() {
     url: `https://thestartupdeck.com.au/guides/${ctx.urlSlug}`,
     metaTitle, metaDescription,
   });
-  console.log(`\n=== 29-POINT GEO AUDIT: ${audit.normalized_score}/100 (raw ${audit.total_score}/${audit.applicable_max}) ===`);
+  console.log(`\n=== 27-POINT GEO AUDIT: ${audit.normalized_score}/100 (raw ${audit.total_score}/${audit.applicable_max}) ===`);
   for (const c of audit.checks) {
     if (c.passed === false) console.log(`  ❌ ${c.id} (${c.max_points}pt) ${c.parameter} — ${c.detail}`);
   }

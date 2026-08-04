@@ -1,5 +1,5 @@
 /**
- * auditRules.ts — the 29-point weighted SEO & GEO audit rules.
+ * auditRules.ts — the 27-point weighted SEO & GEO audit rules (site-level MAC-12/13 removed).
  *
  * SOURCE OF TRUTH: copied verbatim from the Gemini "29-Point Weighted JSON
  * Schema" directive (IDs, parameters, pass conditions, and max_points are
@@ -34,8 +34,9 @@ export const AUDIT_RULES: AuditRule[] = [
   { id: "MAC-09", phase: "Macro Architecture", parameter: "Internal Link (UP)", pass_condition: "Detects >=1 internal <a> tag where anchor text exactly matches a predefined Hub keyword.", max_points: 5 },
   { id: "MAC-10", phase: "Macro Architecture", parameter: "Internal Link (DOWN)", pass_condition: "If page is a Hub, detects internal <a> tags pointing to deeper cluster URLs.", max_points: 2 },
   { id: "MAC-11", phase: "Macro Architecture", parameter: "Internal Link (LATERAL)", pass_condition: "Detects >=1 internal <a> tag pointing to a sibling cluster URL.", max_points: 2 },
-  { id: "MAC-12", phase: "Macro Architecture", parameter: "Core Web Vitals", pass_condition: "API check confirms LCP, FID/INP, and CLS are within Google's passing thresholds.", max_points: 4, requiresLiveUrl: true },
-  { id: "MAC-13", phase: "Macro Architecture", parameter: "llms.txt Presence", pass_condition: "HTTP GET request to domain.com/llms.txt returns 200 OK.", max_points: 5, requiresLiveUrl: true },
+  // NOTE: MAC-12 (Core Web Vitals) and MAC-13 (llms.txt) were removed — they are
+  // site-level / live-URL checks a blog post cannot control, so the audit now covers
+  // only what a post itself can satisfy. 27 checks in total.
   { id: "MIC-01", phase: "Micro Architecture", parameter: "H1 Singularity", pass_condition: "Document contains exactly one <h1> tag.", max_points: 3 },
   { id: "MIC-02", phase: "Micro Architecture", parameter: "H1 Keyword Presence", pass_condition: "The single <h1> contains the primary target keyword.", max_points: 5 },
   { id: "MIC-03", phase: "Micro Architecture", parameter: "H2 Question Framing", pass_condition: "At least 50% of <h2> tags end in '?' or begin with Who/What/Where/Why/How/Do/Can.", max_points: 5 },
@@ -54,5 +55,5 @@ export const AUDIT_RULES: AuditRule[] = [
   { id: "EAT-08", phase: "E-E-A-T & Voice", parameter: "AI Buzzword Blocklist", pass_condition: "Zero instances of blocklisted words: delve, tapestry, bustling, testament, moreover.", max_points: 3 },
 ];
 
-/** Total available points across all 29 rules — must equal 100. */
+/** Total available points across all 27 rules (site-level MAC-12/13 removed). */
 export const AUDIT_MAX_POINTS = AUDIT_RULES.reduce((sum, r) => sum + r.max_points, 0);

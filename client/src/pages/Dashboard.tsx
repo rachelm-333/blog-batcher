@@ -126,25 +126,6 @@ export default function Dashboard() {
     makeLinksLiveMutation.mutate({ businessId: selectedBusinessId });
   }
 
-  // MAC-13 — generate the site's llms.txt and download it for hosting.
-  const [genLlms, setGenLlms] = useState(false);
-  async function handleGenerateLlmsTxt() {
-    if (!selectedBusinessId) return;
-    setGenLlms(true);
-    try {
-      const r = await utils.articles.generateLlmsTxt.fetch({ businessId: selectedBusinessId });
-      const blob = new Blob([r.content], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = "llms.txt"; a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`llms.txt generated (${r.postCount} published post${r.postCount !== 1 ? "s" : ""}). Host the downloaded file at ${r.hostAt} so AI search engines can find your content.`, { duration: 12000 });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate llms.txt");
-    } finally {
-      setGenLlms(false);
-    }
-  }
   const statusCounts = summary?.statusCounts;
   const bizName = summary?.business?.name ?? "Your business";
 
@@ -302,21 +283,6 @@ export default function Dashboard() {
                 {makeLinksLiveMutation.isPending ? "Linking…" : "Make internal links live"}
               </button>
             )}
-            <button
-              onClick={handleGenerateLlmsTxt}
-              disabled={genLlms}
-              title="Generate the site's llms.txt (lists your key pages + published posts for AI search engines). Download it and host it at yourdomain.com/llms.txt."
-              style={{
-                fontSize: 12, fontWeight: 600, color: "#3730a3",
-                border: "1px solid #c7d2fe", borderRadius: 8,
-                padding: "6px 14px", background: "#eef2ff",
-                cursor: genLlms ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", gap: 6, opacity: genLlms ? 0.6 : 1,
-              }}
-            >
-              <FileText style={{ width: 13, height: 13 }} />
-              {genLlms ? "Generating…" : "Generate llms.txt"}
-            </button>
           </div>
         </div>
 
