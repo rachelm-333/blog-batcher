@@ -34,6 +34,7 @@ import {
 } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
 import { invokeClaudeWithCost as invokeLLMWithCost } from "./claudeLLM";
+import { auditHtml } from "./auditEngine/auditEngine";
 import { getDb } from "./db";
 import { slugFromHref } from "../shared/slug";
 
@@ -174,18 +175,54 @@ export function trimHtmlToWordCount(
 // ---------------------------------------------------------------------------
 // Status badge thresholds (from scope Section 6.6)
 // ---------------------------------------------------------------------------
-// Badge thresholds based on Pass 1 (16-point checklist) score only.
-// Pass 1 score = (points_passed / 16) * 100
-// 16/16 = 100, 15/16 ≈ 94, 14/16 ≈ 88, 13/16 ≈ 81
+// Rating thresholds — based on the 27-point SEO/GEO audit (normalised /100).
+// 3-tier: Superb 85+ · Great 70–84 · Needs Work <70.
 export const BADGE_THRESHOLDS = {
-  authority_ready: 94,  // 15–16/16 points met (≥94 = 15 or 16 out of 16)
-  strong: 81,           // 13–14/16 points met
-  // below 81 = needs_review (12 or fewer points)
+  authority_ready: 85,  // "Superb"
+  strong: 70,           // "Great"
+  // below 70 = needs_review ("Needs Work")
 } as const;
 
-// Minimum Pass 1 score to surface to user without needs_review flag
-// 13/16 = 81.25 → rounds to 81
-export const MIN_DELIVERY_SCORE = 81;
+// HARD QUALITY FLOOR — the system must never surface a post below this. Sub-70
+// articles are auto-improved (up to MAX_IMPROVEMENT_ROUNDS) and only held for
+// review if they still can't clear it.
+export const MIN_DELIVERY_SCORE = 70;
+export const MAX_IMPROVEMENT_ROUNDS = 3;
+
+/** Map an audit score (/100) to the user-facing 3-tier rating. */
+export function auditRating(score: number): { label: "Superb" | "Great" | "Needs Work"; badge: "authority_ready" | "strong" | "needs_review" } {
+  if (score >= BADGE_THRESHOLDS.authority_ready) return { label: "Superb", badge: "authority_ready" };
+  if (score >= BADGE_THRESHOLDS.strong) return { label: "Great", badge: "strong" };
+  return { label: "Needs Work", badge: "needs_review" };
+}
+
+/**
+ * Per-check remediation instructions for the ≥70 improvement loop — mirrors the
+ * Bloginator repair playbook. Given a failed audit check id, returns a surgical
+ * LLM instruction to fix it (deterministic checks are handled separately).
+ */
+export const AUDIT_FIX_INSTRUCTIONS: Record<string, string> = {
+  "MAC-04": "Ensure the primary keyword appears in BOTH the meta title and meta description.",
+  "MAC-05": "Add valid JSON-LD Article schema in a <script type=\"application/ld+json\"> block.",
+  "MAC-06": "Add a visible FAQ section AND matching FAQPage JSON-LD schema.",
+  "MAC-07": "Add Organization JSON-LD schema for the business.",
+  "MAC-08": "Add Author (Person) JSON-LD schema.",
+  "MIC-02": "Edit the single <h1> so it contains the exact primary keyword, read naturally.",
+  "MIC-03": "Rewrite headings so at least half of the <h2>s are the exact question a user would search (end with '?').",
+  "MIC-04": "Add <h3> action-step subheadings under the <h2> sections.",
+  "MIC-05": "Make the first paragraph after each <h2> a direct 40–60 word answer.",
+  "MIC-06": "Convert the most list-like paragraph into a <ul> with one <li> per item.",
+  "MIC-07": "Present comparison data as a bold-label bullet list: <li><strong>Label:</strong> detail</li> (≥2 items). No <table>.",
+  "MIC-08": "Split any paragraph longer than 4 sentences into shorter paragraphs.",
+  "EAT-01": "Weave in a concrete, real statistic or number (never fabricated).",
+  "EAT-02": "Add genuine first-hand experience phrasing (e.g. 'in our experience…').",
+  "EAT-03": "Name a common mistake or approach that doesn't work.",
+  "EAT-04": "Add an attributed <blockquote> quoting a real, well-known industry organisation, with a live link to it.",
+  "EAT-05": "Add one outbound link to a real .gov/.gov.au/.edu/.edu.au resource, root domain.",
+  "EAT-06": "Add a second outbound link to a different well-known industry authority (root domain).",
+  "EAT-07": "Rewrite passive sentences into active voice.",
+  "EAT-08": "Remove the AI buzzwords delve/tapestry/bustling/testament/moreover.",
+};
 
 // ---------------------------------------------------------------------------
 // Banned AI fingerprint phrases (from scope Section 6.4)
@@ -2971,21 +3008,72 @@ ${bodyHtml}`;
     }
 
     // =========================================================================
-    // STEP 6 — DERIVE BADGE AND RETURN
+    // STEP 5B — 27-POINT AUDIT + HARD ≥70 QUALITY FLOOR
+    // The finished article is scored on the 27-point SEO/GEO audit. If it's below
+    // MIN_DELIVERY_SCORE, run up to MAX_IMPROVEMENT_ROUNDS targeted improvement
+    // passes (deterministic fixers + one surgical LLM pass on the failing checks),
+    // re-scoring each round. The system NEVER surfaces a post below the floor —
+    // if it still can't clear it, the article is flagged needs_review.
     // =========================================================================
-    let { internalScore, statusBadge } = deriveStatusBadge(pass1.score, pass2.score);
-    // Only override to needs_review if Pass 2 failed AND Pass 1 also failed.
-    // If Pass 1 >= 14/16 (score >= 81), the article is objectively good — do not
-    // penalise it for a subjective Pass 2 score that the model couldn't improve.
-    if (pass2.score < 80 && improvementAttempts > 0 && pass1.score < MIN_DELIVERY_SCORE) {
+    const buildAuditDoc = () => {
+      const withH1 = /<h1[\s>]/i.test(bodyHtml) ? bodyHtml : `<h1>${title}</h1>${bodyHtml}`;
+      const schemaTag = schemaMarkupFinal ? `<script type="application/ld+json">${schemaMarkupFinal}</script>` : "";
+      return `<html><head><title>${metaTitle}</title><meta name="description" content="${metaDescription}">${schemaTag}</head><body>${withH1}</body></html>`;
+    };
+    const runAudit = () => auditHtml({
+      html: buildAuditDoc(),
+      primaryKeyword: ctx.primaryKeyword,
+      hubKeyword: ctx.parentKeyword,
+      url: `${(ctx.websiteUrl ?? "https://example.com").replace(/\/+$/, "")}/${ctx.urlSlug}`,
+      metaTitle,
+      metaDescription,
+      isHub: ctx.level !== "cluster",
+    });
+
+    let audit = runAudit();
+    let improvementRounds = 0;
+    console.log(`[ArticleEngine] 27-point audit for node ${nodeId}: ${audit.normalized_score}/100`);
+    while (audit.normalized_score < MIN_DELIVERY_SCORE && improvementRounds < MAX_IMPROVEMENT_ROUNDS) {
+      improvementRounds++;
+      const failed = audit.failed_checks.map((f) => f.id);
+      console.log(`[ArticleEngine] Node ${nodeId} below floor (${audit.normalized_score} < ${MIN_DELIVERY_SCORE}) — improvement round ${improvementRounds}; failing: ${failed.join(", ")}`);
+
+      // Deterministic fixes first (cheap, safe, no LLM).
+      bodyHtml = ensureQuestionH2s(bodyHtml).bodyHtml;
+      bodyHtml = trimAnswersAfterH2(bodyHtml, 60).bodyHtml;
+      bodyHtml = splitDenseParagraphs(bodyHtml, 4);
+      bodyHtml = ensureKeywordInH2(bodyHtml, ctx.primaryKeyword).bodyHtml;
+      bodyHtml = ensureKeywordInH3(bodyHtml, ctx.primaryKeyword).bodyHtml;
+
+      // One combined surgical LLM pass for the remaining body/link/E-E-A-T checks
+      // (schema checks MAC-05/06/07/08 are set by generation, not the body).
+      const surgicalTargets = failed.filter((id) => AUDIT_FIX_INSTRUCTIONS[id] && !id.startsWith("MAC-0"));
+      if (surgicalTargets.length) {
+        const instr = "Improve this article so it passes these SEO/GEO checks. Make the smallest edits that fix each. Do NOT fabricate facts, statistics, quotes, or links:\n" +
+          surgicalTargets.map((id) => `- ${id}: ${AUDIT_FIX_INSTRUCTIONS[id]}`).join("\n");
+        bodyHtml = await surgicalHtmlRepair(bodyHtml, instr, { userId, nodeId, feature: "article_generation" });
+      }
+      wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+      audit = runAudit();
+      console.log(`[ArticleEngine] Node ${nodeId} after improvement round ${improvementRounds}: ${audit.normalized_score}/100`);
+    }
+    const auditScore = audit.normalized_score;
+    const belowFloor = auditScore < MIN_DELIVERY_SCORE;
+
+    // =========================================================================
+    // STEP 6 — DERIVE RATING AND RETURN (based on the 27-point audit)
+    // =========================================================================
+    const rating = auditRating(auditScore);
+    let internalScore = auditScore;
+    let statusBadge: "authority_ready" | "strong" | "needs_review" = rating.badge;
+    if (belowFloor) {
+      // Never surface a sub-floor post as ready — hold it for review.
       statusBadge = "needs_review";
-      console.log(`[ArticleEngine] Badge overridden to needs_review for node ${nodeId} (Pass 1 ${pass1.score}/100, Pass 2 ${pass2.score}/100 after improvement attempt)`);
-    } else if (pass2.score < 80 && improvementAttempts > 0) {
-      console.log(`[ArticleEngine] Pass 2 score ${pass2.score}/100 after improvement attempt — badge kept as ${statusBadge} because Pass 1 passed (${pass1.score}/100)`);
+      console.warn(`[ArticleEngine] Node ${nodeId} still below ${MIN_DELIVERY_SCORE}/100 after ${improvementRounds} improvement round(s) (best ${auditScore}). Flagged needs_review.`);
     }
 
     const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1);
-    console.log(`[ArticleEngine] Complete for node ${nodeId}: Pass 1 ${pass1.score}/100, Pass 2 ${pass2.score}/100, badge=${statusBadge}, total=${totalElapsed}s`);
+    console.log(`[ArticleEngine] Complete for node ${nodeId}: audit ${auditScore}/100 (${rating.label}), Pass 1 ${pass1.score}/100, Pass 2 ${pass2.score}/100, badge=${statusBadge}, rounds=${improvementRounds}, total=${totalElapsed}s`);
 
     return {
       title,

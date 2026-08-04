@@ -374,14 +374,14 @@ export default function ArticleGeneration() {
                       <td style={{ padding:"12px 16px" }}>
                         {article.internalScore != null ? (
                           <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
-                            {/* Checkpoint 1 — SEO Structure */}
+                            {/* SEO/GEO rating — 27-point audit, 3-tier */}
                             {(() => {
-                              const pts = Math.round((article.internalScore / 100) * 16);
-                              const color = pts >= 15 ? "#D9F542" : pts >= 13 ? "#5A5A52" : "#C98A2B";
-                              const bg = pts >= 15 ? "#EFEBDF" : pts >= 13 ? "#EFEBDF" : "#EFEBDF";
+                              const s = article.internalScore;
+                              const label = s >= 85 ? "Superb" : s >= 70 ? "Great" : "Needs Work";
+                              const color = s >= 85 ? "#3f6212" : s >= 70 ? "#5A5A52" : "#C98A2B";
                               return (
-                                <span style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:99, fontSize:10, fontWeight:600, background:bg, color, whiteSpace:"nowrap" }}>
-                                  ✓1 {pts}/16
+                                <span style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:99, fontSize:10, fontWeight:600, background:"#EFEBDF", color, whiteSpace:"nowrap" }}>
+                                  {label} · {s}/100
                                 </span>
                               );
                             })()}

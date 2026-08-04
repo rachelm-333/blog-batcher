@@ -392,27 +392,28 @@ describe("AI fingerprint scrub pass", () => {
 // ---------------------------------------------------------------------------
 
 describe("Status badge derivation", () => {
-  it("authority_ready badge when combined score ≥ 90", () => {
+  // 3-tier rating on the 27-point audit score: Superb 85+ · Great 70–84 · Needs Work <70.
+  it("authority_ready (Superb) badge when score ≥ 85", () => {
     const { statusBadge, internalScore } = deriveStatusBadge(95, 95);
     expect(statusBadge).toBe("authority_ready");
     expect(internalScore).toBeGreaterThanOrEqual(BADGE_THRESHOLDS.authority_ready);
   });
 
-  it("strong badge when combined score is 80–89", () => {
-    const { statusBadge, internalScore } = deriveStatusBadge(85, 80);
+  it("strong (Great) badge when score is 70–84", () => {
+    const { statusBadge, internalScore } = deriveStatusBadge(78, 80);
     expect(statusBadge).toBe("strong");
     expect(internalScore).toBeGreaterThanOrEqual(BADGE_THRESHOLDS.strong);
     expect(internalScore).toBeLessThan(BADGE_THRESHOLDS.authority_ready);
   });
 
-  it("needs_review badge when combined score < 80", () => {
-    const { statusBadge, internalScore } = deriveStatusBadge(70, 65);
+  it("needs_review (Needs Work) badge when score < 70", () => {
+    const { statusBadge, internalScore } = deriveStatusBadge(65, 65);
     expect(statusBadge).toBe("needs_review");
     expect(internalScore).toBeLessThan(BADGE_THRESHOLDS.strong);
   });
 
   it("Combined score is Pass 1 only (Pass 2 is advisory)", () => {
-    // Badge is now based solely on Pass 1 score — Pass 2 is stored but does not affect badge
+    // deriveStatusBadge is retained for compatibility; it scores on its first arg.
     const { internalScore } = deriveStatusBadge(100, 0);
     expect(internalScore).toBe(100);
   });
@@ -422,19 +423,16 @@ describe("Status badge derivation", () => {
     expect(internalScore).toBe(100);
   });
 
-  it("MIN_DELIVERY_SCORE is 81 (13/16 points = auto-regenerate threshold)", () => {
-    // 13/16 * 100 = 81.25, rounded to 81
-    expect(MIN_DELIVERY_SCORE).toBe(81);
+  it("MIN_DELIVERY_SCORE is 70 (hard quality floor — never surface below this)", () => {
+    expect(MIN_DELIVERY_SCORE).toBe(70);
   });
 
-  it("BADGE_THRESHOLDS.authority_ready is 94 (15/16 points)", () => {
-    // 15/16 * 100 = 93.75, rounded to 94
-    expect(BADGE_THRESHOLDS.authority_ready).toBe(94);
+  it("BADGE_THRESHOLDS.authority_ready is 85 (Superb)", () => {
+    expect(BADGE_THRESHOLDS.authority_ready).toBe(85);
   });
 
-  it("BADGE_THRESHOLDS.strong is 81 (13/16 points)", () => {
-    // 13/16 * 100 = 81.25, rounded to 81
-    expect(BADGE_THRESHOLDS.strong).toBe(81);
+  it("BADGE_THRESHOLDS.strong is 70 (Great)", () => {
+    expect(BADGE_THRESHOLDS.strong).toBe(70);
   });
 });
 
@@ -1077,9 +1075,8 @@ describe("Surgical fix pass — two-track architecture", () => {
 });
 
 describe("Surgical fix pass — needs_review badge", () => {
-  it("deriveStatusBadge returns needs_review when Pass 1 score is below strong threshold", () => {
-    // When Pass 2 score is still <80 after the quality fix attempt, the engine overrides badge to needs_review.
-    const { statusBadge } = deriveStatusBadge(70, 65);
+  it("deriveStatusBadge returns needs_review when score is below the Great threshold (70)", () => {
+    const { statusBadge } = deriveStatusBadge(60, 65);
     expect(statusBadge).toBe("needs_review");
   });
 

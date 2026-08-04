@@ -466,7 +466,7 @@ function StatusBadgeChip({
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-foreground">
         <Trophy className="h-3 w-3" />
-        Authority Ready
+        Superb
       </span>
     );
   }
@@ -474,14 +474,14 @@ function StatusBadgeChip({
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary">
         <Zap className="h-3 w-3" />
-        Strong
+        Great
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-[#C98A2B]">
       <AlertTriangle className="h-3 w-3" />
-      Needs Review
+      Needs Work
     </span>
   );
 }
@@ -1245,15 +1245,15 @@ export default function ArticleReview() {
                           variant="outline"
                           type="button"
                           className="h-6 text-[10px] px-2 border-destructive/50 text-destructive hover:bg-destructive/10"
-                          disabled={retryPublish.isPending && retryPublish.variables?.articleId === item.id}
-                          onClick={() => item.id && retryPublish.mutate({ articleId: item.id })}
+                          disabled={regenerate.isPending && regenerate.variables?.articleId === item.id}
+                          onClick={() => item.id && regenerate.mutate({ articleId: item.id })}
                         >
-                          {retryPublish.isPending && retryPublish.variables?.articleId === item.id ? (
+                          {regenerate.isPending && regenerate.variables?.articleId === item.id ? (
                             <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />
                           ) : (
                             <RefreshCw className="h-2.5 w-2.5 mr-1" />
                           )}
-                          Retry publish
+                          Retry blog post
                         </Button>
                         <Button
                           size="sm"
@@ -1275,17 +1275,14 @@ export default function ArticleReview() {
                   {item.internalScore != null && (
                     <div className="mt-1 flex gap-1">
                       {(() => {
-                        const displayScore = item.internalScore != null ? Math.round((item.internalScore / 100) * 16) : null;
-                        if (displayScore == null) return null;
+                        const s = item.internalScore;
+                        if (s == null) return null;
+                        const label = s >= 85 ? "Superb" : s >= 70 ? "Great" : "Needs Work";
                         return (
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                            displayScore >= 15
-                              ? "bg-secondary text-foreground"
-                              : displayScore >= 13
-                              ? "bg-secondary text-foreground"
-                              : "bg-secondary text-[#C98A2B]"
+                            s >= 70 ? "bg-secondary text-foreground" : "bg-secondary text-[#C98A2B]"
                           }`}>
-                            ✓1 {displayScore}/16
+                            {label} · {s}/100
                           </span>
                         );
                       })()}
@@ -1700,17 +1697,38 @@ export default function ArticleReview() {
                   </Button>
                 </div>
               ) : selectedItem.status === "failed" ? (
+                (() => {
+                  // Distinguish a GENERATION failure (empty article — must regenerate)
+                  // from a PUBLISH failure (article exists — retry publishing).
+                  const isGenFailure = !selectedItem.errorMessage || /generat/i.test(selectedItem.errorMessage);
+                  return (
                 <div className="space-y-2">
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive">
                     <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
                     <div>
-                      <div className="font-semibold">Publish failed</div>
+                      <div className="font-semibold">{isGenFailure ? "Generation failed" : "Publish failed"}</div>
                       {selectedItem.errorMessage && (
                         <div className="mt-1 text-destructive">{selectedItem.errorMessage}</div>
                       )}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
+                    {isGenFailure ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                      onClick={() => selectedItem.id && regenerate.mutate({ articleId: selectedItem.id })}
+                      disabled={regenerate.isPending || keepAndReview.isPending}
+                    >
+                      {regenerate.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                      )}
+                      Retry blog post
+                    </Button>
+                    ) : (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1725,6 +1743,7 @@ export default function ArticleReview() {
                       )}
                       Retry Publish
                     </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
@@ -1739,6 +1758,8 @@ export default function ArticleReview() {
                     </Button>
                   </div>
                 </div>
+                  );
+                })()
               ) : selectedItem.status === "published" ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary border border-border text-xs text-foreground">
