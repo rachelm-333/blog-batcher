@@ -283,10 +283,10 @@ export default function Architecture() {
   const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
 
-  // Flat 2-tier shape: NO cornerstone. The user picks the pillar count (1–6) and
-  // the clusters-per-pillar count (3–5).
+  // Flat 2-tier shape: NO cornerstone. Exactly ONE pillar (fixed); the only lever
+  // the user has is the clusters-per-pillar count (3–5).
   const localCornerstones = FIXED_CORNERSTONES; // 0
-  const [localPillars, setLocalPillars] = useState<number>(FIXED_PILLARS_PER_CORNERSTONE);
+  const localPillars = FIXED_PILLARS_PER_CORNERSTONE; // 1 — fixed, no slider
   const [localClusters, setLocalClusters] = useState(DEFAULT_CLUSTERS_PER_PILLAR);
   const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
 
@@ -318,16 +318,14 @@ export default function Architecture() {
     }
   }, [archLoading, businessId, archData?.architecture]);
 
-  // Sync the pillar + clusters sliders with the saved DB values when arch loads.
-  // (Cornerstone count is always 0 in flat 2-tier, so it is never read back.)
+  // Sync the clusters slider with the saved DB value when arch loads.
+  // (Cornerstone=0 and pillar count=1 are fixed, so they are never read back.)
   useEffect(() => {
     if (arch) {
-      setLocalPillars(arch.pillarCount ?? FIXED_PILLARS_PER_CORNERSTONE);
       setLocalClusters(arch.clustersPerPillar ?? DEFAULT_CLUSTERS_PER_PILLAR);
     }
-  }, [arch?.pillarCount, arch?.clustersPerPillar]);
+  }, [arch?.clustersPerPillar]);
 
-  const handlePillarsChange = (v: number) => setLocalPillars(v);
   const handleClustersChange = (v: number) => setLocalClusters(v);
 
   // Live breakdown (raw slider values, no guardrail correction)
@@ -475,19 +473,15 @@ export default function Architecture() {
               so they never compete with each other.
             </div>
 
-            {/* Pillar count (1–6) */}
-            <SliderRow
-              label="Pillar Pages"
-              subtitle="Broad topic pages — 1,500–1,800 words. Each anchors a group of cluster posts. Choose 1–6 (even a single pillar over 3–5 clusters is a strong focused hub)."
-              value={localPillars}
-              min={MIN_PILLARS_PER_CORNERSTONE}
-              max={MAX_PILLARS_PER_CORNERSTONE}
-              colour="text-foreground"
-              disabled={locked}
-              onChange={handlePillarsChange}
-            />
+            {/* Pillar count is fixed at 1 — no slider */}
+            <div className="rounded-lg bg-secondary border border-border px-4 py-3">
+              <div className="text-sm font-medium text-foreground">1 Pillar Page</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your batch is built as one focused pillar page (1,500–1,800 words) with its cluster posts beneath it — a tight, high-authority topic hub.
+              </p>
+            </div>
 
-            {/* Clusters per pillar (3–5) */}
+            {/* Clusters per pillar (3–5) — the only adjustable lever */}
             <SliderRow
               label="Cluster Articles (per pillar post)"
               subtitle="Specific, focused posts — 800–1,200 words. Each cluster links back to its pillar. Choose 3–5 per pillar."
@@ -501,9 +495,8 @@ export default function Architecture() {
 
             {/* Architecture summary sentence */}
             <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-4 py-3">
-              <strong>{localPillars}</strong> pillar{localPillars !== 1 ? "s" : ""}
-              {" × "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""} each
-              {" + "}<strong>{localPillars}</strong> pillar page{localPillars !== 1 ? "s" : ""}
+              <strong>1</strong> pillar page
+              {" + "}<strong>{localClusters}</strong> cluster{localClusters !== 1 ? "s" : ""}
               {" = "}<strong>{liveBreakdown.total} articles total</strong>
             </p>
 

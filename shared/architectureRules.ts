@@ -43,7 +43,7 @@ export const MIN_CORNERSTONES = 0;   // 2-tier = 0 cornerstones
 export const MAX_CORNERSTONES = 0;
 /** The fixed, non-negotiable parts of the creation architecture (flat 2-tier). */
 export const FIXED_CORNERSTONES = 0;
-export const FIXED_PILLARS_PER_CORNERSTONE = 3;
+export const FIXED_PILLARS_PER_CORNERSTONE = 1;
 
 export const ARTICLE_TYPES = [
   "cornerstone_guide",
@@ -105,11 +105,12 @@ export const WORD_COUNT_TARGETS: Record<"cornerstone" | "pillar" | "cluster", { 
 
 // ─── Default architectures ────────────────────────────────────────────────────
 
-// Default = flat 2-tier: 0 cornerstones × 3 pillars × 3 clusters = 12 articles.
+// Default = flat 2-tier focused hub: 0 cornerstones × 1 pillar × 3 clusters = 4 articles.
+// The pillar count is fixed at 1; only the clusters-per-pillar is user-adjustable (3–5).
 export const DEFAULT_ARCHITECTURE = {
   cornerstones: 0,
-  pillarsPerCornerstone: 3,
-  clustersPerPillar: MIN_CLUSTERS_PER_PILLAR, // 3 clusters per pillar
+  pillarsPerCornerstone: FIXED_PILLARS_PER_CORNERSTONE, // 1
+  clustersPerPillar: MIN_CLUSTERS_PER_PILLAR, // 3 clusters
 };
 
 // ─── Calculation helpers ──────────────────────────────────────────────────────
