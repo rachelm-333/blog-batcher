@@ -605,8 +605,10 @@ export default function Keywords() {
               <p style={{ fontSize:11, color:"#92400e", margin:"0 0 4px", opacity:0.85 }}>Already built for this business:</p>
               {prior.map((b) => (
                 <div key={b.batchNumber} style={{ fontSize:12, color:"#78350f", lineHeight:1.5 }}>
-                  <strong>Batch {b.batchNumber}</strong> ({b.total} posts): {Array.from(new Set(b.themes.length ? b.themes : b.allKeywords)).slice(0, 6).join(", ")}
-                  {Array.from(new Set(b.allKeywords)).length > 6 ? "…" : ""}
+                  <strong>Batch {b.batchNumber}</strong> ({b.total} posts)
+                  {b.focusKeyword
+                    ? <> — focus: <strong>{b.focusKeyword}</strong></>
+                    : <>: {Array.from(new Set(b.themes.length ? b.themes : b.allKeywords)).slice(0, 6).join(", ")}{Array.from(new Set(b.allKeywords)).length > 6 ? "…" : ""}</>}
                 </div>
               ))}
             </div>
