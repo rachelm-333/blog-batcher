@@ -351,6 +351,8 @@ export const blogArchitectures = mysqlTable("blog_architectures", {
   totalArticleCount: int("totalArticleCount").notNull(),
   /** Whether the user has confirmed this architecture and advanced to Stage 3. */
   confirmed: boolean("confirmed").default(false).notNull(),
+  /** The focus/theme keyword the user entered for this batch (seeds the hub; never used verbatim as an article keyword). Nullable for pre-existing batches. */
+  focusKeyword: varchar("focusKeyword", { length: 512 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

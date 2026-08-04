@@ -19,6 +19,7 @@ import {
   businesses,
   businessServices,
   brandVoice,
+  blogArchitectures,
   keywords,
   keywordSeeds,
   selectedKeywords,
@@ -786,6 +787,12 @@ export const keywordsRouter = router({
           .where(eq(articleNodes.id, a.nodeId));
       }
 
+      // Record the focus/theme keyword for this batch (for the "already built"
+      // history + cross-batch guidance). Seed only — never used verbatim as a keyword.
+      await db.update(blogArchitectures)
+        .set({ focusKeyword: input.cornerstoneKeyword.trim() })
+        .where(and(eq(blogArchitectures.businessId, input.businessId), eq(blogArchitectures.batchNumber, activeBatch)));
+
       return {
         assigned: assignments.length,
         warnings,
@@ -868,11 +875,22 @@ export const keywordsRouter = router({
         .where(eq(keywords.businessId, input.businessId))
         .orderBy(keywords.batchNumber, articleNodes.sortOrder);
 
-      // Group by batch: expose the "headline" keywords (cornerstone/pillar level)
-      // as the batch's themes, and count every article.
-      const byBatch = new Map<number, { batchNumber: number; total: number; themes: string[]; allKeywords: string[] }>();
+      // The stored focus keyword per batch (the seed the user typed). Nullable for
+      // batches created before this field existed → we fall back to pillar keywords.
+      const archRows = await db
+        .select({ batchNumber: blogArchitectures.batchNumber, focusKeyword: blogArchitectures.focusKeyword })
+        .from(blogArchitectures)
+        .where(eq(blogArchitectures.businessId, input.businessId));
+      const focusByBatch = new Map<number, string>();
+      for (const a of archRows as Array<{ batchNumber: number; focusKeyword: string | null }>) {
+        if (a.focusKeyword) focusByBatch.set(a.batchNumber, a.focusKeyword);
+      }
+
+      // Group by batch: expose the stored focus keyword (or headline pillar keywords
+      // as a fallback) as the batch's theme, and count every article.
+      const byBatch = new Map<number, { batchNumber: number; total: number; focusKeyword: string | null; themes: string[]; allKeywords: string[] }>();
       for (const r of rows) {
-        const b = byBatch.get(r.batchNumber) ?? { batchNumber: r.batchNumber, total: 0, themes: [], allKeywords: [] };
+        const b = byBatch.get(r.batchNumber) ?? { batchNumber: r.batchNumber, total: 0, focusKeyword: focusByBatch.get(r.batchNumber) ?? null, themes: [], allKeywords: [] };
         b.total += 1;
         if (r.primaryKeyword) {
           b.allKeywords.push(r.primaryKeyword);
