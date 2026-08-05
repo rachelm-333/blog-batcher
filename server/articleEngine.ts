@@ -35,6 +35,7 @@ import {
 import { invokeLLM } from "./_core/llm";
 import { invokeClaudeWithCost as invokeLLMWithCost } from "./claudeLLM";
 import { auditHtml } from "./auditEngine/auditEngine";
+import { getAuthorityLinks, authorityPromptBlock } from "./authorityLinks";
 import { getDb } from "./db";
 import { slugFromHref } from "../shared/slug";
 
@@ -1900,6 +1901,7 @@ Note: External authority links (government, industry body, nationally recognised
 8. META DESCRIPTION: Must include the EXACT primary keyword phrase "${ctx.primaryKeyword}" verbatim. Exactly 140–160 characters. Written for CTR.
 9. OPENING ANSWER BLOCK: Immediately after the H1, include a direct-answer block that answers the most likely search question in 40–60 words. Format: start with the question as a bold line or <strong> tag, then answer it directly in 1–2 sentences. This block must be present and clearly formatted for Google Featured Snippet extraction.
 10. EXTERNAL AUTHORITY LINKS: You MUST include at least TWO hyperlinks to real, well-known, popular, authoritative sources that are DIRECTLY relevant to the article topic and the business's target market — each to a DIFFERENT source. At least ONE of these two links MUST point to a .gov, .gov.au, .edu, or .edu.au domain (e.g. https://business.gov.au, https://www.ato.gov.au, https://www.accc.gov.au, https://www.fairwork.gov.au) — this is mandatory; do not substitute a commercial or news site for it. The other link can be a recognised brand, major publication, or industry body relevant to the niche. CRITICAL RULES: (a) Link ONLY to the ROOT DOMAIN / homepage of each source (e.g. https://www.gordonramsay.com, https://business.gov.au) — never invent a deep sub-page path. (b) Each source must be genuinely well-known and popular — not obscure. (c) If you cannot name a second non-government source, still include the mandatory government link. (d) These links will be live-checked before publishing — a 404 or dead URL will be automatically stripped. Use descriptive anchor text.
+${authorityPromptBlock(ctx.industry)}
 11. INTERNAL CTA LINK: At least one link back to the business (shop, product, service, bookings, or testimonials page). Anchor text only.
 12. INTERNAL BLOG LINKS: You MUST include at minimum 2 internal links to OTHER articles in this batch. Use ONLY the real slugs from the LINK ALLOWLIST above — do NOT invent, guess, or construct any URL. If fewer than 2 batch slugs are available, link to as many as exist.${ctx.level === "pillar" && ctx.childClusterUrls && ctx.childClusterUrls.length ? `
 12b. PILLAR DOWN-LINKS (MANDATORY): This is a pillar page — it is the hub for its cluster posts. You MUST link DOWN to EVERY one of these cluster posts, each with descriptive anchor text, woven naturally into the relevant section: ${ctx.childClusterUrls.join(", ")}. Every one of these must appear as a link.` : ""}${ctx.level === "cluster" && ctx.parentPillarUrl ? `
@@ -2466,9 +2468,10 @@ export async function generateSingleArticle(
     // Runs AFTER the link stripper (STEP 2.6) so we validate the surviving links.
     if (!hasGovEduLink(bodyHtml)) {
       console.log(`[ArticleEngine] No .gov/.edu link found — running EAT-05 surgical repair on node ${nodeId}`);
+      const govSuggestions = getAuthorityLinks(ctx.industry).govEdu.slice(0, 5).join(", ");
       bodyHtml = await surgicalHtmlRepair(
         bodyHtml,
-        `This article has no outbound link to a .gov / .gov.au / .edu / .edu.au domain. Insert exactly ONE such link into the most contextually appropriate existing paragraph, using descriptive anchor text and a REAL, live Australian government or educational resource relevant to the topic (e.g. https://business.gov.au, https://www.ato.gov.au, https://www.accc.gov.au, https://www.fairwork.gov.au). Link only to the root domain. Change nothing else.`,
+        `This article has no outbound link to a .gov / .gov.au / .edu / .edu.au domain. Insert exactly ONE such link into the most contextually appropriate existing paragraph, using descriptive anchor text and a REAL, live Australian government or educational resource relevant to the topic. Prefer one of these vetted sources: ${govSuggestions}. Link only to the root domain. Change nothing else.`,
         { userId, nodeId },
       );
       wordCount = bodyHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
