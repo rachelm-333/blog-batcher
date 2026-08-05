@@ -2260,6 +2260,13 @@ export default function ArticleReview() {
                     <span className="text-xs font-semibold text-foreground">Copy for Manual Publishing</span>
                     <span className="ml-auto text-[10px] text-muted-foreground">Click any field to copy</span>
                   </div>
+                  {/* Manual-publishing internal-link warning */}
+                  <div className="px-4 py-2.5 bg-[#C98A2B]/10 border-b border-[#C98A2B]/30 flex items-start gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 text-[#C98A2B] mt-0.5 shrink-0" />
+                    <p className="text-[11px] leading-snug text-[#C98A2B]">
+                      <span className="font-semibold">Publishing these manually?</span> Internal links between your posts only work once each target post is <span className="font-semibold">live</span>. Publish all the posts first, then go back and add the internal links using the other post's title as the anchor text — pointing at its real live URL. Don't link to a post that isn't published yet, or you'll create a 404. (If you publish through Blog Batcher instead, the <span className="font-semibold">"Make internal links live"</span> button on the Dashboard does this for you automatically.)
+                    </p>
+                  </div>
                   <div className="divide-y divide-border">
                     {([
                       { label: "URL Slug", value: (fullArticle as any).urlSlug ?? "" },
